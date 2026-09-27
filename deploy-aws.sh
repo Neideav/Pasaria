@@ -1,56 +1,134 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Shopcart AWS EC2 Deployment & Permissions Script
+# Shopcart — AWS EC2 (Ubuntu + Apache2) + RDS MariaDB Deployment Script
 # =============================================================================
-set -e
+# Cara penggunaan:
+#   1. Upload/git clone repo ke /var/www/shopcart
+#   2. Salin .env.example ke .env dan isi variabel DB_HOST, DB_PASSWORD, dll.
+#   3. Jalankan: bash deploy-aws.sh
+# =============================================================================
+set -euo pipefail
 
-echo "🚀 Starting Shopcart deployment on AWS EC2..."
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WEB_USER="www-data"
 
-# 1. Pastikan file .env ada
-if [ ! -f ".env" ]; then
-    echo "⚠️  File .env tidak ditemukan. Menyalin dari .env.example..."
-    cp .env.example .env
-    php artisan key:generate
+echo "🚀 Shopcart — AWS EC2 Deployment"
+echo "📂 App directory: $APP_DIR"
+
+# ---------------------------------------------------------------------------
+# 1. Pastikan .env ada
+# ---------------------------------------------------------------------------
+if [ ! -f "$APP_DIR/.env" ]; then
+    echo "⚠️  .env tidak ditemukan — menyalin dari .env.example..."
+    cp "$APP_DIR/.env.example" "$APP_DIR/.env"
+    echo "   ✏️  PENTING: Edit .env dan isi DB_HOST, DB_PASSWORD, APP_KEY, dll."
+    echo "   Lalu jalankan: php artisan key:generate"
+    exit 1
 fi
 
-# 2. Pastikan direktori storage dan cache tersedia
-mkdir -p storage/framework/{sessions,views,cache/data} storage/logs bootstrap/cache
-
-# 3. Atur hak akses permission untuk Web Server (Apache2 / Nginx / PHP-FPM)
-echo "🔒 Mengatur hak akses storage & cache..."
-if command -v id -u www-data >/dev/null 2>&1; then
-    sudo chown -R www-data:www-data storage bootstrap/cache
-elif command -v id -u nginx >/dev/null 2>&1; then
-    sudo chown -R nginx:nginx storage bootstrap/cache
-fi
-sudo chmod -R 775 storage bootstrap/cache
-
-# 4. Install Composer dependencies (production mode)
-if command -v composer >/dev/null 2>&1; then
-    echo "📦 Menginstall dependencies..."
-    composer install --no-dev --optimize-autoloader --no-interaction
+# ---------------------------------------------------------------------------
+# 2. Pastikan APP_KEY sudah diset
+# ---------------------------------------------------------------------------
+if grep -q 'APP_KEY=$\|APP_KEY=base64:yourGenerated' "$APP_DIR/.env"; then
+    echo "🔑 Generating application key..."
+    php artisan key:generate --force
 fi
 
-# 5. Jalankan migrasi database ke MariaDB / AWS RDS
-echo "🗄️  Menjalankan database migration & seeders..."
-php artisan migrate --force --seed
+# ---------------------------------------------------------------------------
+# 3. Buat direktori storage & cache yang dibutuhkan
+# ---------------------------------------------------------------------------
+echo "📁 Menyiapkan direktori storage & cache..."
+mkdir -p \
+    "$APP_DIR/storage/framework/sessions" \
+    "$APP_DIR/storage/framework/views" \
+    "$APP_DIR/storage/framework/cache/data" \
+    "$APP_DIR/storage/logs" \
+    "$APP_DIR/bootstrap/cache"
 
-# 6. Bersihkan cache lama agar konfigurasi .env terbaru aktif
-echo "⚡ Membersihkan cache Laravel..."
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
+# ---------------------------------------------------------------------------
+# 4. Install PHP dependencies (production, tanpa dev)
+# ---------------------------------------------------------------------------
+if command -v composer &>/dev/null; then
+    echo "📦 Menginstall Composer dependencies (production mode)..."
+    composer install \
+        --no-dev \
+        --optimize-autoloader \
+        --no-interaction \
+        --working-dir="$APP_DIR"
+else
+    echo "❌ ERROR: composer tidak ditemukan. Install dulu: https://getcomposer.org"
+    exit 1
+fi
 
-# 7. Konfigurasi Apache2 jika terpasang di sistem
-if command -v a2enmod >/dev/null 2>&1; then
-    echo "🌐 Mengaktifkan modul Apache2 (rewrite, headers)..."
-    sudo a2enmod rewrite headers || true
-    if [ -f "apache/shopcart.conf" ] && [ -d "/etc/apache2/sites-available" ]; then
-        sudo cp apache/shopcart.conf /etc/apache2/sites-available/shopcart.conf
-        sudo a2ensite shopcart.conf || true
-        sudo a2dissite 000-default.conf || true
-        sudo apache2ctl configtest && sudo systemctl reload apache2 || true
+# ---------------------------------------------------------------------------
+# 5. Jalankan migrasi ke AWS RDS MariaDB
+# ---------------------------------------------------------------------------
+echo "🗄️  Menjalankan database migrations..."
+php "$APP_DIR/artisan" migrate --force
+
+echo "🌱 Menjalankan database seeders..."
+php "$APP_DIR/artisan" db:seed --force
+
+# ---------------------------------------------------------------------------
+# 6. Set permission untuk Apache2 (www-data)
+# ---------------------------------------------------------------------------
+echo "🔒 Mengatur file permissions untuk $WEB_USER..."
+sudo chown -R "$WEB_USER:$WEB_USER" \
+    "$APP_DIR/storage" \
+    "$APP_DIR/bootstrap/cache"
+sudo chmod -R 775 \
+    "$APP_DIR/storage" \
+    "$APP_DIR/bootstrap/cache"
+# Owner file PHP boleh dimiliki current user, tapi readable oleh www-data
+sudo find "$APP_DIR" -type f -name "*.php" -exec chmod 644 {} \;
+sudo find "$APP_DIR" -type d -exec chmod 755 {} \;
+# Restore akses storage & cache ke 775 setelah find
+sudo chmod -R 775 "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
+
+# ---------------------------------------------------------------------------
+# 7. Optimize Laravel untuk production
+# ---------------------------------------------------------------------------
+echo "⚡ Optimizing Laravel untuk production..."
+php "$APP_DIR/artisan" config:cache
+php "$APP_DIR/artisan" route:cache
+php "$APP_DIR/artisan" view:cache
+
+# ---------------------------------------------------------------------------
+# 8. Konfigurasi Apache2 Virtual Host
+# ---------------------------------------------------------------------------
+if command -v a2enmod &>/dev/null; then
+    echo "🌐 Mengaktifkan modul Apache2..."
+    sudo a2enmod rewrite headers
+
+    VHOST_SRC="$APP_DIR/apache/shopcart.conf"
+    VHOST_DEST="/etc/apache2/sites-available/shopcart.conf"
+
+    if [ -f "$VHOST_SRC" ]; then
+        echo "📋 Menyalin Apache vhost config..."
+        sudo cp "$VHOST_SRC" "$VHOST_DEST"
+        sudo a2ensite shopcart.conf
+        sudo a2dissite 000-default.conf 2>/dev/null || true
+
+        echo "🔍 Verifikasi konfigurasi Apache..."
+        sudo apache2ctl configtest
+        sudo systemctl reload apache2
+        echo "✅ Apache2 dikonfigurasi dan di-reload."
+    else
+        echo "⚠️  File $VHOST_SRC tidak ditemukan, skip konfigurasi Apache."
     fi
 fi
 
-echo "✅ Deployment selesai! Shopcart siap diakses melalui Apache2 / Web Server."
+# ---------------------------------------------------------------------------
+# 9. Tampilkan ringkasan
+# ---------------------------------------------------------------------------
+echo ""
+echo "========================================================"
+echo "✅ Deployment Shopcart SELESAI!"
+echo "========================================================"
+echo "   App URL : $(grep APP_URL "$APP_DIR/.env" | cut -d= -f2)"
+echo "   DB Host : $(grep DB_HOST "$APP_DIR/.env" | cut -d= -f2)"
+echo "   DB Name : $(grep DB_DATABASE "$APP_DIR/.env" | cut -d= -f2)"
+echo "   SQLi Mode: $(grep DEMO_SQLI_MODE "$APP_DIR/.env" | cut -d= -f2)"
+echo ""
+echo "   Akses website melalui Apache2 di port 80."
+echo "========================================================"

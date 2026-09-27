@@ -1,8 +1,72 @@
-node_modules/
-build/
-dist/
-coverage/
-.DS_Store
-*.log
-.env*
+# =========================================================================
+# Node & Frontend Build
+# =========================================================================
+/node_modules
+/dist
+/build
+/coverage
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================================================================
+# PHP & Composer Dependencies
+# =========================================================================
+/vendor
+
+# =========================================================================
+# Laravel Cache & Storage
+# =========================================================================
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+
+/storage/*.key
+/storage/app/*
+!/storage/app/.gitignore
+!/storage/app/public/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+!/storage/framework/cache/data/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+
+# =========================================================================
+# Local Database & SQLite Files
+# =========================================================================
+/database/*.sqlite
+/database/*.sqlite-journal
+/database/*.sqlite-shm
+/database/*.sqlite-wal
+
+# =========================================================================
+# Environment Variables & Secrets
+# =========================================================================
+.env
+.env.backup
+.env.*.local
+.env.production
+.env.local
 !.env.example
+
+# =========================================================================
+# Testing & Cache
+# =========================================================================
+.phpunit.result.cache
+*.log
+
+# =========================================================================
+# OS & IDE / Editor Artifacts
+# =========================================================================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
