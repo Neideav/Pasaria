@@ -288,5 +288,9 @@ class DatabaseSeeder extends Seeder
 
         // 5. Call Additional Products Seeder
         $this->call(AdditionalProductsSeeder::class);
+
+        // 6. Call Demo Records Seeder (for UNION-based extraction educational demonstration)
+        $this->call(DemoRecordsSeeder::class);
     }
 }
+

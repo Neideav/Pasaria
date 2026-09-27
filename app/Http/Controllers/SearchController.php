@@ -17,17 +17,17 @@ class SearchController extends Controller
     public function index(Request $request)
     {
         $keyword = $request->input('q', '');
-        
-        // Execute search through query service (which switches dynamically based on DEMO_SQLI_MODE)
+
+        // Execute search through query service (switches dynamically based on DEMO_SQLI_MODE)
         $products = $this->queryService->searchProducts($keyword, [
             'category' => $request->input('category'),
-            'sort' => $request->input('sort', 'popular'),
+            'sort'     => $request->input('sort', 'popular'),
         ]);
 
         return view('search.index', [
-            'keyword' => $keyword,
+            'keyword'  => $keyword,
             'products' => $products,
-            'count' => $products->count(),
+            'count'    => $products->count(),
         ]);
     }
 }

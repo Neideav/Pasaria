@@ -453,6 +453,20 @@ const initialUsers = [
   }
 ];
 
+const initialDemoRecords = [
+  { record_name: 'Server Room A', record_value: 'Jakarta Branch Office' },
+  { record_name: 'Warehouse 02', record_value: 'Bekasi Distribution Hub' },
+  { record_name: 'Inventory System', record_value: 'ERP v3.1 - Operational' },
+  { record_name: 'Demo Record 01', record_value: 'Asset ID: BR-001' },
+  { record_name: 'Demo Record 02', record_value: 'Asset ID: BR-002' },
+  { record_name: 'Demo Record 03', record_value: 'Asset ID: BR-003' },
+  { record_name: 'Office Network', record_value: 'VLAN 10 - Internal' },
+  { record_name: 'Branch: Surabaya', record_value: 'Floor 3, Tower B' },
+  { record_name: 'Branch: Bandung', record_value: 'Floor 7, Menara Hijau' },
+  { record_name: 'Maintenance Window', record_value: 'Sunday 00:00 - 04:00 WIB' },
+];
+
+
 // Initialize database
 async function initDatabase() {
   const SQL = await initSqlJs();
@@ -499,7 +513,8 @@ async function initDatabase() {
       zip TEXT,
       phone TEXT,
       role TEXT DEFAULT 'customer',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -530,6 +545,14 @@ async function initDatabase() {
       color TEXT,
       image TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS demo_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      record_name TEXT NOT NULL,
+      record_value TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Seed categories
@@ -559,6 +582,14 @@ async function initDatabase() {
       `INSERT INTO users (name, username, email, password, address, city, zip, phone, role)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [u.name, u.username, u.email, u.password, u.address, u.city, u.zip, u.phone, u.role]
+    );
+  }
+
+  // Seed demo records for UNION data extraction
+  for (const dr of initialDemoRecords) {
+    db.run(
+      `INSERT INTO demo_records (record_name, record_value) VALUES (?, ?)`,
+      [dr.record_name, dr.record_value]
     );
   }
 
@@ -730,11 +761,20 @@ async function startServer() {
         stmt.free();
       }
 
-      // Parse JSON fields
+      // Parse JSON fields safely (handle injected UNION results that might contain non-JSON text)
+      const parseJsonSafe = (val: any) => {
+        if (typeof val !== 'string') return val;
+        try {
+          return JSON.parse(val);
+        } catch {
+          return [];
+        }
+      };
+
       const formattedProducts = products.map(p => ({
         ...p,
-        colors: typeof p.colors === 'string' ? JSON.parse(p.colors) : p.colors,
-        specs: typeof p.specs === 'string' ? JSON.parse(p.specs) : p.specs
+        colors: parseJsonSafe(p.colors),
+        specs: parseJsonSafe(p.specs)
       }));
 
       res.json({
