@@ -1,0 +1,6 @@
+{
+  "name": "Shopcart - Modern E-Commerce Store",
+  "description": "A modern, clean e-commerce shopping experience for premium audio, tech, and lifestyle goods.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
