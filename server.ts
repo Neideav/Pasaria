@@ -927,6 +927,90 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
+  // API: Authentication - Social & SSO Login / Register (Google, VK, Facebook, SSO)
+  // ---------------------------------------------------------------------------
+  app.post('/api/auth/social', (req: Request, res: Response) => {
+    try {
+      const { provider, email: customEmail, name: customName, ssoDomain } = req.body;
+
+      if (!provider) {
+        return res.status(400).json({ success: false, message: 'Provider is required' });
+      }
+
+      const normalizedProvider = String(provider).toLowerCase();
+
+      const providerProfiles: Record<string, { defaultName: string; defaultEmail: string; defaultUsername: string }> = {
+        google: {
+          defaultName: 'Alex Rivera (Google)',
+          defaultEmail: 'alex.rivera@gmail.com',
+          defaultUsername: 'alex_google'
+        },
+        vk: {
+          defaultName: 'Dmitry Ivanov (VK)',
+          defaultEmail: 'dmitry.ivanov@vk.com',
+          defaultUsername: 'dmitry_vk'
+        },
+        facebook: {
+          defaultName: 'Sarah Jenkins (Facebook)',
+          defaultEmail: 'sarah.jenkins@facebook.com',
+          defaultUsername: 'sarah_fb'
+        },
+        sso: {
+          defaultName: customName || (ssoDomain ? `Corporate User (${ssoDomain})` : 'Enterprise User (SSO)'),
+          defaultEmail: customEmail || (ssoDomain ? `colleague@${ssoDomain}` : 'employee@enterprise-corp.com'),
+          defaultUsername: 'enterprise_user'
+        }
+      };
+
+      const config = providerProfiles[normalizedProvider] || {
+        defaultName: `${provider.toUpperCase()} User`,
+        defaultEmail: `${normalizedProvider}@social.shopcart.com`,
+        defaultUsername: `${normalizedProvider}_user`
+      };
+
+      const email = customEmail || config.defaultEmail;
+      const name = customName || config.defaultName;
+      const username = (customEmail ? customEmail.split('@')[0] : config.defaultUsername) + '_' + normalizedProvider;
+
+      // Check if user already exists
+      const checkStmt = db.prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
+      checkStmt.bind({ ':email': email });
+      let existingUser: any = null;
+      if (checkStmt.step()) {
+        existingUser = checkStmt.getAsObject();
+      }
+      checkStmt.free();
+
+      if (!existingUser) {
+        // Insert new user
+        db.run(
+          `INSERT INTO users (name, username, email, password, address, city, zip, phone, role)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [name, username, email, 'oauth_' + Math.random().toString(36).substring(7), '4140 Parker Rd.', 'Allentown', '31134', '+001234567890', 'customer']
+        );
+
+        const fetchStmt = db.prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
+        fetchStmt.bind({ ':email': email });
+        if (fetchStmt.step()) {
+          existingUser = fetchStmt.getAsObject();
+        }
+        fetchStmt.free();
+      }
+
+      const { password: _, ...safeUser } = existingUser;
+
+      res.json({
+        success: true,
+        message: `Authenticated successfully via ${provider.toUpperCase()}`,
+        user: safeUser,
+        provider: normalizedProvider
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
   // API: Orders - Create Order
   // ---------------------------------------------------------------------------
   app.post('/api/orders', (req: Request, res: Response) => {

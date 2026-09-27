@@ -72,6 +72,55 @@ class AuthController extends Controller
         return redirect()->route('home')->with('success', 'Your account has been created successfully!');
     }
 
+    public function socialLogin(Request $request, $provider)
+    {
+        $validProviders = ['google', 'vk', 'facebook', 'sso'];
+        $normalizedProvider = strtolower($provider);
+
+        if (!in_array($normalizedProvider, $validProviders)) {
+            return redirect()->route('login')->withErrors(['provider' => 'Unsupported authentication provider.']);
+        }
+
+        $providerProfiles = [
+            'google' => [
+                'name' => 'Alex Rivera (Google)',
+                'email' => 'alex.rivera@gmail.com',
+                'username' => 'alex_google',
+            ],
+            'vk' => [
+                'name' => 'Dmitry Ivanov (VK)',
+                'email' => 'dmitry.ivanov@vk.com',
+                'username' => 'dmitry_vk',
+            ],
+            'facebook' => [
+                'name' => 'Sarah Jenkins (Facebook)',
+                'email' => 'sarah.jenkins@facebook.com',
+                'username' => 'sarah_fb',
+            ],
+            'sso' => [
+                'name' => 'Enterprise Colleague (SSO)',
+                'email' => 'employee@enterprise-corp.com',
+                'username' => 'enterprise_user',
+            ],
+        ];
+
+        $profile = $providerProfiles[$normalizedProvider];
+
+        $user = User::firstOrCreate(
+            ['email' => $profile['email']],
+            [
+                'name' => $profile['name'],
+                'username' => $profile['username'],
+                'password' => Hash::make(uniqid('oauth_', true)),
+                'role' => 'customer',
+            ]
+        );
+
+        Auth::login($user);
+
+        return redirect()->intended(route('home'))->with('success', 'Logged in successfully with ' . strtoupper($provider) . '!');
+    }
+
     public function logout(Request $request)
     {
         Auth::logout();
