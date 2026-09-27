@@ -68,19 +68,6 @@ export const api = {
     return json.user;
   },
 
-  async socialLogin(provider: string, options?: { email?: string; name?: string; ssoDomain?: string }): Promise<User> {
-    const res = await fetch('/api/auth/social', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, ...options })
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.message || 'Social login failed');
-    }
-    return json.user;
-  },
-
   async createOrder(orderData: any): Promise<{ order_number: string; transaction_id: string }> {
     const res = await fetch('/api/orders', {
       method: 'POST',
