@@ -62,13 +62,22 @@ if ! command -v composer &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Aktifkan modul Apache2
+# 4. Install Node.js (v20 LTS) & npm untuk build React SPA
+# ---------------------------------------------------------------------------
+if ! command -v node &>/dev/null; then
+    echo "🟢 Menginstall Node.js 20.x & npm..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Aktifkan modul Apache2
 # ---------------------------------------------------------------------------
 echo "🌐 Mengaktifkan modul Apache2..."
 a2enmod rewrite headers php${PHP_VERSION}
 
 # ---------------------------------------------------------------------------
-# 5. Buat direktori aplikasi & set permissions
+# 6. Buat direktori aplikasi & set permissions
 # ---------------------------------------------------------------------------
 echo "📁 Menyiapkan direktori aplikasi..."
 mkdir -p "$APP_DIR"

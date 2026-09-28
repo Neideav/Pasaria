@@ -5,6 +5,8 @@
 /dist
 /build
 /coverage
+/public/assets
+/public/index.html
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

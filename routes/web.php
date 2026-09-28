@@ -49,3 +49,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
+
+// React SPA Fallback Route (serves React frontend when built)
+Route::fallback(function () {
+    $spaPath = public_path('index.html');
+    if (file_exists($spaPath)) {
+        return response()->file($spaPath);
+    }
+    $distPath = base_path('dist/index.html');
+    if (file_exists($distPath)) {
+        return response()->file($distPath);
+    }
+    return response()->view('home');
+});
+
