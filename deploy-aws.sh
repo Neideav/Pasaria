@@ -78,13 +78,12 @@ if command -v npm &>/dev/null; then
     echo "   🔨 Running npm run build..."
     npm run build
 
-    # Salin hasil build React ke public/ agar disajikan oleh Apache2
+    # Salin seluruh hasil build React ke public/ agar disajikan oleh Apache2
     if [ -d "$APP_DIR/dist" ]; then
         echo "   📋 Menyalin aset React build ke $APP_DIR/public/..."
-        mkdir -p "$APP_DIR/public/assets"
-        cp -rf "$APP_DIR/dist/assets/"* "$APP_DIR/public/assets/" 2>/dev/null || true
-        cp -f "$APP_DIR/dist/index.html" "$APP_DIR/public/index.html" 2>/dev/null || true
-        echo "   ✅ React SPA & assets berhasil dipindahkan ke public/"
+        cp -rf "$APP_DIR/dist/"* "$APP_DIR/public/"
+        chmod -R 755 "$APP_DIR/public"
+        echo "   ✅ React SPA & assets berhasil disalin ke public/"
     fi
 else
     echo "⚠️  WARNING: npm / nodejs tidak ditemukan! Jalankan setup-server.sh terlebih dahulu untuk menginstall Node.js."
@@ -128,8 +127,9 @@ php "$APP_DIR/artisan" view:cache
 # 9. Konfigurasi Apache2 Virtual Host
 # ---------------------------------------------------------------------------
 if command -v a2enmod &>/dev/null; then
-    echo "🌐 Mengaktifkan modul Apache2..."
-    sudo a2enmod rewrite headers
+    echo "🌐 Mengaktifkan modul Apache2 & PHP handler..."
+    sudo a2dismod mpm_event mpm_worker 2>/dev/null || true
+    sudo a2enmod mpm_prefork php8.2 rewrite headers 2>/dev/null || sudo a2enmod rewrite headers
 
     VHOST_SRC="$APP_DIR/apache/shopcart.conf"
     VHOST_DEST="/etc/apache2/sites-available/shopcart.conf"

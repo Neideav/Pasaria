@@ -71,10 +71,12 @@ if ! command -v node &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Aktifkan modul Apache2
+# 5. Aktifkan modul Apache2 & PHP handler
 # ---------------------------------------------------------------------------
-echo "🌐 Mengaktifkan modul Apache2..."
-a2enmod rewrite headers php${PHP_VERSION}
+echo "🌐 Mengaktifkan modul Apache2 & PHP ${PHP_VERSION}..."
+a2dismod mpm_event mpm_worker 2>/dev/null || true
+a2enmod mpm_prefork php${PHP_VERSION} rewrite headers
+systemctl restart apache2
 
 # ---------------------------------------------------------------------------
 # 6. Buat direktori aplikasi & set permissions
