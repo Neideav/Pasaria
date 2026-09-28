@@ -13,22 +13,50 @@ This project is styled after modern high-end consumer retail sites (warm ivory, 
 ### Requirements
 - PHP >= 8.2 (dengan ekstensi `pdo_mysql`, `mbstring`, `bcmath`, `curl`)
 - Composer
-- MariaDB Server >= 10.5 (atau AWS RDS MariaDB) / SQLite3
+- Node.js >= 20 LTS & npm
+- MariaDB Server >= 10.5 (atau AWS RDS MariaDB)
 
-### Installation Steps
+### Automated Deployment (Recommended for AWS EC2)
 
-1. **Install Dependencies**
+1. **Inisialisasi Server (Sekali saat pertama kali):**
+   ```bash
+   sudo bash setup-server.sh
+   ```
+2. **Konfigurasi .env:**
+   ```bash
+   cp .env.example .env
+   nano .env  # Isi DB_HOST (RDS endpoint), DB_PASSWORD, APP_URL
+   ```
+3. **Deploy & Build:**
+   ```bash
+   bash deploy-aws.sh
+   ```
+
+---
+
+### Manual Installation Steps
+
+1. **Install Backend Dependencies**
    ```bash
    composer install --optimize-autoloader --no-dev
    ```
 
-2. **Environment Setup**
+2. **Build Frontend (React + Vite SPA)**
+   ```bash
+   npm install
+   npm run build
+   # Salin output bundle & images ke public directory Laravel
+   cp -rf dist/assets/* public/assets/
+   cp -f dist/index.html public/index.html
+   ```
+
+3. **Environment Setup**
    ```bash
    cp .env.example .env
    php artisan key:generate
    ```
 
-3. **Database Setup (MariaDB / AWS RDS)**
+4. **Database Setup (MariaDB / AWS RDS)**
    Buat database di MariaDB:
    ```sql
    CREATE DATABASE shopcart CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -52,7 +80,7 @@ This project is styled after modern high-end consumer retail sites (warm ivory, 
    php artisan migrate:fresh --seed
    ```
 
-4. **Apache2 Web Server Setup (AWS EC2 / Linux Ubuntu)**
+5. **Apache2 Web Server Setup (AWS EC2 / Linux Ubuntu)**
    Install Apache2 dan modul PHP:
    ```bash
    sudo apt update
@@ -73,7 +101,7 @@ This project is styled after modern high-end consumer retail sites (warm ivory, 
    sudo systemctl restart apache2
    ```
 
-5. **Alternatif: Nginx Web Server**
+6. **Alternatif: Nginx Web Server**
    Jika menggunakan Nginx, file konfigurasi tersedia di `nginx/shopcart.conf`.
 
 ---
