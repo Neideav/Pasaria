@@ -63,10 +63,10 @@ return [
             // ---------------------------------------------------------------
             'options' => extension_loaded('pdo_mysql') ? (function () {
                 $options = [
-                    // Nonaktifkan verifikasi sertifikat SSL server (untuk RDS tanpa bundle)
+                    PDO::ATTR_TIMEOUT => (int) env('DB_TIMEOUT', 5),
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                 ];
-                // Tambahkan CA bundle hanya jika path-nya diset di .env
                 if ($ca = env('MYSQL_ATTR_SSL_CA')) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
                 }
@@ -91,6 +91,8 @@ return [
             'engine'      => null,
             'options' => extension_loaded('pdo_mysql') ? (function () {
                 $options = [
+                    PDO::ATTR_TIMEOUT => (int) env('DB_TIMEOUT', 5),
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                 ];
                 if ($ca = env('MYSQL_ATTR_SSL_CA')) {

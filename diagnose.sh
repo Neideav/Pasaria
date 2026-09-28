@@ -125,7 +125,18 @@ fi
 echo ""
 
 # 11. Test database connection dari Laravel
-echo "--- [11] Database Connection Test ---"
+echo "--- [11] Database Connection & Network Test ---"
+DB_H=$(grep '^DB_HOST=' "$APP_DIR/.env" | cut -d= -f2 | tr -d ' ' || echo "127.0.0.1")
+DB_P=$(grep '^DB_PORT=' "$APP_DIR/.env" | cut -d= -f2 | tr -d ' ' || echo "3306")
+echo "🔌 Testing TCP network reachability to $DB_H:$DB_P..."
+if timeout 3 bash -c "</dev/tcp/$DB_H/$DB_P" 2>/dev/null; then
+    echo "   ✅ TCP connection to RDS ($DB_H:$DB_P) BERHASIL!"
+else
+    echo "   ❌ TCP CONNECTION HANG/FAILED ke $DB_H:$DB_P!"
+    echo "   👉 PENYEBAB: AWS RDS Security Group belum mengizinkan Inbound Port 3306 dari EC2 ini (IP: $(curl -s ifconfig.me || echo 'EC2 Private IP')). Tambahkan Inbound Rule: Type: MySQL/Aurora (3306), Source: 0.0.0.0/0 atau Security Group EC2."
+fi
+
+echo "🐘 Testing Laravel database connection..."
 cd "$APP_DIR" && php artisan db:monitor 2>&1 | head -5 || \
     php artisan migrate:status 2>&1 | head -5 || \
     echo "(tidak bisa test DB dari sini)"
