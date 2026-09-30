@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
 import { ProductFilterBar } from './components/ProductFilterBar';
@@ -16,18 +15,38 @@ import { OrdersView } from './components/OrdersView';
 import { DeliveryView } from './components/DeliveryView';
 import { ShopDashboardView } from './components/ShopDashboardView';
 import { ShopProfileView } from './components/ShopProfileView';
+import { SettingsView } from './components/SettingsView';
 import { Product, CartItem, User, Order, DeliveryShipment, Shop } from './types';
 import { api } from './services/api';
+import { Language, translations } from './i18n/translations';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function App() {
-  const [view, setView] = useState<'home' | 'product' | 'search' | 'category' | 'cart' | 'profile' | 'orders' | 'delivery' | 'shop_dashboard' | 'shop_profile'>('home');
+  const [view, setView] = useState<'home' | 'product' | 'search' | 'category' | 'cart' | 'profile' | 'orders' | 'delivery' | 'shop_dashboard' | 'shop_profile' | 'settings'>('home');
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedShopProfile, setSelectedShopProfile] = useState<Shop | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+
+  const [lang, setLang] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('shopcart_lang');
+      return (saved === 'en' || saved === 'id') ? saved : 'id';
+    } catch {
+      return 'id';
+    }
+  });
+
+  const t = translations[lang];
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLang(newLang);
+    try {
+      localStorage.setItem('shopcart_lang', newLang);
+    } catch {}
+  };
 
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     try {
@@ -77,12 +96,41 @@ export default function App() {
     }
   }, [activeShipment]);
 
-  // Sync cart items to localStorage
-  useEffect(() => {
+  // Sync cart items to database & localStorage
+  const syncCartToDatabase = async (items: CartItem[], currentUid?: number) => {
+    const uid = currentUid || user?.id || 1;
     try {
-      localStorage.setItem('shopcart_cart', JSON.stringify(cartItems));
-    } catch {}
-  }, [cartItems]);
+      localStorage.setItem('shopcart_cart', JSON.stringify(items));
+      if (user) {
+        await api.syncCart(uid, items);
+      }
+    } catch (e) {
+      console.warn('Cart sync note:', e);
+    }
+  };
+
+  const loadCartFromDatabase = async (uid: number) => {
+    try {
+      const dbItems = await api.getCart(uid);
+      if (dbItems && Array.isArray(dbItems) && dbItems.length > 0) {
+        setCartItems(dbItems);
+        localStorage.setItem('shopcart_cart', JSON.stringify(dbItems));
+      }
+    } catch (e) {
+      console.warn('Load cart from db note:', e);
+    }
+  };
+
+  const loadDeliveriesFromDatabase = async (uid: number) => {
+    try {
+      const shipments = await api.getDeliveries(uid);
+      if (shipments && shipments.length > 0 && !activeShipment) {
+        setActiveShipment(shipments[0]);
+      }
+    } catch (e) {
+      console.warn('Load deliveries note:', e);
+    }
+  };
 
   // Filter & pagination state
   const [filters, setFilters] = useState({
@@ -95,11 +143,19 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 8;
 
-  // Load products on mount
+  // Load products when filters/search change
   useEffect(() => {
     loadProducts();
-    loadOrders();
   }, [filters, searchQuery, activeCategory]);
+
+  // Load orders and user-specific data on mount/login
+  useEffect(() => {
+    loadOrders();
+    if (user) {
+      loadCartFromDatabase(user.id);
+      loadDeliveriesFromDatabase(user.id);
+    }
+  }, [user?.id]);
 
   const loadProducts = async () => {
     try {
@@ -190,6 +246,7 @@ export default function App() {
     } else {
       setSelectedShopProfile({
         id: shopId || 99,
+        user_id: 0,
         name: shopName,
         slug: shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         slogan: 'Penyedia Produk Original & Terpercaya',
@@ -295,17 +352,18 @@ export default function App() {
       return false;
     }
 
-    setCartItems((prev) => {
-      const existingIdx = prev.findIndex(
-        (item) => item.product.id === product.id && item.selectedColor === color
-      );
-      if (existingIdx > -1) {
-        const next = [...prev];
-        next[existingIdx].quantity += quantity;
-        return next;
-      }
-      return [...prev, { product, quantity, selectedColor: color }];
-    });
+    const existingIdx = cartItems.findIndex(
+      (item) => item.product.id === product.id && item.selectedColor === color
+    );
+    let next: CartItem[] = [];
+    if (existingIdx > -1) {
+      next = [...cartItems];
+      next[existingIdx].quantity += quantity;
+    } else {
+      next = [...cartItems, { product, quantity, selectedColor: color }];
+    }
+    setCartItems(next);
+    syncCartToDatabase(next, user.id);
     return true;
   };
 
@@ -320,25 +378,44 @@ export default function App() {
     setCheckoutModalOpen(true);
   };
 
-  const handleLoginSuccess = (loggedUser: User) => {
+  const handleLoginSuccess = async (loggedUser: User) => {
     setUser(loggedUser);
     try {
       localStorage.setItem('shopcart_user', JSON.stringify(loggedUser));
     } catch {}
 
+    // Load user cart from database
+    try {
+      const dbCart = await api.getCart(loggedUser.id);
+      if (dbCart && Array.isArray(dbCart) && dbCart.length > 0) {
+        setCartItems(dbCart);
+      } else if (cartItems.length > 0) {
+        await api.syncCart(loggedUser.id, cartItems);
+      }
+    } catch (_) {}
+
+    // Load user deliveries from database
+    try {
+      const dbShipments = await api.getDeliveries(loggedUser.id);
+      if (dbShipments && dbShipments.length > 0) {
+        setActiveShipment(dbShipments[0]);
+      }
+    } catch (_) {}
+
     if (pendingCartAction) {
       const { type, product, quantity, color } = pendingCartAction;
-      setCartItems((prev) => {
-        const existingIdx = prev.findIndex(
-          (item) => item.product.id === product.id && item.selectedColor === color
-        );
-        if (existingIdx > -1) {
-          const next = [...prev];
-          next[existingIdx].quantity += quantity;
-          return next;
-        }
-        return [...prev, { product, quantity, selectedColor: color }];
-      });
+      const existingIdx = cartItems.findIndex(
+        (item) => item.product.id === product.id && item.selectedColor === color
+      );
+      let next: CartItem[] = [];
+      if (existingIdx > -1) {
+        next = [...cartItems];
+        next[existingIdx].quantity += quantity;
+      } else {
+        next = [...cartItems, { product, quantity, selectedColor: color }];
+      }
+      setCartItems(next);
+      syncCartToDatabase(next, loggedUser.id);
 
       if (type === 'buy') {
         setCheckoutModalOpen(true);
@@ -351,7 +428,11 @@ export default function App() {
     setUser(null);
     try {
       localStorage.removeItem('shopcart_user');
+      localStorage.removeItem('shopcart_cart');
+      localStorage.removeItem('shopcart_active_shipment');
     } catch {}
+    setCartItems([]);
+    setActiveShipment(null);
     handleNavigateHome();
   };
 
@@ -360,15 +441,17 @@ export default function App() {
       handleRemoveCartItem(productId);
       return;
     }
-    setCartItems((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity: qty } : item
-      )
+    const next = cartItems.map((item) =>
+      item.product.id === productId ? { ...item, quantity: qty } : item
     );
+    setCartItems(next);
+    syncCartToDatabase(next);
   };
 
   const handleRemoveCartItem = (productId: number) => {
-    setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
+    const next = cartItems.filter((item) => item.product.id !== productId);
+    setCartItems(next);
+    syncCartToDatabase(next);
   };
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -386,18 +469,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fcfcfc] text-[#1c2a23]">
-      {/* 1. Promotional Top Bar */}
-      <TopBar
-        onShopNow={() => {
-          setView('home');
-          window.scrollTo({ top: 400, behavior: 'smooth' });
-        }}
-      />
-
-      {/* 2. Main Sticky Navbar */}
+      {/* 1. Main Sticky Navbar */}
       <Navbar
         user={user}
         cartCount={cartCount}
+        currentLang={lang}
+        onLanguageChange={handleLanguageChange}
         onNavigateHome={handleNavigateHome}
         onNavigateCategory={handleNavigateCategory}
         onNavigateSearch={handleNavigateSearch}
@@ -424,6 +501,10 @@ export default function App() {
           }
         }}
         onNavigateShop={handleNavigateShop}
+        onNavigateSettings={() => {
+          setView('settings');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         onOpenAuth={() => {
           setAuthMessage('');
           setAuthModalOpen(true);
@@ -432,7 +513,7 @@ export default function App() {
         products={products}
       />
 
-      {/* 3. Dynamic Page View Router */}
+      {/* 2. Dynamic Page View Router */}
       <main className="flex-1">
         {view === 'home' && (
           <div>
@@ -464,7 +545,7 @@ export default function App() {
             <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                  Headphones For You!
+                  {t.headphonesForYou}
                 </h2>
               </div>
 
@@ -530,7 +611,7 @@ export default function App() {
               <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left border-t border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                    Weekly Popular Products
+                    {t.weeklyPopular}
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -627,15 +708,38 @@ export default function App() {
           />
         )}
 
+        {view === 'settings' && (
+          <SettingsView
+            user={user}
+            currentLang={lang}
+            onLanguageChange={handleLanguageChange}
+            onNavigateHome={handleNavigateHome}
+            onClearCache={() => {
+              if (user) {
+                loadCartFromDatabase(user.id);
+                loadDeliveriesFromDatabase(user.id);
+              }
+              loadProducts();
+            }}
+          />
+        )}
+
         {view === 'shop_dashboard' && (
           <ShopDashboardView
             user={user}
             products={products}
-            onCreateShop={handleCreateShop}
+            onUpdateUser={(updated) => {
+              setUser(updated);
+              try { localStorage.setItem('shopcart_user', JSON.stringify(updated)); } catch {}
+              if (updated.shop) {
+                api.createShop({ ...updated.shop, user_id: updated.id }).catch(() => {});
+              }
+            }}
             onAddProduct={handleAddProduct}
             onDeleteProduct={handleDeleteProduct}
             onNavigateHome={handleNavigateHome}
-            onPreviewShopPublic={(shop) => {
+            onSelectProduct={handleSelectProduct}
+            onViewShopPublic={(shop) => {
               setSelectedShopProfile(shop);
               setView('shop_profile');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -749,6 +853,7 @@ export default function App() {
         {view === 'delivery' && (
           <DeliveryView
             activeShipment={activeShipment}
+            orders={orders}
             onNavigateHome={handleNavigateHome}
             onSelectProductBySlug={async (slug) => {
               try {
@@ -762,16 +867,24 @@ export default function App() {
         )}
       </main>
 
-      {/* 4. Checkout Modal & Order Placement */}
+      {/* 3. Checkout Modal & Order Placement */}
       <CheckoutModal
         items={cartItems}
         user={user}
         isOpen={checkoutModalOpen}
         onClose={() => setCheckoutModalOpen(false)}
-        onOrderSuccess={(orderNum, shipment, openDeliveryView) => {
+        onOrderSuccess={async (orderNum, shipment, openDeliveryView) => {
           loadOrders();
           setCartItems([]);
+          if (user) {
+            await api.clearCart(user.id);
+          }
           if (shipment) {
+            try {
+              await api.saveDelivery(shipment);
+            } catch (e) {
+              console.warn('Save delivery db note:', e);
+            }
             setActiveShipment(shipment);
           }
           if (openDeliveryView) {
@@ -782,7 +895,7 @@ export default function App() {
         subtotal={cartSubtotal}
       />
 
-      {/* 5. Authentication Modal */}
+      {/* 4. Authentication Modal */}
       <AuthModal
         isOpen={authModalOpen}
         message={authMessage}
@@ -793,7 +906,7 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
       />
 
-      {/* 6. Clean Minimal Footer */}
+      {/* 5. Clean Minimal Footer */}
       <Footer />
     </div>
   );

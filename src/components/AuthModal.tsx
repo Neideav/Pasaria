@@ -93,18 +93,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const setCustomerCredentials = () => {
-    setUsername('customer@shopcart.com');
-    setPassword('password123');
-    setErrorMsg('');
-  };
-
-  const setAdminCredentials = () => {
-    setUsername('admin@shopcart.com');
-    setPassword('admin123');
-    setErrorMsg('');
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
       <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 border border-slate-100 text-left">
@@ -193,28 +181,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
 
-            {/* Quick Demo Credentials */}
-            <div className="pt-3 border-t border-slate-100">
-              <div className="text-[11px] text-slate-400 mb-2 font-medium">Quick Fill Demo Accounts:</div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={setCustomerCredentials}
-                  className="flex-1 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 rounded-lg text-[11px] font-medium text-slate-700 border border-slate-200 transition-colors cursor-pointer"
-                >
-                  Wade Warren
-                </button>
-                <button
-                  type="button"
-                  onClick={setAdminCredentials}
-                  className="flex-1 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 rounded-lg text-[11px] font-medium text-slate-700 border border-slate-200 transition-colors cursor-pointer"
-                >
-                  Administrator
-                </button>
-              </div>
-            </div>
-
-            <div className="text-center pt-2 text-slate-500">
+            <div className="text-center pt-3 text-slate-500">
               Don't have an account?{' '}
               <button
                 type="button"

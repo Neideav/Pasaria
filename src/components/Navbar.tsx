@@ -16,14 +16,19 @@ import {
   LogOut,
   Package,
   Heart,
-  Store
+  Store,
+  Settings as SettingsIcon,
+  Globe
 } from 'lucide-react';
 import { User, Product } from '../types';
 import { ProductVisual } from './ProductVisual';
+import { Language, translations } from '../i18n/translations';
 
 interface NavbarProps {
   user: User | null;
   cartCount: number;
+  currentLang: Language;
+  onLanguageChange: (lang: Language) => void;
   onNavigateHome: () => void;
   onNavigateCategory: (category: string) => void;
   onNavigateSearch: (query: string) => void;
@@ -31,6 +36,7 @@ interface NavbarProps {
   onNavigateProfile: () => void;
   onNavigateOrders: () => void;
   onNavigateShop?: () => void;
+  onNavigateSettings?: () => void;
   onOpenAuth: () => void;
   onLogout: () => void;
   products: Product[];
@@ -39,6 +45,8 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   user,
   cartCount,
+  currentLang,
+  onLanguageChange,
   onNavigateHome,
   onNavigateCategory,
   onNavigateSearch,
@@ -46,19 +54,23 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateProfile,
   onNavigateOrders,
   onNavigateShop,
+  onNavigateSettings,
   onOpenAuth,
   onLogout,
   products,
 }) => {
+  const t = translations[currentLang];
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -150,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {showCategoriesMenu && (
                 <div className="absolute left-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-2 py-1 mb-1">
-                    Popular Categories
+                    {t.categories}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {categoryList.map((cat) => {
@@ -187,19 +199,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onNavigateCategory('Deals')}
               className="hover:text-[#003d29] transition-colors cursor-pointer"
             >
-              Deals
+              {t.deals}
             </button>
             <button
               onClick={() => onNavigateCategory('What\'s New')}
               className="hover:text-[#003d29] transition-colors cursor-pointer"
             >
-              What's New
+              {t.whatsNew}
             </button>
             <button
               onClick={() => onNavigateCategory('Delivery')}
               className="hover:text-[#003d29] transition-colors cursor-pointer"
             >
-              Delivery
+              {t.delivery}
             </button>
           </div>
         </div>
@@ -215,7 +227,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setShowSearchSuggestions(true);
               }}
               onFocus={() => setShowSearchSuggestions(true)}
-              placeholder="Search Product"
+              placeholder={t.searchPlaceholder}
               className="w-full pl-4 pr-10 py-2.5 text-xs sm:text-sm bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-2 focus:ring-[#003d29]/10 transition-all placeholder:text-slate-400"
             />
             <button
@@ -232,7 +244,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {searchSuggestions.length > 0 ? (
                 <div>
                   <div className="px-4 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Matching Products
+                    {t.matchingProducts}
                   </div>
                   {searchSuggestions.map((item) => (
                     <button
@@ -263,7 +275,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onClick={handleSearchSubmit}
                       className="w-full py-1.5 text-center text-xs font-medium text-[#003d29] hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                     >
-                      View all results for "{searchQuery}"
+                      {t.viewAllResults} "{searchQuery}"
                     </button>
                   </div>
                 </div>
@@ -276,8 +288,44 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Right: Account & Cart */}
-        <div className="flex items-center gap-4 sm:gap-6">
+        {/* Right: Language Toggle, Account & Cart */}
+        <div className="flex items-center gap-3 sm:gap-5">
+          {/* Language Selector */}
+          <div className="relative" ref={langRef}>
+            <button
+              onClick={() => setShowLangMenu(!showLangMenu)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
+              title="Change Language"
+            >
+              <Globe className="w-3.5 h-3.5 text-slate-600" />
+              <span>{currentLang === 'id' ? 'ID' : 'EN'}</span>
+            </button>
+            {showLangMenu && (
+              <div className="absolute right-0 mt-2 w-36 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-xs animate-in fade-in duration-150">
+                <button
+                  onClick={() => {
+                    onLanguageChange('id');
+                    setShowLangMenu(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer ${currentLang === 'id' ? 'font-bold text-[#003d29] bg-emerald-50/40' : 'text-slate-700'}`}
+                >
+                  <span>🇮🇩 Indonesia</span>
+                  {currentLang === 'id' && <span className="text-emerald-700 font-bold">✓</span>}
+                </button>
+                <button
+                  onClick={() => {
+                    onLanguageChange('en');
+                    setShowLangMenu(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer ${currentLang === 'en' ? 'font-bold text-[#003d29] bg-emerald-50/40' : 'text-slate-700'}`}
+                >
+                  <span>🇺🇸 English</span>
+                  {currentLang === 'en' && <span className="text-emerald-700 font-bold">✓</span>}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Account Dropdown */}
           <div className="relative" ref={accountRef}>
             <button
@@ -292,7 +340,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <UserIcon className="w-4 h-4 text-slate-700" />
               <span className="hidden sm:inline">
-                {user ? user.name.split(' ')[0] : 'Sign In'}
+                {user ? user.name.split(' ')[0] : t.signIn}
               </span>
             </button>
 
@@ -308,20 +356,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setShowAccountMenu(false);
                       onNavigateProfile();
                     }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
                   >
                     <UserIcon className="w-3.5 h-3.5" />
-                    <span>My Profile</span>
+                    <span>{t.myProfile}</span>
                   </button>
                   <button
                     onClick={() => {
                       setShowAccountMenu(false);
                       onNavigateOrders();
                     }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
                   >
                     <Package className="w-3.5 h-3.5" />
-                    <span>My Orders</span>
+                    <span>{t.myOrders}</span>
                   </button>
                   {onNavigateShop && (
                     <button
@@ -329,10 +377,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                         setShowAccountMenu(false);
                         onNavigateShop();
                       }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-emerald-800 hover:bg-emerald-50/80 transition-colors"
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-emerald-800 hover:bg-emerald-50/80 transition-colors cursor-pointer"
                     >
                       <Store className="w-3.5 h-3.5 text-emerald-700" />
-                      <span className="font-semibold">{user?.shop ? 'Toko Saya' : 'Buka Toko Gratis'}</span>
+                      <span className="font-semibold">{user?.shop ? t.myShop : t.openShop}</span>
+                    </button>
+                  )}
+                  {onNavigateSettings && (
+                    <button
+                      onClick={() => {
+                        setShowAccountMenu(false);
+                        onNavigateSettings();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
+                    >
+                      <SettingsIcon className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{t.settings}</span>
                     </button>
                   )}
                 </div>
@@ -342,10 +402,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setShowAccountMenu(false);
                       onLogout();
                     }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    <span>Logout</span>
+                    <span>{t.logout}</span>
                   </button>
                 </div>
               </div>
@@ -365,13 +425,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               )}
             </div>
-            <span className="hidden sm:inline">Cart</span>
+            <span className="hidden sm:inline">{t.cart}</span>
           </button>
 
           {/* Mobile Menu Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-1.5 text-slate-700 hover:text-[#003d29] transition-colors"
+            className="lg:hidden p-1.5 text-slate-700 hover:text-[#003d29] transition-colors cursor-pointer"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -381,8 +441,22 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-slate-100 bg-white px-4 py-4 space-y-3 animate-in slide-in-from-top-2">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Categories
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.categories}</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onLanguageChange('id')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold ${currentLang === 'id' ? 'bg-[#003d29] text-white' : 'bg-slate-100 text-slate-600'}`}
+              >
+                🇮🇩 ID
+              </button>
+              <button
+                onClick={() => onLanguageChange('en')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold ${currentLang === 'en' ? 'bg-[#003d29] text-white' : 'bg-slate-100 text-slate-600'}`}
+              >
+                🇺🇸 EN
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {categoryList.map((cat) => (
@@ -392,7 +466,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setMobileMenuOpen(false);
                   onNavigateCategory(cat.name);
                 }}
-                className="text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+                className="text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer"
               >
                 {cat.name}
               </button>
@@ -404,27 +478,27 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setMobileMenuOpen(false);
                 onNavigateCategory('Deals');
               }}
-              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer"
             >
-              Deals
+              {t.deals}
             </button>
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 onNavigateCategory("What's New");
               }}
-              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer"
             >
-              What's New
+              {t.whatsNew}
             </button>
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 onNavigateCategory('Delivery');
               }}
-              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg cursor-pointer"
             >
-              Delivery
+              {t.delivery}
             </button>
             {onNavigateShop && (
               <button
@@ -432,10 +506,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setMobileMenuOpen(false);
                   onNavigateShop();
                 }}
-                className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-800 bg-emerald-50/60 rounded-lg flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-800 bg-emerald-50/60 rounded-lg flex items-center gap-2 cursor-pointer"
               >
                 <Store className="w-3.5 h-3.5" />
-                <span>{user?.shop ? 'Toko Saya' : 'Buka Toko Gratis'}</span>
+                <span>{user?.shop ? t.myShop : t.openShop}</span>
+              </button>
+            )}
+            {onNavigateSettings && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onNavigateSettings();
+                }}
+                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2 cursor-pointer"
+              >
+                <SettingsIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span>{t.settings}</span>
               </button>
             )}
           </div>

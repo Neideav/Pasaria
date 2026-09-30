@@ -141,6 +141,51 @@ export const api = {
     });
     const json = await res.json();
     return json;
+  },
+
+  async getCart(userId: number = 1): Promise<any[]> {
+    const res = await fetch(`/api/cart?user_id=${userId}`);
+    const json = await res.json();
+    return json.data || [];
+  },
+
+  async syncCart(userId: number = 1, items: any[]): Promise<boolean> {
+    const res = await fetch('/api/cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, items })
+    });
+    const json = await res.json();
+    return json.success;
+  },
+
+  async clearCart(userId: number = 1): Promise<boolean> {
+    const res = await fetch(`/api/cart?user_id=${userId}`, { method: 'DELETE' });
+    const json = await res.json();
+    return json.success;
+  },
+
+  async getDeliveries(userId: number = 1): Promise<any[]> {
+    const res = await fetch(`/api/deliveries?user_id=${userId}`);
+    const json = await res.json();
+    return json.data || [];
+  },
+
+  async getDeliveryByCode(code: string): Promise<any> {
+    const res = await fetch(`/api/deliveries/${code}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Shipment not found');
+    return json.data;
+  },
+
+  async saveDelivery(shipment: any): Promise<any> {
+    const res = await fetch('/api/deliveries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(shipment)
+    });
+    const json = await res.json();
+    return json.shipment || shipment;
   }
 };
 

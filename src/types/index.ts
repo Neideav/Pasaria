@@ -15,6 +15,7 @@ export interface Shop {
   user_id: number;
   name: string;
   slug: string;
+  slogan?: string;
   tagline?: string;
   description?: string;
   logo?: string;
@@ -22,14 +23,18 @@ export interface Shop {
   city: string;
   phone?: string;
   rating: number;
+  review_count?: number;
   product_count?: number;
   total_sales?: number;
   joined_date?: string;
   is_verified?: boolean;
+  verified?: boolean;
+  created_at?: string;
 }
 
 export interface Product {
   id: number;
+  title?: string;
   name: string;
   slug: string;
   category: string;
@@ -48,6 +53,8 @@ export interface Product {
   shop_logo?: string;
   colors?: ColorOption[];
   specs?: ProductSpecs;
+  badge?: string;
+  discount_percent?: number;
   created_at?: string;
 }
 

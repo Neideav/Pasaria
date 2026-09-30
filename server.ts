@@ -568,6 +568,39 @@ async function initDatabase() {
       image TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS carts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      items_json TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS shipments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shipment_id TEXT NOT NULL UNIQUE,
+      order_number TEXT NOT NULL,
+      user_id INTEGER,
+      courier_name TEXT NOT NULL,
+      courier_service TEXT,
+      tracking_number TEXT NOT NULL UNIQUE,
+      status TEXT DEFAULT 'in_transit',
+      status_label TEXT,
+      recipient_name TEXT,
+      recipient_phone TEXT,
+      delivery_address TEXT,
+      origin_address TEXT,
+      estimated_arrival TEXT,
+      driver_name TEXT,
+      driver_phone TEXT,
+      driver_vehicle TEXT,
+      current_location TEXT,
+      items_count INTEGER DEFAULT 1,
+      items_preview_json TEXT,
+      total_amount REAL DEFAULT 0,
+      checkpoints_json TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS demo_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       record_name TEXT NOT NULL,
@@ -1178,6 +1211,184 @@ async function startServer() {
         [name, address, city, zip, phone, avatar, id || 1, 'wade_warren']
       );
       res.json({ success: true, message: 'Profile updated successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Cart - Get Cart for User
+  // ---------------------------------------------------------------------------
+  app.get('/api/cart', (req: Request, res: Response) => {
+    try {
+      const userId = Number(req.query.user_id) || 1;
+      const stmt = db.prepare('SELECT items_json FROM carts WHERE user_id = :userId LIMIT 1');
+      stmt.bind({ ':userId': userId });
+      let items: any[] = [];
+      if (stmt.step()) {
+        const row = stmt.getAsObject();
+        try {
+          items = JSON.parse(row.items_json as string);
+        } catch {}
+      }
+      stmt.free();
+      res.json({ success: true, data: items });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Cart - Save / Sync Cart
+  // ---------------------------------------------------------------------------
+  app.post('/api/cart', (req: Request, res: Response) => {
+    try {
+      const { user_id, items } = req.body;
+      const uid = Number(user_id) || 1;
+      const itemsJson = JSON.stringify(items || []);
+
+      const checkStmt = db.prepare('SELECT id FROM carts WHERE user_id = :uid LIMIT 1');
+      checkStmt.bind({ ':uid': uid });
+      const exists = checkStmt.step();
+      checkStmt.free();
+
+      if (exists) {
+        db.run('UPDATE carts SET items_json = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', [itemsJson, uid]);
+      } else {
+        db.run('INSERT INTO carts (user_id, items_json) VALUES (?, ?)', [uid, itemsJson]);
+      }
+
+      res.json({ success: true, message: 'Cart synced to database' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Cart - Clear Cart
+  // ---------------------------------------------------------------------------
+  app.delete('/api/cart', (req: Request, res: Response) => {
+    try {
+      const uid = Number(req.query.user_id) || 1;
+      db.run('DELETE FROM carts WHERE user_id = ?', [uid]);
+      res.json({ success: true, message: 'Cart cleared' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Deliveries - List All Shipments
+  // ---------------------------------------------------------------------------
+  app.get('/api/deliveries', (req: Request, res: Response) => {
+    try {
+      const stmt = db.prepare('SELECT * FROM shipments ORDER BY id DESC');
+      const shipments: any[] = [];
+      while (stmt.step()) {
+        const item = stmt.getAsObject() as any;
+        try {
+          item.items_preview = typeof item.items_preview_json === 'string' ? JSON.parse(item.items_preview_json) : [];
+        } catch {
+          item.items_preview = [];
+        }
+        try {
+          item.checkpoints = typeof item.checkpoints_json === 'string' ? JSON.parse(item.checkpoints_json) : [];
+        } catch {
+          item.checkpoints = [];
+        }
+        shipments.push(item);
+      }
+      stmt.free();
+      res.json({ success: true, data: shipments });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Deliveries - Create / Save New Shipment
+  // ---------------------------------------------------------------------------
+  app.post('/api/deliveries', (req: Request, res: Response) => {
+    try {
+      const s = req.body;
+      const shipmentId = s.id || `shp-${s.order_number || Date.now()}`;
+      const trackingNumber = s.tracking_number || `SC-TRK-${s.order_number || Math.floor(100000 + Math.random() * 900000)}`;
+      const itemsPreviewJson = JSON.stringify(s.items_preview || []);
+      const checkpointsJson = JSON.stringify(s.checkpoints || []);
+
+      db.run(
+        `INSERT OR REPLACE INTO shipments (
+          shipment_id, order_number, user_id, courier_name, courier_service, tracking_number,
+          status, status_label, recipient_name, recipient_phone, delivery_address, origin_address,
+          estimated_arrival, driver_name, driver_phone, driver_vehicle, current_location,
+          items_count, items_preview_json, total_amount, checkpoints_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          shipmentId,
+          s.order_number || String(Date.now()),
+          s.user_id || 1,
+          s.courier_name || 'Shopcart Express Priority',
+          s.courier_service || 'Fast Local & Ground Tracking',
+          trackingNumber,
+          s.status || 'in_transit',
+          s.status_label || 'In Transit — Live GPS Tracking Active',
+          s.recipient_name || 'Customer',
+          s.recipient_phone || '+1 (555) 234-5678',
+          s.delivery_address || '4140 Parker Rd. Allentown, New Mexico 31134',
+          s.origin_address || 'Central Fulfillment Center #4, North Hub',
+          s.estimated_arrival || 'Tomorrow by 2:00 PM',
+          s.driver_name || 'Marcus Vance (Courier Specialist)',
+          s.driver_phone || '+1 (555) 987-6543',
+          s.driver_vehicle || 'Eco Delivery Van #EV-428',
+          s.current_location || 'Regional Distribution Center, Sector 7',
+          s.items_count || 1,
+          itemsPreviewJson,
+          s.total_amount || 0,
+          checkpointsJson
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: 'Delivery shipment saved to database',
+        shipment: {
+          ...s,
+          id: shipmentId,
+          tracking_number: trackingNumber
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Deliveries - Get Single Delivery by Tracking or Order Number
+  // ---------------------------------------------------------------------------
+  app.get('/api/deliveries/:idOrCode', (req: Request, res: Response) => {
+    try {
+      const { idOrCode } = req.params;
+      const stmt = db.prepare(
+        'SELECT * FROM shipments WHERE shipment_id = :code OR tracking_number = :code OR order_number = :code LIMIT 1'
+      );
+      stmt.bind({ ':code': idOrCode });
+      let shipment: any = null;
+      if (stmt.step()) {
+        shipment = stmt.getAsObject();
+        try {
+          shipment.items_preview = typeof shipment.items_preview_json === 'string' ? JSON.parse(shipment.items_preview_json) : [];
+        } catch {}
+        try {
+          shipment.checkpoints = typeof shipment.checkpoints_json === 'string' ? JSON.parse(shipment.checkpoints_json) : [];
+        } catch {}
+      }
+      stmt.free();
+
+      if (!shipment) {
+        return res.status(404).json({ success: false, message: 'Shipment not found' });
+      }
+
+      res.json({ success: true, data: shipment });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
