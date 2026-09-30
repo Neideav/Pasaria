@@ -7,7 +7,9 @@ import {
   Heart,
   ChevronRight,
   Check,
-  Share2
+  Share2,
+  Store,
+  ShieldCheck
 } from 'lucide-react';
 import { Product } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -20,6 +22,7 @@ interface ProductDetailPageProps {
   onBuyNow: (product: Product, quantity: number, color?: string) => void;
   onSelectProduct: (product: Product) => void;
   onBackToHome: () => void;
+  onViewShop?: (shopName: string, shopId?: number) => void;
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
@@ -29,6 +32,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onBuyNow,
   onSelectProduct,
   onBackToHome,
+  onViewShop,
 }) => {
   const [selectedColor, setSelectedColor] = useState(
     product.colors && product.colors.length > 0 ? product.colors[0].name : ''
@@ -257,8 +261,43 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </button>
           </div>
 
+          {/* Seller / Store Information Card */}
+          <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/70 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-white border border-emerald-200 flex items-center justify-center font-extrabold text-[#003d29] shadow-2xs overflow-hidden shrink-0">
+                {product.shop_logo ? (
+                  <img src={product.shop_logo} alt={product.shop_name || 'Store'} className="w-full h-full object-cover" />
+                ) : (
+                  <Store className="w-5 h-5 text-[#003d29]" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {product.shop_name || 'Shopcart Official Merchant'}
+                  </span>
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                  <span>📍 {product.shop_city || 'Jakarta'}</span>
+                  <span>·</span>
+                  <span className="text-emerald-700 font-semibold">★ 5.0 Rating Toko</span>
+                </div>
+              </div>
+            </div>
+
+            {onViewShop && (
+              <button
+                onClick={() => onViewShop(product.shop_name || 'Shopcart Official Store', product.shop_id)}
+                className="py-2 px-3.5 rounded-xl bg-white hover:bg-emerald-50 text-[#003d29] font-bold text-xs border border-emerald-200/80 transition-colors shadow-2xs cursor-pointer shrink-0"
+              >
+                Kunjungi Toko
+              </button>
+            )}
+          </div>
+
           {/* Delivery & Return info cards */}
-          <div className="space-y-3 pt-4 border-t border-slate-100">
+          <div className="space-y-3 pt-2">
             <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-amber-50/40 border border-amber-100/60">
               <div className="w-8 h-8 rounded-lg bg-amber-100/80 flex items-center justify-center text-amber-700 shrink-0">
                 <Truck className="w-4 h-4" />

@@ -101,5 +101,46 @@ export const api = {
     });
     const json = await res.json();
     return json.demo_sqli_mode;
+  },
+
+  async createShop(data: any): Promise<{ success: boolean; shop: any }> {
+    const res = await fetch('/api/shops', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to create shop');
+    return json;
+  },
+
+  async addProduct(productData: any): Promise<{ success: boolean; product: Product }> {
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(productData)
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to add product');
+    return json;
+  },
+
+  async deleteProduct(productId: number): Promise<{ success: boolean }> {
+    const res = await fetch(`/api/products/${productId}`, {
+      method: 'DELETE'
+    });
+    const json = await res.json();
+    return json;
+  },
+
+  async updateProfile(userData: Partial<User>): Promise<{ success: boolean; user: User }> {
+    const res = await fetch('/api/user/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    const json = await res.json();
+    return json;
   }
 };
+

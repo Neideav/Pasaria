@@ -498,6 +498,10 @@ async function initDatabase() {
       stock INTEGER DEFAULT 10,
       colors TEXT,
       specs TEXT,
+      shop_id INTEGER DEFAULT 1,
+      shop_name TEXT DEFAULT 'Shopcart Official Merchant',
+      shop_logo TEXT,
+      shop_city TEXT DEFAULT 'Jakarta',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -512,9 +516,27 @@ async function initDatabase() {
       city TEXT,
       zip TEXT,
       phone TEXT,
+      avatar TEXT,
       role TEXT DEFAULT 'customer',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS shops (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      slogan TEXT,
+      city TEXT,
+      phone TEXT,
+      description TEXT,
+      logo TEXT,
+      banner TEXT,
+      rating REAL DEFAULT 5.0,
+      review_count INTEGER DEFAULT 0,
+      verified INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -633,7 +655,8 @@ async function startServer() {
   await initDatabase();
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // ---------------------------------------------------------------------------
   // API: Get Categories
@@ -1032,6 +1055,129 @@ async function startServer() {
       }
       stmt.free();
       res.json({ success: true, data: rows });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Shops - Create / Update Shop
+  // ---------------------------------------------------------------------------
+  app.post('/api/shops', (req: Request, res: Response) => {
+    try {
+      const { user_id, name, slug, slogan, city, phone, description, logo, banner } = req.body;
+      const cleanSlug = (slug || name || 'store').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      const checkStmt = db.prepare('SELECT id FROM shops WHERE user_id = :user_id OR slug = :slug LIMIT 1');
+      checkStmt.bind({ ':user_id': user_id || 1, ':slug': cleanSlug });
+      const exists = checkStmt.step();
+      checkStmt.free();
+
+      if (exists) {
+        db.run(
+          `UPDATE shops SET name = ?, slogan = ?, city = ?, phone = ?, description = ?, logo = ?, banner = ? WHERE user_id = ?`,
+          [name, slogan || '', city || 'Jakarta', phone || '', description || '', logo || '', banner || '', user_id || 1]
+        );
+      } else {
+        db.run(
+          `INSERT INTO shops (user_id, name, slug, slogan, city, phone, description, logo, banner, rating, review_count, verified)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [user_id || 1, name, cleanSlug, slogan || '', city || 'Jakarta', phone || '', description || '', logo || '', banner || '', 5.0, 0, 1]
+        );
+      }
+
+      res.json({
+        success: true,
+        message: 'Shop saved successfully',
+        shop: {
+          user_id,
+          name,
+          slug: cleanSlug,
+          slogan,
+          city,
+          phone,
+          description,
+          logo,
+          banner,
+          rating: 5.0,
+          review_count: 0,
+          verified: true
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Products - Create Product (Seller)
+  // ---------------------------------------------------------------------------
+  app.post('/api/products', (req: Request, res: Response) => {
+    try {
+      const p = req.body;
+      const slug = p.slug || (p.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
+      const colorsStr = typeof p.colors === 'string' ? p.colors : JSON.stringify(p.colors || [{ name: 'Default', hex: '#003d29' }]);
+      const specsStr = typeof p.specs === 'string' ? p.specs : JSON.stringify(p.specs || { Details: { Warranty: '1 Year' } });
+
+      db.run(
+        `INSERT INTO products (name, slug, category, price, original_price, monthly_price, short_desc, description, image, rating, review_count, stock, colors, specs, shop_id, shop_name, shop_logo, shop_city)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          p.name,
+          slug,
+          p.category || 'Headphone',
+          p.price,
+          p.original_price || null,
+          p.monthly_price || null,
+          p.short_desc || '',
+          p.description || '',
+          p.image || 'airpods-max',
+          p.rating || 5.0,
+          p.review_count || 0,
+          p.stock || 10,
+          colorsStr,
+          specsStr,
+          p.shop_id || 1,
+          p.shop_name || 'Shopcart Official Merchant',
+          p.shop_logo || '',
+          p.shop_city || 'Jakarta'
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: 'Product created successfully',
+        product: { ...p, slug }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: Products - Delete Product
+  // ---------------------------------------------------------------------------
+  app.delete('/api/products/:id', (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      db.run(`DELETE FROM products WHERE id = ?`, [Number(id)]);
+      res.json({ success: true, message: 'Product deleted successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // API: User Profile - Update
+  // ---------------------------------------------------------------------------
+  app.put('/api/user/profile', (req: Request, res: Response) => {
+    try {
+      const { id, name, address, city, zip, phone, avatar } = req.body;
+      db.run(
+        `UPDATE users SET name = ?, address = ?, city = ?, zip = ?, phone = ?, avatar = ? WHERE id = ? OR username = ?`,
+        [name, address, city, zip, phone, avatar, id || 1, 'wade_warren']
+      );
+      res.json({ success: true, message: 'Profile updated successfully' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

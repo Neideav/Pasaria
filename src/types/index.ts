@@ -10,6 +10,24 @@ export interface ProductSpecs {
   [key: string]: Record<string, string> | undefined;
 }
 
+export interface Shop {
+  id: number;
+  user_id: number;
+  name: string;
+  slug: string;
+  tagline?: string;
+  description?: string;
+  logo?: string;
+  banner?: string;
+  city: string;
+  phone?: string;
+  rating: number;
+  product_count?: number;
+  total_sales?: number;
+  joined_date?: string;
+  is_verified?: boolean;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -24,6 +42,10 @@ export interface Product {
   rating: number;
   review_count: number;
   stock: number;
+  shop_id?: number;
+  shop_name?: string;
+  shop_city?: string;
+  shop_logo?: string;
   colors?: ColorOption[];
   specs?: ProductSpecs;
   created_at?: string;
@@ -48,11 +70,13 @@ export interface User {
   name: string;
   username: string;
   email: string;
+  avatar?: string;
   address?: string;
   city?: string;
   zip?: string;
   phone?: string;
-  role: 'customer' | 'admin';
+  role: 'customer' | 'admin' | 'seller';
+  shop?: Shop | null;
 }
 
 export interface Order {

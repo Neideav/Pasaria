@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, MapPin, Phone, Mail, Shield, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User, MapPin, Phone, Mail, Shield, Check, Camera, Upload } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface ProfileViewProps {
@@ -10,6 +10,7 @@ interface ProfileViewProps {
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
   user,
+  onUpdateUser,
   onNavigateHome,
 }) => {
   const [name, setName] = useState(user?.name || '');
@@ -18,10 +19,38 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [city, setCity] = useState(user?.city || '');
   const [zip, setZip] = useState(user?.zip || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [avatar, setAvatar] = useState(user?.avatar || '');
   const [saved, setSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setAvatar(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (user) {
+      const updatedUser: UserType = {
+        ...user,
+        name,
+        email,
+        address,
+        city,
+        zip,
+        phone,
+        avatar
+      };
+      onUpdateUser(updatedUser);
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -39,7 +68,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
         <button
           onClick={onNavigateHome}
-          className="text-xs font-semibold text-[#003d29] hover:underline"
+          className="text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
         >
           Return to Store
         </button>
@@ -47,13 +76,43 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-2xs">
         <form onSubmit={handleSave} className="space-y-6 text-xs">
-          <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 text-[#003d29] font-extrabold text-xl flex items-center justify-center">
-              {name.charAt(0)}
+          <div className="flex items-center gap-5 pb-6 border-b border-slate-100">
+            <div className="relative group">
+              <div className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-200 text-[#003d29] font-extrabold text-2xl flex items-center justify-center overflow-hidden shadow-inner">
+                {avatar ? (
+                  <img src={avatar} alt={name} className="w-full h-full object-cover" />
+                ) : (
+                  name.charAt(0) || 'U'
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-0 right-0 p-1.5 bg-[#003d29] text-white rounded-full hover:bg-emerald-900 transition-colors shadow-md cursor-pointer"
+                title="Change Avatar"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">{name}</h3>
-              <p className="text-slate-400">{user?.role === 'admin' ? 'Administrator' : 'Verified Member'}</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">{name || 'User Profile'}</h3>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 underline ml-2 cursor-pointer"
+                >
+                  Upload Foto
+                </button>
+              </div>
+              <p className="text-slate-400 mt-0.5">{user?.role === 'admin' ? 'Administrator' : 'Verified Member'}</p>
             </div>
           </div>
 

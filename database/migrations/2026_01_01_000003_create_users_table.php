@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('city')->nullable();
             $table->string('zip')->nullable();
             $table->string('phone')->nullable();
+            $table->longText('avatar')->nullable();
             $table->string('role')->default('customer');
             $table->rememberToken();
             $table->timestamps();

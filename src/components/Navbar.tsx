@@ -15,7 +15,8 @@ import {
   Sparkles,
   LogOut,
   Package,
-  Heart
+  Heart,
+  Store
 } from 'lucide-react';
 import { User, Product } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -29,6 +30,7 @@ interface NavbarProps {
   onNavigateCart: () => void;
   onNavigateProfile: () => void;
   onNavigateOrders: () => void;
+  onNavigateShop?: () => void;
   onOpenAuth: () => void;
   onLogout: () => void;
   products: Product[];
@@ -43,6 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateCart,
   onNavigateProfile,
   onNavigateOrders,
+  onNavigateShop,
   onOpenAuth,
   onLogout,
   products,
@@ -320,6 +323,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <Package className="w-3.5 h-3.5" />
                     <span>My Orders</span>
                   </button>
+                  {onNavigateShop && (
+                    <button
+                      onClick={() => {
+                        setShowAccountMenu(false);
+                        onNavigateShop();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-emerald-800 hover:bg-emerald-50/80 transition-colors"
+                    >
+                      <Store className="w-3.5 h-3.5 text-emerald-700" />
+                      <span className="font-semibold">{user?.shop ? 'Toko Saya' : 'Buka Toko Gratis'}</span>
+                    </button>
+                  )}
                 </div>
                 <div className="border-t border-slate-100 pt-1">
                   <button
@@ -411,6 +426,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Delivery
             </button>
+            {onNavigateShop && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onNavigateShop();
+                }}
+                className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-800 bg-emerald-50/60 rounded-lg flex items-center gap-2"
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>{user?.shop ? 'Toko Saya' : 'Buka Toko Gratis'}</span>
+              </button>
+            )}
           </div>
         </div>
       )}

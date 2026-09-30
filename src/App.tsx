@@ -14,14 +14,17 @@ import { AuthModal } from './components/AuthModal';
 import { ProfileView } from './components/ProfileView';
 import { OrdersView } from './components/OrdersView';
 import { DeliveryView } from './components/DeliveryView';
-import { Product, CartItem, User, Order, DeliveryShipment } from './types';
+import { ShopDashboardView } from './components/ShopDashboardView';
+import { ShopProfileView } from './components/ShopProfileView';
+import { Product, CartItem, User, Order, DeliveryShipment, Shop } from './types';
 import { api } from './services/api';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function App() {
-  const [view, setView] = useState<'home' | 'product' | 'search' | 'category' | 'cart' | 'profile' | 'orders' | 'delivery'>('home');
+  const [view, setView] = useState<'home' | 'product' | 'search' | 'category' | 'cart' | 'profile' | 'orders' | 'delivery' | 'shop_dashboard' | 'shop_profile'>('home');
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedShopProfile, setSelectedShopProfile] = useState<Shop | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -171,6 +174,118 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleNavigateShop = () => {
+    if (!user) {
+      setAuthMessage('Silakan masuk atau buat akun untuk membuka dan mengelola toko Anda.');
+      setAuthModalOpen(true);
+      return;
+    }
+    setView('shop_dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleViewShopPublic = (shopName: string, shopId?: number) => {
+    if (user?.shop && (user.shop.name === shopName || user.shop.id === shopId)) {
+      setSelectedShopProfile(user.shop);
+    } else {
+      setSelectedShopProfile({
+        id: shopId || 99,
+        name: shopName,
+        slug: shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        slogan: 'Penyedia Produk Original & Terpercaya',
+        city: 'Jakarta Pusat',
+        phone: '+62 812-8888-9999',
+        description: `Selamat datang di ${shopName}! Kami menyediakan berbagai produk audio, aksesoris, dan gadget original dengan garansi resmi dan pengiriman super cepat.`,
+        logo: '',
+        banner: '',
+        rating: 5.0,
+        review_count: 128,
+        verified: true
+      });
+    }
+    setView('shop_profile');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCreateShop = async (shopData: Partial<Shop>) => {
+    if (!user) return;
+    const newShop: Shop = {
+      id: Date.now(),
+      user_id: user.id,
+      name: shopData.name || 'My Store',
+      slug: (shopData.name || 'my-store').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      slogan: shopData.slogan || '',
+      city: shopData.city || 'Jakarta',
+      phone: shopData.phone || user.phone || '',
+      description: shopData.description || '',
+      logo: shopData.logo || '',
+      banner: shopData.banner || '',
+      rating: 5.0,
+      review_count: 0,
+      verified: true,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      await api.createShop(newShop);
+    } catch (err) {
+      console.warn('API createShop note:', err);
+    }
+
+    const updatedUser: User = {
+      ...user,
+      shop: newShop
+    };
+    setUser(updatedUser);
+    try {
+      localStorage.setItem('shopcart_user', JSON.stringify(updatedUser));
+    } catch {}
+  };
+
+  const handleAddProduct = async (productData: Partial<Product>) => {
+    const rawPrice = Number(productData.price) || 99;
+    const discount = productData.discount_percent ? Number(productData.discount_percent) : 0;
+    const newProduct: Product = {
+      id: Date.now(),
+      title: productData.title || productData.name || 'Produk Baru',
+      name: productData.name || productData.title || 'Produk Baru',
+      slug: ((productData.name || productData.title || 'produk').toLowerCase().replace(/[^a-z0-9]+/g, '-')) + '-' + Date.now(),
+      category: productData.category || 'Headphones',
+      price: rawPrice,
+      original_price: discount > 0 ? Number((rawPrice * (1 + discount / 100)).toFixed(2)) : undefined,
+      discount_percent: discount > 0 ? discount : undefined,
+      rating: 5.0,
+      review_count: 1,
+      stock: Number(productData.stock) || 20,
+      description: productData.description || 'Produk berkualitas tinggi bergaransi resmi.',
+      image: productData.image || 'airpods-max',
+      colors: productData.colors && productData.colors.length > 0 ? productData.colors : [{ name: 'Default', hex: '#003d29' }],
+      badge: 'NEW ARRIVAL',
+      shop_id: user?.shop?.id || 1,
+      shop_name: user?.shop?.name || user?.name + ' Store',
+      shop_logo: user?.shop?.logo,
+      shop_city: user?.shop?.city,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      await api.addProduct(newProduct);
+    } catch (err) {
+      console.warn('API addProduct note:', err);
+    }
+
+    setProducts((prev) => [newProduct, ...prev]);
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    try {
+      await api.deleteProduct(productId);
+    } catch (err) {
+      console.warn('API deleteProduct error:', err);
+    }
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+  };
+
   // Cart operations
   const handleAddToCart = (product: Product, quantity = 1, color?: string): boolean => {
     if (!user) {
@@ -308,6 +423,7 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }
         }}
+        onNavigateShop={handleNavigateShop}
         onOpenAuth={() => {
           setAuthMessage('');
           setAuthModalOpen(true);
@@ -455,6 +571,7 @@ export default function App() {
             onBuyNow={handleBuyNow}
             onSelectProduct={handleSelectProduct}
             onBackToHome={handleNavigateHome}
+            onViewShop={handleViewShopPublic}
           />
         )}
 
@@ -507,6 +624,32 @@ export default function App() {
               } catch {}
             }}
             onNavigateHome={handleNavigateHome}
+          />
+        )}
+
+        {view === 'shop_dashboard' && (
+          <ShopDashboardView
+            user={user}
+            products={products}
+            onCreateShop={handleCreateShop}
+            onAddProduct={handleAddProduct}
+            onDeleteProduct={handleDeleteProduct}
+            onNavigateHome={handleNavigateHome}
+            onPreviewShopPublic={(shop) => {
+              setSelectedShopProfile(shop);
+              setView('shop_profile');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {view === 'shop_profile' && selectedShopProfile && (
+          <ShopProfileView
+            shop={selectedShopProfile}
+            products={products}
+            onSelectProduct={handleSelectProduct}
+            onAddToCart={(p) => handleAddToCart(p, 1)}
+            onBackToHome={handleNavigateHome}
           />
         )}
 
