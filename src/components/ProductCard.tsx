@@ -6,7 +6,7 @@ import { ProductVisual } from './ProductVisual';
 interface ProductCardProps {
   product: Product;
   onSelect: (product: Product) => void;
-  onAddToCart: (product: Product, e: React.MouseEvent) => void;
+  onAddToCart: (product: Product, e: React.MouseEvent) => boolean | void;
   isWishlisted?: boolean;
   onToggleWishlist?: (product: Product, e: React.MouseEvent) => void;
 }
@@ -23,9 +23,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onAddToCart(product, e);
-    setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 1400);
+    const result = onAddToCart(product, e);
+    if (result !== false) {
+      setJustAdded(true);
+      setTimeout(() => setJustAdded(false), 1400);
+    }
   };
 
   const handleHeartClick = (e: React.MouseEvent) => {

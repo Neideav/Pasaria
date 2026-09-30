@@ -12,12 +12,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   user,
   onNavigateHome,
 }) => {
-  const [name, setName] = useState(user?.name || 'Wade Warren');
-  const [email, setEmail] = useState(user?.email || 'customer@shopcart.com');
-  const [address, setAddress] = useState(user?.address || '4140 Parker Rd.');
-  const [city, setCity] = useState(user?.city || 'Allentown');
-  const [zip, setZip] = useState(user?.zip || '31134');
-  const [phone, setPhone] = useState(user?.phone || '+001234567890');
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [address, setAddress] = useState(user?.address || '');
+  const [city, setCity] = useState(user?.city || '');
+  const [zip, setZip] = useState(user?.zip || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [saved, setSaved] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {

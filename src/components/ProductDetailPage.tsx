@@ -16,7 +16,7 @@ import { ProductCard } from './ProductCard';
 interface ProductDetailPageProps {
   product: Product;
   relatedProducts: Product[];
-  onAddToCart: (product: Product, quantity: number, color?: string) => void;
+  onAddToCart: (product: Product, quantity: number, color?: string) => boolean | void;
   onBuyNow: (product: Product, quantity: number, color?: string) => void;
   onSelectProduct: (product: Product) => void;
   onBackToHome: () => void;
@@ -54,9 +54,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
 
   const handleAdd = () => {
-    onAddToCart(product, quantity, selectedColor);
-    setAddedSuccess(true);
-    setTimeout(() => setAddedSuccess(false), 1600);
+    const result = onAddToCart(product, quantity, selectedColor);
+    if (result !== false) {
+      setAddedSuccess(true);
+      setTimeout(() => setAddedSuccess(false), 1600);
+    }
   };
 
   const handleBuy = () => {

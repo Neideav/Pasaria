@@ -9,7 +9,7 @@ interface SearchPageProps {
   category?: string;
   products: Product[];
   onSelectProduct: (product: Product) => void;
-  onAddToCart: (product: Product, e: React.MouseEvent) => void;
+  onAddToCart: (product: Product, e: React.MouseEvent) => boolean | void;
   onBackToHome: () => void;
   filters: any;
   onChangeFilters: (filters: any) => void;

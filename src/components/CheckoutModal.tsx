@@ -30,16 +30,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderSuccess,
   subtotal,
 }) => {
-  const [firstName, setFirstName] = useState(user?.name ? user.name.split(' ')[0] : 'Wade');
-  const [lastName, setLastName] = useState(user?.name && user.name.split(' ').length > 1 ? user.name.split(' ')[1] : 'Warren');
-  const [address, setAddress] = useState(user?.address || '4140 Parker Rd.');
-  const [city, setCity] = useState(user?.city || 'Allentown');
-  const [zipCode, setZipCode] = useState(user?.zip || '31134');
-  const [mobile, setMobile] = useState(user?.phone || '+001234567890');
-  const [email, setEmail] = useState(user?.email || 'customer@shopcart.com');
+  const [firstName, setFirstName] = useState(user?.name ? user.name.split(' ')[0] : '');
+  const [lastName, setLastName] = useState(user?.name && user.name.split(' ').length > 1 ? user.name.split(' ')[1] : '');
+  const [address, setAddress] = useState(user?.address || '');
+  const [city, setCity] = useState(user?.city || '');
+  const [zipCode, setZipCode] = useState(user?.zip || '');
+  const [mobile, setMobile] = useState(user?.phone || '');
+  const [email, setEmail] = useState(user?.email || '');
 
   const [paymentMethod, setPaymentMethod] = useState<'credit' | 'cod' | 'paypal' | 'shopcart'>('credit');
-  const [cardHolder, setCardHolder] = useState('Wade Warren');
+  const [cardHolder, setCardHolder] = useState(user?.name || '');
   const [cardNumber, setCardNumber] = useState('3657 8943 0012 3410');
   const [expiry, setExpiry] = useState('08/29');
   const [cvc, setCvc] = useState('784');

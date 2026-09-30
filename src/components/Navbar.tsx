@@ -289,7 +289,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <UserIcon className="w-4 h-4 text-slate-700" />
               <span className="hidden sm:inline">
-                {user ? user.name.split(' ')[0] : 'Account'}
+                {user ? user.name.split(' ')[0] : 'Sign In'}
               </span>
             </button>
 

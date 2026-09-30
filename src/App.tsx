@@ -25,44 +25,42 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
 
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    // Start with 1 item in cart matching video
-    {
-      product: {
-        id: 1,
-        name: 'Airpods- Max',
-        slug: 'airpods-max',
-        category: 'Headphone',
-        price: 549.0,
-        original_price: 599.0,
-        monthly_price: 99.99,
-        short_desc: 'a perfect balance of exhilarating high-fidelity audio and the effortless magic of AirPods.',
-        description: 'Apple-designed dynamic driver provides high-fidelity audio.',
-        image: 'airpods-max',
-        rating: 5.0,
-        review_count: 121,
-        stock: 12,
-      },
-      quantity: 1,
-      selectedColor: 'Pink',
-    },
-  ]);
-
-  const [user, setUser] = useState<User | null>({
-    id: 1,
-    name: 'Wade Warren',
-    username: 'wadewarren',
-    email: 'customer@shopcart.com',
-    address: '4140 Parker Rd.',
-    city: 'Allentown',
-    zip: '31134',
-    phone: '+001234567890',
-    role: 'customer',
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('shopcart_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
+
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('shopcart_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [authMessage, setAuthMessage] = useState<string>('');
+  const [pendingCartAction, setPendingCartAction] = useState<{
+    type: 'add' | 'buy';
+    product: Product;
+    quantity: number;
+    color?: string;
+  } | null>(null);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+
+  // Sync cart items to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('shopcart_cart', JSON.stringify(cartItems));
+    } catch {}
+  }, [cartItems]);
 
   // Filter & pagination state
   const [filters, setFilters] = useState({
@@ -152,7 +150,14 @@ export default function App() {
   };
 
   // Cart operations
-  const handleAddToCart = (product: Product, quantity = 1, color?: string) => {
+  const handleAddToCart = (product: Product, quantity = 1, color?: string): boolean => {
+    if (!user) {
+      setAuthMessage('Please sign in or create an account to add items to your cart.');
+      setPendingCartAction({ type: 'add', product, quantity, color });
+      setAuthModalOpen(true);
+      return false;
+    }
+
     setCartItems((prev) => {
       const existingIdx = prev.findIndex(
         (item) => item.product.id === product.id && item.selectedColor === color
@@ -164,11 +169,53 @@ export default function App() {
       }
       return [...prev, { product, quantity, selectedColor: color }];
     });
+    return true;
   };
 
   const handleBuyNow = (product: Product, quantity = 1, color?: string) => {
+    if (!user) {
+      setAuthMessage('Please sign in or create an account to proceed with purchase.');
+      setPendingCartAction({ type: 'buy', product, quantity, color });
+      setAuthModalOpen(true);
+      return;
+    }
     handleAddToCart(product, quantity, color);
     setCheckoutModalOpen(true);
+  };
+
+  const handleLoginSuccess = (loggedUser: User) => {
+    setUser(loggedUser);
+    try {
+      localStorage.setItem('shopcart_user', JSON.stringify(loggedUser));
+    } catch {}
+
+    if (pendingCartAction) {
+      const { type, product, quantity, color } = pendingCartAction;
+      setCartItems((prev) => {
+        const existingIdx = prev.findIndex(
+          (item) => item.product.id === product.id && item.selectedColor === color
+        );
+        if (existingIdx > -1) {
+          const next = [...prev];
+          next[existingIdx].quantity += quantity;
+          return next;
+        }
+        return [...prev, { product, quantity, selectedColor: color }];
+      });
+
+      if (type === 'buy') {
+        setCheckoutModalOpen(true);
+      }
+      setPendingCartAction(null);
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    try {
+      localStorage.removeItem('shopcart_user');
+    } catch {}
+    handleNavigateHome();
   };
 
   const handleUpdateCartQuantity = (productId: number, qty: number) => {
@@ -222,15 +269,28 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onNavigateProfile={() => {
-          setView('profile');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (!user) {
+            setAuthMessage('Please sign in to view your profile.');
+            setAuthModalOpen(true);
+          } else {
+            setView('profile');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         }}
         onNavigateOrders={() => {
-          setView('orders');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (!user) {
+            setAuthMessage('Please sign in to view your order history.');
+            setAuthModalOpen(true);
+          } else {
+            setView('orders');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         }}
-        onOpenAuth={() => setAuthModalOpen(true)}
-        onLogout={() => setUser(null)}
+        onOpenAuth={() => {
+          setAuthMessage('');
+          setAuthModalOpen(true);
+        }}
+        onLogout={handleLogout}
         products={products}
       />
 
@@ -399,7 +459,14 @@ export default function App() {
             items={cartItems}
             onUpdateQuantity={handleUpdateCartQuantity}
             onRemoveItem={handleRemoveCartItem}
-            onProceedToCheckout={() => setCheckoutModalOpen(true)}
+            onProceedToCheckout={() => {
+              if (!user) {
+                setAuthMessage('Please sign in or create an account to proceed to checkout.');
+                setAuthModalOpen(true);
+              } else {
+                setCheckoutModalOpen(true);
+              }
+            }}
             onContinueShopping={handleNavigateHome}
           />
         )}
@@ -407,7 +474,12 @@ export default function App() {
         {view === 'profile' && (
           <ProfileView
             user={user}
-            onUpdateUser={(updated) => setUser(updated)}
+            onUpdateUser={(updated) => {
+              setUser(updated);
+              try {
+                localStorage.setItem('shopcart_user', JSON.stringify(updated));
+              } catch {}
+            }}
             onNavigateHome={handleNavigateHome}
           />
         )}
@@ -444,8 +516,12 @@ export default function App() {
       {/* 5. Authentication Modal */}
       <AuthModal
         isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onLoginSuccess={(loggedUser) => setUser(loggedUser)}
+        message={authMessage}
+        onClose={() => {
+          setAuthModalOpen(false);
+          setAuthMessage('');
+        }}
+        onLoginSuccess={handleLoginSuccess}
       />
 
       {/* 6. Clean Minimal Footer */}

@@ -6,16 +6,18 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: User) => void;
+  message?: string;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
+  message,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
-  const [username, setUsername] = useState('customer@shopcart.com');
-  const [password, setPassword] = useState('password123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   // Register fields
   const [regName, setRegName] = useState('');
@@ -125,6 +127,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               : 'Join thousands of satisfied shoppers today.'}
           </p>
         </div>
+
+        {/* Notice message (e.g. prompt to login before adding to cart) */}
+        {message && !errorMsg && (
+          <div className="p-3 mb-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 font-medium flex items-center gap-2">
+            <span>ℹ️</span>
+            <span>{message}</span>
+          </div>
+        )}
 
         {/* Error message */}
         {errorMsg && (
