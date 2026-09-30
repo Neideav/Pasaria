@@ -18,8 +18,14 @@ use App\Http\Controllers\OrderController;
 |
 */
 
-// Home & Catalog
-Route::get('/', [HomeController::class, 'index'])->name('home');
+// Home & Catalog (serves React SPA if built, otherwise fallback to Blade)
+Route::get('/', function () {
+    $spaPath = public_path('index.html');
+    if (file_exists($spaPath)) {
+        return response()->file($spaPath);
+    }
+    return app(HomeController::class)->index(request());
+})->name('home');
 Route::get('/products/{slug}', [ProductController::class, 'show'])->name('products.show');
 Route::get('/category/{slug}', [HomeController::class, 'category'])->name('category.show');
 

@@ -68,6 +68,7 @@ RUN sed -i \
     /etc/apache2/sites-available/000-default.conf
 
 RUN printf '%s\n' \
+    'DirectoryIndex index.html index.php' \
     '<Directory /var/www/html/public>' \
     '    Options -Indexes +FollowSymLinks' \
     '    AllowOverride All' \
