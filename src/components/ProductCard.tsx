@@ -74,7 +74,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {product.name}
           </h3>
           <span className="text-sm sm:text-base font-bold text-slate-900 tabular-nums shrink-0">
-            ${product.price.toFixed(2)}
+            ${(Number(product.price) || 0).toFixed(2)}
           </span>
         </div>
 

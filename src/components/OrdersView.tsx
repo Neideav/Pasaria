@@ -93,7 +93,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       </div>
                     </div>
                     <div className="font-semibold text-slate-900 tabular-nums">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      ${((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
                     </div>
                   </div>
                 ))}
@@ -104,7 +104,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   Paid via <span className="font-medium text-slate-700">{order.payment_method}</span>
                 </div>
                 <div className="text-sm font-extrabold text-slate-900">
-                  Total: <span className="text-[#003d29] tabular-nums">${order.total.toFixed(2)}</span>
+                  Total: <span className="text-[#003d29] tabular-nums">${(Number(order.total) || 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>

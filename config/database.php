@@ -58,8 +58,7 @@ return [
             'strict'      => true,
             'engine'      => null,
             // ---------------------------------------------------------------
-            // SSL OPTIONS — PERBAIKAN: jangan pakai array_filter untuk nilai false
-            // array_filter() menghapus false, membuat VERIFY_SERVER_CERT tidak efektif
+            // SSL OPTIONS — Automatic SSL/TLS for AWS RDS with --require_secure_transport=ON
             // ---------------------------------------------------------------
             'options' => extension_loaded('pdo_mysql') ? (function () {
                 $options = [
@@ -67,9 +66,20 @@ return [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                 ];
-                if ($ca = env('MYSQL_ATTR_SSL_CA')) {
+
+                $ca = env('MYSQL_ATTR_SSL_CA');
+                if (!$ca) {
+                    if (file_exists('/etc/ssl/certs/rds-combined-ca-bundle.pem')) {
+                        $ca = '/etc/ssl/certs/rds-combined-ca-bundle.pem';
+                    } elseif (file_exists('/etc/ssl/certs/ca-certificates.crt')) {
+                        $ca = '/etc/ssl/certs/ca-certificates.crt';
+                    }
+                }
+
+                if ($ca) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
                 }
+
                 return $options;
             })() : [],
         ],
@@ -95,9 +105,20 @@ return [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                 ];
-                if ($ca = env('MYSQL_ATTR_SSL_CA')) {
+
+                $ca = env('MYSQL_ATTR_SSL_CA');
+                if (!$ca) {
+                    if (file_exists('/etc/ssl/certs/rds-combined-ca-bundle.pem')) {
+                        $ca = '/etc/ssl/certs/rds-combined-ca-bundle.pem';
+                    } elseif (file_exists('/etc/ssl/certs/ca-certificates.crt')) {
+                        $ca = '/etc/ssl/certs/ca-certificates.crt';
+                    }
+                }
+
+                if ($ca) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
                 }
+
                 return $options;
             })() : [],
         ],

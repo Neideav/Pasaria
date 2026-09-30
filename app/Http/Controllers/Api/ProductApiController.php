@@ -116,9 +116,16 @@ class ProductApiController extends Controller
                 $products = $query->get()->toArray();
             }
 
-            // Helper to parse JSON fields safely
+            // Helper to parse JSON fields and cast numeric fields safely
             $formattedProducts = array_map(function ($p) {
                 $item = (array) $p;
+                $item['id'] = (int) ($item['id'] ?? 0);
+                $item['price'] = (float) ($item['price'] ?? 0);
+                $item['original_price'] = isset($item['original_price']) && $item['original_price'] !== null ? (float) $item['original_price'] : null;
+                $item['monthly_price'] = isset($item['monthly_price']) && $item['monthly_price'] !== null ? (float) $item['monthly_price'] : null;
+                $item['rating'] = (float) ($item['rating'] ?? 5.0);
+                $item['review_count'] = (int) ($item['review_count'] ?? 0);
+                $item['stock'] = (int) ($item['stock'] ?? 0);
                 if (isset($item['colors']) && is_string($item['colors'])) {
                     $decoded = json_decode($item['colors'], true);
                     $item['colors'] = json_last_error() === JSON_ERROR_NONE ? $decoded : [];
@@ -163,6 +170,13 @@ class ProductApiController extends Controller
             }
 
             $productData = $product->toArray();
+            $productData['id'] = (int) ($productData['id'] ?? 0);
+            $productData['price'] = (float) ($productData['price'] ?? 0);
+            $productData['original_price'] = isset($productData['original_price']) && $productData['original_price'] !== null ? (float) $productData['original_price'] : null;
+            $productData['monthly_price'] = isset($productData['monthly_price']) && $productData['monthly_price'] !== null ? (float) $productData['monthly_price'] : null;
+            $productData['rating'] = (float) ($productData['rating'] ?? 5.0);
+            $productData['review_count'] = (int) ($productData['review_count'] ?? 0);
+            $productData['stock'] = (int) ($productData['stock'] ?? 0);
             if (is_string($productData['colors'])) {
                 $productData['colors'] = json_decode($productData['colors'], true) ?? [];
             }
@@ -176,6 +190,13 @@ class ProductApiController extends Controller
                 ->get()
                 ->map(function ($item) {
                     $arr = $item->toArray();
+                    $arr['id'] = (int) ($arr['id'] ?? 0);
+                    $arr['price'] = (float) ($arr['price'] ?? 0);
+                    $arr['original_price'] = isset($arr['original_price']) && $arr['original_price'] !== null ? (float) $arr['original_price'] : null;
+                    $arr['monthly_price'] = isset($arr['monthly_price']) && $arr['monthly_price'] !== null ? (float) $arr['monthly_price'] : null;
+                    $arr['rating'] = (float) ($arr['rating'] ?? 5.0);
+                    $arr['review_count'] = (int) ($arr['review_count'] ?? 0);
+                    $arr['stock'] = (int) ($arr['stock'] ?? 0);
                     if (is_string($arr['colors'])) {
                         $arr['colors'] = json_decode($arr['colors'], true) ?? [];
                     }

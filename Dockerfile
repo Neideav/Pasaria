@@ -2,7 +2,7 @@
 # Stage 1 — React/Vite build
 # =========================================================
 
-FROM node:22-bookworm AS frontend
+FROM node:22-bookworm-slim AS frontend
 
 WORKDIR /app
 
@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y \
     intl \
     zip \
     && a2enmod rewrite headers \
+    && curl -fsSL https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o /etc/ssl/certs/rds-combined-ca-bundle.pem \
     && rm -rf /var/lib/apt/lists/*
 
 # Composer
@@ -55,7 +56,8 @@ RUN composer install \
     --no-dev \
     --no-interaction \
     --prefer-dist \
-    --optimize-autoloader
+    --optimize-autoloader \
+    && rm -rf /root/.composer/cache
 
 # React build → Laravel public
 COPY --from=frontend /app/dist/ ./public/
@@ -75,6 +77,10 @@ RUN printf '%s\n' \
 
 RUN a2enconf shopcart
 
+# Entrypoint script for runtime permissions
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Laravel permissions
 RUN chown -R www-data:www-data \
     /var/www/html/storage \
@@ -87,4 +93,5 @@ RUN chmod -R 775 \
 
 EXPOSE 80
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["apache2-foreground"]

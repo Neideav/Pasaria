@@ -32,9 +32,14 @@ class OrderApiController extends Controller
 
             $orderNumber = (string) rand(1000000000, 9999999999);
 
+            $userId = auth()->id();
+            if (!$userId && \App\Models\User::where('id', 1)->exists()) {
+                $userId = 1;
+            }
+
             $order = Order::create([
                 'order_number' => $orderNumber,
-                'user_id' => 1,
+                'user_id' => $userId,
                 'customer_name' => $customerName,
                 'customer_email' => $customerEmail,
                 'shipping_address' => $shippingAddress,
@@ -87,6 +92,11 @@ class OrderApiController extends Controller
         try {
             $orders = Order::orderBy('id', 'desc')->get()->map(function ($order) {
                 $item = $order->toArray();
+                $item['subtotal'] = (float) $order->subtotal;
+                $item['tax'] = (float) $order->tax;
+                $item['discount'] = (float) $order->discount;
+                $item['shipping_cost'] = (float) $order->shipping_cost;
+                $item['total'] = (float) $order->total;
                 $item['items'] = is_array($order->items_json) ? $order->items_json : (json_decode($order->items_json, true) ?? []);
                 return $item;
             });

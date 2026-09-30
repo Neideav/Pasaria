@@ -158,13 +158,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div className="border-t border-slate-100 pt-5">
             <div className="flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums">
-                ${product.price.toFixed(2)}
+                ${(Number(product.price) || 0).toFixed(2)}
               </span>
-              {product.monthly_price && (
+              {product.monthly_price ? (
                 <span className="text-sm font-semibold text-slate-500">
-                  or {product.monthly_price.toFixed(2)}/month
+                  or {(Number(product.monthly_price) || 0).toFixed(2)}/month
                 </span>
-              )}
+              ) : null}
             </div>
             <p className="text-xs text-slate-400 mt-1">
               Suggested payments with 6 months special financing
