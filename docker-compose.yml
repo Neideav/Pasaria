@@ -17,6 +17,7 @@ services:
 
     volumes:
       - shopcart-storage:/var/www/html/storage
+      - ./.env:/var/www/html/.env
 
     networks:
       - shopcart-network
