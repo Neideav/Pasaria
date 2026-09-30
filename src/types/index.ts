@@ -68,6 +68,10 @@ export interface Order {
   shipping_cost: number;
   total: number;
   status: string;
+  courier?: string;
+  courier_service?: string;
+  tracking_number?: string;
+  estimated_delivery?: string;
   items?: Array<{
     id: number;
     name: string;
@@ -78,4 +82,43 @@ export interface Order {
     image?: string;
   }>;
   created_at: string;
+}
+
+export interface TrackingCheckpoint {
+  id: string;
+  title: string;
+  location: string;
+  timestamp: string;
+  status: 'completed' | 'current' | 'upcoming';
+  description?: string;
+}
+
+export interface DeliveryShipment {
+  id: string;
+  order_number: string;
+  courier_name: string;
+  courier_service: string;
+  courier_logo?: string;
+  tracking_number: string;
+  status: 'processing' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered';
+  status_label: string;
+  recipient_name: string;
+  recipient_phone: string;
+  delivery_address: string;
+  origin_address: string;
+  estimated_arrival: string;
+  driver_name?: string;
+  driver_phone?: string;
+  driver_vehicle?: string;
+  current_location: string;
+  items_count: number;
+  items_preview?: Array<{
+    name: string;
+    quantity: number;
+    image?: string;
+    color?: string;
+  }>;
+  total_amount: number;
+  created_at: string;
+  checkpoints: TrackingCheckpoint[];
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ArrowLeft, CheckCircle2, Clock } from 'lucide-react';
+import { Package, ArrowLeft, CheckCircle2, Clock, Truck } from 'lucide-react';
 import { Order } from '../types';
 import { ProductVisual } from './ProductVisual';
 
@@ -7,12 +7,14 @@ interface OrdersViewProps {
   orders: Order[];
   onNavigateHome: () => void;
   onSelectProductBySlug: (slug: string) => void;
+  onTrackDelivery?: (order: Order) => void;
 }
 
 export const OrdersView: React.FC<OrdersViewProps> = ({
   orders,
   onNavigateHome,
   onSelectProductBySlug,
+  onTrackDelivery,
 }) => {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 text-left">
@@ -68,7 +70,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{order.status || 'Delivered'}</span>
+                  <span>{order.status || 'In Transit'}</span>
                 </div>
               </div>
 
@@ -100,8 +102,19 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 text-xs">
-                <div className="text-slate-500">
-                  Paid via <span className="font-medium text-slate-700">{order.payment_method}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-500">
+                    Paid via <span className="font-medium text-slate-700">{order.payment_method}</span>
+                  </span>
+                  {onTrackDelivery && (
+                    <button
+                      onClick={() => onTrackDelivery(order)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-[#003d29] bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+                    >
+                      <Truck className="w-3.5 h-3.5" />
+                      <span>Track Delivery</span>
+                    </button>
+                  )}
                 </div>
                 <div className="text-sm font-extrabold text-slate-900">
                   Total: <span className="text-[#003d29] tabular-nums">${(Number(order.total) || 0).toFixed(2)}</span>

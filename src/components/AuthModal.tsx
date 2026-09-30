@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User as UserIcon, ArrowRight } from 'lucide-react';
+import { X, Lock, Mail, User as UserIcon, ArrowRight, Info } from 'lucide-react';
 import { User } from '../types';
 
 interface AuthModalProps {
@@ -130,9 +130,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Notice message (e.g. prompt to login before adding to cart) */}
         {message && !errorMsg && (
-          <div className="p-3 mb-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 font-medium flex items-center gap-2">
-            <span>ℹ️</span>
-            <span>{message}</span>
+          <div className="p-3.5 mb-5 rounded-2xl bg-[#003d29]/5 border border-[#003d29]/20 text-[#003d29] text-xs font-medium flex items-center gap-3 shadow-2xs animate-in fade-in">
+            <div className="w-6 h-6 rounded-full bg-[#003d29]/10 flex items-center justify-center shrink-0 text-[#003d29]">
+              <Info className="w-3.5 h-3.5 stroke-[2.5]" />
+            </div>
+            <span className="leading-relaxed">{message}</span>
           </div>
         )}
 

@@ -13,12 +13,13 @@ import { SearchPage } from './components/SearchPage';
 import { AuthModal } from './components/AuthModal';
 import { ProfileView } from './components/ProfileView';
 import { OrdersView } from './components/OrdersView';
-import { Product, CartItem, User, Order } from './types';
+import { DeliveryView } from './components/DeliveryView';
+import { Product, CartItem, User, Order, DeliveryShipment } from './types';
 import { api } from './services/api';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function App() {
-  const [view, setView] = useState<'home' | 'product' | 'search' | 'category' | 'cart' | 'profile' | 'orders'>('home');
+  const [view, setView] = useState<'home' | 'product' | 'search' | 'category' | 'cart' | 'profile' | 'orders' | 'delivery'>('home');
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -43,6 +44,15 @@ export default function App() {
     }
   });
 
+  const [activeShipment, setActiveShipment] = useState<DeliveryShipment | null>(() => {
+    try {
+      const saved = localStorage.getItem('shopcart_active_shipment');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [authMessage, setAuthMessage] = useState<string>('');
   const [pendingCartAction, setPendingCartAction] = useState<{
     type: 'add' | 'buy';
@@ -54,6 +64,15 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+
+  // Sync active shipment to localStorage
+  useEffect(() => {
+    if (activeShipment) {
+      try {
+        localStorage.setItem('shopcart_active_shipment', JSON.stringify(activeShipment));
+      } catch {}
+    }
+  }, [activeShipment]);
 
   // Sync cart items to localStorage
   useEffect(() => {
@@ -136,16 +155,19 @@ export default function App() {
     if (catName === 'Deals') {
       setFilters((prev) => ({ ...prev, minPrice: 0, maxPrice: 150 }));
       setActiveCategory('all');
+      setView('category');
     } else if (catName === 'What\'s New') {
       setFilters((prev) => ({ ...prev, sort: 'newest' }));
       setActiveCategory('all');
+      setView('category');
     } else if (catName === 'Delivery') {
-      window.scrollTo({ top: 600, behavior: 'smooth' });
+      setView('delivery');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     } else {
       setActiveCategory(catName);
+      setView('category');
     }
-    setView('category');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -413,6 +435,10 @@ export default function App() {
               onLearnMore={(serviceTitle) => {
                 if (serviceTitle.includes('Payment')) {
                   setView('cart');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else if (serviceTitle.includes('Delivery')) {
+                  setView('delivery');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
                   window.scrollTo({ top: 400, behavior: 'smooth' });
                 }
@@ -496,6 +522,99 @@ export default function App() {
                 setView('product');
               } catch (_) {}
             }}
+            onTrackDelivery={(order) => {
+              if (activeShipment && activeShipment.order_number === order.order_number) {
+                setView('delivery');
+              } else {
+                const orderShipment: DeliveryShipment = {
+                  id: `shp-${order.order_number}`,
+                  order_number: order.order_number,
+                  courier_name: order.courier || 'Shopcart Express Priority',
+                  courier_service: order.courier_service || 'Fast Local & Ground Tracking',
+                  tracking_number: order.tracking_number || `SC-TRK-${order.order_number}`,
+                  status: 'in_transit',
+                  status_label: 'In Transit — Live GPS Tracking Active',
+                  recipient_name: order.customer_name,
+                  recipient_phone: user?.phone || '+1 (555) 234-5678',
+                  delivery_address: order.shipping_address,
+                  origin_address: 'Central Fulfillment Center #4, North Hub',
+                  estimated_arrival: order.estimated_delivery || 'Tomorrow by 2:00 PM',
+                  driver_name: 'Marcus Vance (Courier Specialist)',
+                  driver_phone: '+1 (555) 987-6543',
+                  driver_vehicle: 'Eco Delivery Van #EV-428',
+                  current_location: 'Regional Distribution Center, Sector 7',
+                  items_count: order.items?.reduce((s, i) => s + i.quantity, 0) || 1,
+                  items_preview: order.items?.map((i) => ({
+                    name: i.name,
+                    quantity: i.quantity,
+                    image: i.image,
+                    color: i.color,
+                  })),
+                  total_amount: order.total,
+                  created_at: order.created_at || new Date().toISOString(),
+                  checkpoints: [
+                    {
+                      id: 'cp-1',
+                      title: 'Order Confirmed & Processed',
+                      location: 'Shopcart Central Fulfillment Center',
+                      timestamp: '10:00 AM',
+                      status: 'completed',
+                      description: 'Order confirmed and packed with security seal.'
+                    },
+                    {
+                      id: 'cp-2',
+                      title: 'Picked Up by Courier Specialist',
+                      location: 'Logistics Facility',
+                      timestamp: '11:30 AM',
+                      status: 'completed',
+                      description: 'Airway bill barcode scanned and assigned.'
+                    },
+                    {
+                      id: 'cp-3',
+                      title: 'In Transit — En Route to Local Hub',
+                      location: 'Regional Logistics Expressway',
+                      timestamp: 'Active Now',
+                      status: 'current',
+                      description: 'Vehicle GPS active. Approaching destination area.'
+                    },
+                    {
+                      id: 'cp-4',
+                      title: 'Out for Final Delivery',
+                      location: order.shipping_address,
+                      timestamp: order.estimated_delivery || 'Tomorrow',
+                      status: 'upcoming',
+                      description: 'Driver will arrive at front door with contactless delivery.'
+                    },
+                    {
+                      id: 'cp-5',
+                      title: 'Package Delivered',
+                      location: order.shipping_address,
+                      timestamp: order.estimated_delivery || 'Tomorrow',
+                      status: 'upcoming',
+                      description: 'Signed confirmation and photo delivery proof.'
+                    }
+                  ]
+                };
+                setActiveShipment(orderShipment);
+                setView('delivery');
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {view === 'delivery' && (
+          <DeliveryView
+            activeShipment={activeShipment}
+            onNavigateHome={handleNavigateHome}
+            onSelectProductBySlug={async (slug) => {
+              try {
+                const data = await api.getProductBySlug(slug);
+                setSelectedProduct(data.product);
+                setRelatedProducts(data.related);
+                setView('product');
+              } catch (_) {}
+            }}
           />
         )}
       </main>
@@ -506,9 +625,16 @@ export default function App() {
         user={user}
         isOpen={checkoutModalOpen}
         onClose={() => setCheckoutModalOpen(false)}
-        onOrderSuccess={(orderNum) => {
+        onOrderSuccess={(orderNum, shipment, openDeliveryView) => {
           loadOrders();
           setCartItems([]);
+          if (shipment) {
+            setActiveShipment(shipment);
+          }
+          if (openDeliveryView) {
+            setView('delivery');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         }}
         subtotal={cartSubtotal}
       />
