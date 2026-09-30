@@ -8,101 +8,178 @@ This project is styled after modern high-end consumer retail sites (warm ivory, 
 
 ---
 
-## 1. Quick Start Guide
+## 1. Docker Deployment Guide (Ubuntu / AWS EC2)
 
-### Requirements
-- PHP >= 8.2 (dengan ekstensi `pdo_mysql`, `mbstring`, `bcmath`, `curl`)
-- Composer
-- Node.js >= 20 LTS & npm
-- MariaDB Server >= 10.5 (atau AWS RDS MariaDB)
+Panduan deployment Shopcart menggunakan Docker & Docker Compose dengan database AWS RDS MariaDB.
 
-### Automated Deployment (Recommended for AWS EC2)
+### Langkah 1: Persiapan Database di AWS RDS
 
-1. **Inisialisasi Server (Sekali saat pertama kali):**
+Install MariaDB client untuk membuat database awal di instance RDS:
+```bash
+sudo apt update
+sudo apt install -y mariadb-client
+
+# Masuk ke RDS MySQL/MariaDB
+mysql -h YOUR_RDS_ENDPOINT -P 3306 -u admin -p
+
+# Buat database
+CREATE DATABASE database_name;
+exit
+```
+
+---
+
+### Langkah 2: Instalasi Docker di Server (Ubuntu)
+
+1. **Install dependensi & keyring Docker:**
    ```bash
-   sudo bash setup-server.sh
+   sudo apt update
+   sudo apt install -y ca-certificates curl
+   sudo install -m 0755 -d /etc/apt/keyrings
+   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+   sudo chmod a+r /etc/apt/keyrings/docker.asc
    ```
-2. **Konfigurasi .env:**
+
+2. **Tambahkan Docker Repository:**
    ```bash
-   cp .env.example .env
-   nano .env  # Isi DB_HOST (RDS endpoint), DB_PASSWORD, APP_URL
+   sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+   Types: deb
+   URIs: https://download.docker.com/linux/ubuntu
+   Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+   Components: stable
+   Architectures: $(dpkg --print-architecture)
+   Signed-By: /etc/apt/keyrings/docker.asc
+   EOF
    ```
-3. **Deploy & Build:**
+
+3. **Install Docker Engine & Docker Compose Plugin:**
    ```bash
-   bash deploy-aws.sh
+   sudo apt update
+   sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+   ```
+
+4. **Verifikasi instalasi & beri permission ke user:**
+   ```bash
+   docker --version
+   docker compose version
+   sudo usermod -aG docker $USER
+   exit  # Log out dan login kembali agar group docker aktif
    ```
 
 ---
 
-### Manual Installation Steps
+### Langkah 3: Clone Repository
 
-1. **Install Backend Dependencies**
-   ```bash
-   composer install --optimize-autoloader --no-dev
-   ```
+```bash
+docker ps  # pastikan docker berjalan tanpa sudo
+sudo mkdir -p /var/www
+sudo git clone https://github.com/Neideav/shopcart.git /var/www/shopcart
+sudo chown -R ubuntu:ubuntu /var/www/shopcart
+cd /var/www/shopcart
+```
 
-2. **Build Frontend (React + Vite SPA)**
-   ```bash
-   npm install
-   npm run build
-   # Salin output bundle & images ke public directory Laravel
-   cp -rf dist/assets/* public/assets/
-   cp -f dist/index.html public/index.html
-   ```
+---
 
-3. **Environment Setup**
+### Langkah 4: Konfigurasi Environment (`.env`)
+
+Salin file template `.env.example` ke `.env`:
+```bash
+cp .env.example .env
+nano .env
+```
+
+Pastikan variabel berikut disesuaikan dengan server dan RDS Anda:
+```env
+APP_NAME="shopcart"
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=
+APP_TIMEZONE=UTC
+APP_URL=http://EC2_PUBLIC_IP
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+DB_CONNECTION=mariadb
+DB_HOST=YOUR_RDS_ENDPOINT
+DB_PORT=3306
+DB_DATABASE=database_name
+DB_USERNAME=admin
+DB_PASSWORD=YOUR_RDS_PASSWORD
+MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
+
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+CACHE_DRIVER=file
+
+DEMO_SQLI_MODE=true
+```
+
+---
+
+### Langkah 5: Build & Jalankan Docker Container
+
+```bash
+# Build image Docker (Multi-stage build frontend React + backend Laravel)
+docker compose build
+
+# Jalankan container di background
+docker compose up -d
+
+# Cek status container
+docker compose ps
+
+# (Opsional) Cek log container
+docker compose logs -f shopcart
+```
+
+**Verifikasi awal container:**
+```bash
+curl -I http://localhost
+# Atau buka browser: http://EC2_PUBLIC_IP
+```
+
+---
+
+### Langkah 6: Konfigurasi & Inisialisasi Laravel
+
+Jalankan perintah berikut untuk menginisialisasi aplikasi Laravel di dalam container:
+
+1. **Generate Encryption Key:**
    ```bash
-   cp .env.example .env
+   docker exec -it shopcart bash
+   php -v
+   php artisan --version
+   php artisan about
    php artisan key:generate
+   exit
    ```
 
-4. **Database Setup (MariaDB / AWS RDS)**
-   Buat database di MariaDB:
-   ```sql
-   CREATE DATABASE shopcart CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   CREATE USER 'shopcart_user'@'%' IDENTIFIED BY 'shopcart_password_123';
-   GRANT ALL PRIVILEGES ON shopcart.* TO 'shopcart_user'@'%';
-   FLUSH PRIVILEGES;
-   ```
-
-   Sesuaikan variabel di `.env`:
-   ```env
-   DB_CONNECTION=mariadb
-   DB_HOST=127.0.0.1 # atau Endpoint AWS RDS (contoh: xxx.rds.amazonaws.com)
-   DB_PORT=3306
-   DB_DATABASE=shopcart
-   DB_USERNAME=shopcart_user
-   DB_PASSWORD=shopcart_password_123
-   ```
-
-   Jalankan migrasi dan seeder:
+2. **Jalankan Database Migration & Seeder:**
    ```bash
-   php artisan migrate:fresh --seed
+   docker exec shopcart php artisan migrate --force
+   docker exec shopcart php artisan db:seed --force
    ```
 
-5. **Apache2 Web Server Setup (AWS EC2 / Linux Ubuntu)**
-   Install Apache2 dan modul PHP:
+3. **Optimasi Cache Laravel untuk Production:**
    ```bash
-   sudo apt update
-   sudo apt install -y apache2 libapache2-mod-php8.2 php8.2-mysql php8.2-curl php8.2-xml php8.2-mbstring php8.2-zip unzip
+   docker exec shopcart php artisan config:cache
+   docker exec shopcart php artisan route:cache
+   docker exec shopcart php artisan view:cache
+   docker exec shopcart php artisan config:clear
+   docker exec shopcart php artisan config:cache
    ```
 
-   Aktifkan modul `rewrite` dan `headers`:
-   ```bash
-   sudo a2enmod rewrite headers
-   ```
+---
 
-   Salin konfigurasi VirtualHost dari `apache/shopcart.conf`:
-   ```bash
-   sudo cp apache/shopcart.conf /etc/apache2/sites-available/shopcart.conf
-   sudo a2ensite shopcart.conf
-   sudo a2dissite 000-default.conf
-   sudo apache2ctl configtest
-   sudo systemctl restart apache2
-   ```
+### Langkah 7: Pengujian & Verifikasi
 
-6. **Alternatif: Nginx Web Server**
-   Jika menggunakan Nginx, file konfigurasi tersedia di `nginx/shopcart.conf`.
+Uji endpoint API dari terminal atau browser:
+```bash
+curl http://EC2_PUBLIC_IP/api/products
+```
+Buka aplikasi melalui web browser: `http://EC2_PUBLIC_IP`
 
 ---
 
