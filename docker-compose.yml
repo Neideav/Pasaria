@@ -1,56 +1,28 @@
-version: '3.8'
-
 services:
-  # Nginx Web Server
-  nginx:
-    image: nginx:alpine
-    container_name: shopcart_nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - ./:/var/www/shopcart
-      - ./nginx/docker-nginx.conf:/etc/nginx/conf.d/default.conf
-    depends_on:
-      - app
-    networks:
-      - shopcart_network
 
-  # PHP-FPM Application
-  app:
+  shopcart:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: shopcart_app
-    restart: unless-stopped
-    volumes:
-      - ./:/var/www/shopcart
-    networks:
-      - shopcart_network
-    depends_on:
-      - mariadb
 
-  # MariaDB Database (Bisa digunakan lokal atau diganti dengan AWS RDS MariaDB)
-  mariadb:
-    image: mariadb:10.11
-    container_name: shopcart_mariadb
+    container_name: shopcart
+
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root_password_123
-      MYSQL_DATABASE: shopcart
-      MYSQL_USER: shopcart_user
-      MYSQL_PASSWORD: shopcart_password_123
+
     ports:
-      - "3306:3306"
+      - "80:80"
+
+    env_file:
+      - .env
+
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - shopcart-storage:/var/www/html/storage
+
     networks:
-      - shopcart_network
+      - shopcart-network
 
 networks:
-  shopcart_network:
-    driver: bridge
+  shopcart-network:
 
 volumes:
-  mariadb_data:
-    driver: local
+  shopcart-storage:
