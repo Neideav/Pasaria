@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('image');
             $table->float('rating')->default(5.0);
             $table->integer('review_count')->default(0);
+            $table->integer('stock')->default(10);
             $table->json('colors')->nullable();
             $table->json('specs')->nullable();
             $table->unsignedBigInteger('shop_id')->default(1);

@@ -87,10 +87,14 @@ class OrderApiController extends Controller
      *
      * @return JsonResponse
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
-            $orders = Order::orderBy('id', 'desc')->get()->map(function ($order) {
+            $query = Order::orderBy('id', 'desc');
+            if ($request->has('user_id') && !empty($request->input('user_id'))) {
+                $query->where('user_id', $request->input('user_id'));
+            }
+            $orders = $query->get()->map(function ($order) {
                 $item = $order->toArray();
                 $item['subtotal'] = (float) $order->subtotal;
                 $item['tax'] = (float) $order->tax;
