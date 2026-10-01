@@ -177,9 +177,40 @@ export default function App() {
         maxPrice: filters.maxPrice,
         minRating: filters.minRating,
       });
-      setProducts(res.products);
+      let serverProducts = res.products || [];
+
+      // Merge with custom products from local storage so they are NEVER lost even before DB migration
+      try {
+        const savedCustom = localStorage.getItem('shopcart_custom_products');
+        if (savedCustom) {
+          const customList: Product[] = JSON.parse(savedCustom);
+          if (Array.isArray(customList) && customList.length > 0) {
+            const serverSlugs = new Set(serverProducts.map((p) => p.slug));
+            const serverIds = new Set(serverProducts.map((p) => String(p.id)));
+            const missing = customList.filter(
+              (cp) => !serverSlugs.has(cp.slug) && !serverIds.has(String(cp.id))
+            );
+            serverProducts = [...missing, ...serverProducts];
+          }
+        }
+      } catch {}
+
+      setProducts(serverProducts);
     } catch (err) {
       console.error('Failed to load products:', err);
+      try {
+        const savedCustom = localStorage.getItem('shopcart_custom_products');
+        if (savedCustom) {
+          const customList: Product[] = JSON.parse(savedCustom);
+          if (Array.isArray(customList) && customList.length > 0) {
+            setProducts((prev) => {
+              const prevIds = new Set(prev.map((p) => String(p.id)));
+              const missing = customList.filter((cp) => !prevIds.has(String(cp.id)));
+              return [...missing, ...prev];
+            });
+          }
+        }
+      } catch {}
     }
   };
 
@@ -336,10 +367,34 @@ export default function App() {
       created_at: new Date().toISOString()
     };
 
+    // Save immediately to local storage custom products
+    try {
+      const saved = localStorage.getItem('shopcart_custom_products');
+      const list: Product[] = saved ? JSON.parse(saved) : [];
+      const updatedList = [
+        newProduct,
+        ...list.filter((p) => p.slug !== newProduct.slug && String(p.id) !== String(newProduct.id)),
+      ];
+      localStorage.setItem('shopcart_custom_products', JSON.stringify(updatedList));
+    } catch {}
+
     try {
       const res = await api.addProduct(newProduct);
       if (res && res.product) {
-        setProducts((prev) => [res.product, ...prev]);
+        setProducts((prev) => [
+          res.product,
+          ...prev.filter((p) => p.slug !== res.product.slug && String(p.id) !== String(res.product.id)),
+        ]);
+        // Update custom products storage with returned DB product
+        try {
+          const saved = localStorage.getItem('shopcart_custom_products');
+          const list: Product[] = saved ? JSON.parse(saved) : [];
+          const updatedList = [
+            res.product,
+            ...list.filter((p) => p.slug !== res.product.slug && String(p.id) !== String(res.product.id)),
+          ];
+          localStorage.setItem('shopcart_custom_products', JSON.stringify(updatedList));
+        } catch {}
         return;
       }
     } catch (err) {
@@ -355,7 +410,16 @@ export default function App() {
     } catch (err) {
       console.warn('API deleteProduct error:', err);
     }
-    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    // Remove from local storage cache
+    try {
+      const saved = localStorage.getItem('shopcart_custom_products');
+      if (saved) {
+        const list: Product[] = JSON.parse(saved);
+        const filtered = list.filter((p) => String(p.id) !== String(productId));
+        localStorage.setItem('shopcart_custom_products', JSON.stringify(filtered));
+      }
+    } catch {}
+    setProducts((prev) => prev.filter((p) => String(p.id) !== String(productId)));
   };
 
   // Cart operations
