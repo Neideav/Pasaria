@@ -337,7 +337,11 @@ export default function App() {
     };
 
     try {
-      await api.addProduct(newProduct);
+      const res = await api.addProduct(newProduct);
+      if (res && res.product) {
+        setProducts((prev) => [res.product, ...prev]);
+        return;
+      }
     } catch (err) {
       console.warn('API addProduct note:', err);
     }

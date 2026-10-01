@@ -78,7 +78,10 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
   // Filter products belonging to this seller/shop
   const shopProducts = currentShop
-    ? products.filter((p) => p.shop_id === currentShop.id || p.shop_name === currentShop.name)
+    ? products.filter((p) =>
+        (p.shop_id != null && currentShop.id != null && String(p.shop_id) === String(currentShop.id)) ||
+        (p.shop_name && currentShop.name && p.shop_name.trim().toLowerCase() === currentShop.name.trim().toLowerCase())
+      )
     : [];
 
   // Handle Logo Upload (Base64 data URL)
