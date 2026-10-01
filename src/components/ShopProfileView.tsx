@@ -31,7 +31,8 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
 }) => {
   // Filter products by this shop
   const shopProducts = products.filter(
-    (p) => p.shop_id === shop.id || p.shop_name === shop.name
+    (p) => (p.shop_id != null && shop.id != null && String(p.shop_id) === String(shop.id)) ||
+           (p.shop_name && shop.name && p.shop_name.trim().toLowerCase() === shop.name.trim().toLowerCase())
   );
 
   // If no products explicitly tagged to this shop, show products or sample

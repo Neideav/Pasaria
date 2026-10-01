@@ -356,6 +356,23 @@ export const ProductVisual: React.FC<ProductVisualProps> = ({
     );
   }
 
+  // Custom uploaded image or external image URL
+  if (imageKey && (imageKey.startsWith('data:') || imageKey.startsWith('http') || imageKey.startsWith('/') || imageKey.startsWith('blob:'))) {
+    return (
+      <div className={`relative flex items-center justify-center overflow-hidden ${heightMap[size]} ${className}`}>
+        <img
+          src={imageKey}
+          alt={name}
+          className="w-full h-full object-contain drop-shadow-xs"
+          onError={(e) => {
+            // Fallback if broken image
+            (e.target as HTMLElement).style.display = 'none';
+          }}
+        />
+      </div>
+    );
+  }
+
   // Fallback for other items
   return (
     <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
