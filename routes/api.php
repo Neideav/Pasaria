@@ -25,7 +25,9 @@ Route::get('/categories', [CategoryApiController::class, 'index']);
 
 // Products & Search
 Route::get('/products', [ProductApiController::class, 'index']);
+Route::post('/products', [ProductApiController::class, 'store']);
 Route::get('/products/{slug}', [ProductApiController::class, 'show']);
+Route::delete('/products/{id}', [ProductApiController::class, 'destroy']);
 
 // Authentication
 Route::post('/auth/login', [AuthApiController::class, 'login']);

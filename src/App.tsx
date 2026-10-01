@@ -311,27 +311,28 @@ export default function App() {
 
   const handleAddProduct = async (productData: Partial<Product>) => {
     const rawPrice = Number(productData.price) || 99;
-    const discount = productData.discount_percent ? Number(productData.discount_percent) : 0;
     const newProduct: Product = {
-      id: Date.now(),
+      id: productData.id || Date.now(),
       title: productData.title || productData.name || 'Produk Baru',
       name: productData.name || productData.title || 'Produk Baru',
-      slug: ((productData.name || productData.title || 'produk').toLowerCase().replace(/[^a-z0-9]+/g, '-')) + '-' + Date.now(),
+      slug: productData.slug || ((productData.name || 'produk').toLowerCase().replace(/[^a-z0-9]+/g, '-')) + '-' + Date.now(),
       category: productData.category || 'Headphones',
       price: rawPrice,
-      original_price: discount > 0 ? Number((rawPrice * (1 + discount / 100)).toFixed(2)) : undefined,
-      discount_percent: discount > 0 ? discount : undefined,
-      rating: 5.0,
-      review_count: 1,
+      original_price: productData.original_price,
+      monthly_price: productData.monthly_price,
+      short_desc: productData.short_desc,
+      rating: productData.rating || 5.0,
+      review_count: productData.review_count || 0,
       stock: Number(productData.stock) || 20,
       description: productData.description || 'Produk berkualitas tinggi bergaransi resmi.',
       image: productData.image || 'airpods-max',
       colors: productData.colors && productData.colors.length > 0 ? productData.colors : [{ name: 'Default', hex: '#003d29' }],
+      specs: productData.specs,
       badge: 'NEW ARRIVAL',
-      shop_id: user?.shop?.id || 1,
-      shop_name: user?.shop?.name || user?.name + ' Store',
-      shop_logo: user?.shop?.logo,
-      shop_city: user?.shop?.city,
+      shop_id: productData.shop_id || user?.shop?.id || 1,
+      shop_name: productData.shop_name || user?.shop?.name || user?.name + ' Store',
+      shop_logo: productData.shop_logo || user?.shop?.logo,
+      shop_city: productData.shop_city || user?.shop?.city,
       created_at: new Date().toISOString()
     };
 

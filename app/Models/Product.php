@@ -24,6 +24,10 @@ class Product extends Model
         'stock',
         'colors',
         'specs',
+        'shop_id',
+        'shop_name',
+        'shop_logo',
+        'shop_city',
     ];
 
     protected $casts = [

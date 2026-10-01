@@ -218,4 +218,72 @@ class ProductApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Store a new product.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $slug = $request->input('slug');
+
+            // Ensure slug is unique
+            if ($slug && Product::where('slug', $slug)->exists()) {
+                $slug = $slug . '-' . time();
+            }
+            if (!$slug) {
+                $base = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $request->input('name', 'product')));
+                $slug = $base . '-' . time();
+            }
+
+            $product = Product::create([
+                'name'           => $request->input('name', 'Product'),
+                'slug'           => $slug,
+                'category'       => $request->input('category', 'Headphones'),
+                'price'          => (float) $request->input('price', 0),
+                'original_price' => $request->input('original_price') ? (float) $request->input('original_price') : null,
+                'monthly_price'  => $request->input('monthly_price') ? (float) $request->input('monthly_price') : null,
+                'short_desc'     => $request->input('short_desc'),
+                'description'    => $request->input('description', ''),
+                'image'          => $request->input('image', 'airpods-max'),
+                'rating'         => (float) $request->input('rating', 5.0),
+                'review_count'   => (int) $request->input('review_count', 0),
+                'stock'          => (int) $request->input('stock', 10),
+                'colors'         => $request->input('colors', []),
+                'specs'          => $request->input('specs'),
+                'shop_id'        => $request->input('shop_id', 1),
+                'shop_name'      => $request->input('shop_name', 'Shopcart Official Merchant'),
+                'shop_logo'      => $request->input('shop_logo'),
+                'shop_city'      => $request->input('shop_city', 'Jakarta'),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'product' => $product->toArray(),
+                'message' => 'Product created successfully',
+            ], 201);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a product by ID.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $product = Product::find($id);
+            if (!$product) {
+                return response()->json(['success' => false, 'error' => 'Product not found'], 404);
+            }
+            $product->delete();
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
 }
