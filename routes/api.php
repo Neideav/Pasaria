@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\ProductApiController;
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\OrderApiController;
 use App\Http\Controllers\Api\ConfigApiController;
+use App\Http\Controllers\Api\CartApiController;
+use App\Http\Controllers\Api\DeliveryApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +34,16 @@ Route::post('/auth/register', [AuthApiController::class, 'register']);
 // Orders
 Route::post('/orders', [OrderApiController::class, 'store']);
 Route::get('/orders', [OrderApiController::class, 'index']);
+
+// Cart
+Route::get('/cart', [CartApiController::class, 'getCart']);
+Route::post('/cart', [CartApiController::class, 'syncCart']);
+Route::delete('/cart', [CartApiController::class, 'clearCart']);
+
+// Deliveries
+Route::get('/deliveries', [DeliveryApiController::class, 'index']);
+Route::get('/deliveries/{code}', [DeliveryApiController::class, 'show']);
+Route::post('/deliveries', [DeliveryApiController::class, 'store']);
 
 // Demo Mode Toggle
 Route::get('/config/demo-mode', [ConfigApiController::class, 'getDemoMode']);

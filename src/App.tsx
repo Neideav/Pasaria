@@ -901,19 +901,28 @@ export default function App() {
         isOpen={checkoutModalOpen}
         onClose={() => setCheckoutModalOpen(false)}
         onOrderSuccess={async (orderNum, shipment, openDeliveryView) => {
-          if (user) {
-            loadOrders(user.id);
-            await api.clearCart(user.id);
-          } else {
-            loadOrders();
-          }
           setCartItems([]);
           localStorage.removeItem('shopcart_cart');
-          if (shipment) {
+          setCheckoutModalOpen(false);
+
+          if (user) {
             try {
-              if (user) {
-                shipment.user_id = user.id;
-              }
+              await api.clearCart(user.id);
+            } catch (_) {}
+            try {
+              loadOrders(user.id);
+            } catch (_) {}
+          } else {
+            try {
+              loadOrders();
+            } catch (_) {}
+          }
+
+          if (shipment) {
+            if (user) {
+              shipment.user_id = user.id;
+            }
+            try {
               await api.saveDelivery(shipment);
             } catch (e) {
               console.warn('Save delivery db note:', e);
@@ -921,7 +930,8 @@ export default function App() {
             setActiveShipment(shipment);
             localStorage.setItem('shopcart_active_shipment', JSON.stringify(shipment));
           }
-          if (openDeliveryView) {
+
+          if (openDeliveryView !== false) {
             setView('delivery');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }

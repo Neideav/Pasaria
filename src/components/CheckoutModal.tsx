@@ -277,17 +277,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     setIsSubmitting(false);
-    setOrderComplete(true);
-
-    try {
-      confetti({
-        particleCount: 110,
-        spread: 75,
-        origin: { y: 0.6 },
-      });
-    } catch (_) {}
-
-    onOrderSuccess(newTransactionId, newShipment, false);
+    onClose();
+    onOrderSuccess(newTransactionId, newShipment, true);
   };
 
   return (
