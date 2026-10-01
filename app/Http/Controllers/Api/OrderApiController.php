@@ -30,12 +30,8 @@ class OrderApiController extends Controller
             $total = (float) $request->input('total', 0);
             $items = $request->input('items', []);
 
-            $orderNumber = (string) rand(1000000000, 9999999999);
-
-            $userId = auth()->id();
-            if (!$userId && \App\Models\User::where('id', 1)->exists()) {
-                $userId = 1;
-            }
+            $orderNumber = $request->input('order_number') ?: (string) rand(1000000000, 9999999999);
+            $userId = (int) ($request->input('user_id') ?: (auth()->id() ?: 1));
 
             $order = Order::create([
                 'order_number' => $orderNumber,
@@ -49,7 +45,7 @@ class OrderApiController extends Controller
                 'discount' => $discount,
                 'shipping_cost' => $shippingCost,
                 'total' => $total,
-                'status' => 'Processing',
+                'status' => $request->input('status', 'In Transit'),
                 'items_json' => is_array($items) ? $items : json_decode($items, true),
             ]);
 

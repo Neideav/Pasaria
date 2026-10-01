@@ -1028,6 +1028,8 @@ async function startServer() {
   app.post('/api/orders', (req: Request, res: Response) => {
     try {
       const {
+        order_number,
+        user_id,
         customer_name,
         customer_email,
         shipping_address,
@@ -1037,10 +1039,12 @@ async function startServer() {
         discount,
         shipping_cost,
         total,
+        status,
         items
       } = req.body;
 
-      const orderNumber = String(Math.floor(1000000000 + Math.random() * 9000000000));
+      const orderNumber = order_number || String(Math.floor(1000000000 + Math.random() * 9000000000));
+      const uid = Number(user_id) || 1;
       const itemsJson = JSON.stringify(items || []);
 
       db.run(
@@ -1048,7 +1052,7 @@ async function startServer() {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderNumber,
-          1,
+          uid,
           customer_name || 'Customer',
           customer_email || 'customer@shopcart.com',
           shipping_address || '4140 Parker Rd. Allentown, New Mexico 31134',
@@ -1058,7 +1062,7 @@ async function startServer() {
           discount || 0,
           shipping_cost || 0,
           total || 0,
-          'Processing',
+          status || 'In Transit',
           itemsJson
         ]
       );
