@@ -447,9 +447,6 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                   <Compass className="w-4 h-4 text-[#003d29]" />
                   <span>Peta Rute & Posisi Kurir Real-Time</span>
                 </h4>
-                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/80">
-                  🟢 GPS Kurir Aktif
-                </span>
               </div>
 
               {/* Map Canvas Visualizer */}
