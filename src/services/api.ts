@@ -82,8 +82,9 @@ export const api = {
     };
   },
 
-  async getOrders(): Promise<Order[]> {
-    const res = await fetch('/api/orders');
+  async getOrders(userId?: number): Promise<Order[]> {
+    const url = userId ? `/api/orders?user_id=${userId}` : '/api/orders';
+    const res = await fetch(url);
     const json = await res.json();
     return json.data || [];
   },

@@ -1075,14 +1075,18 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
-  // API: Orders - List Orders
+  // API: Orders - List Orders (filtered by user_id)
   // ---------------------------------------------------------------------------
   app.get('/api/orders', (req: Request, res: Response) => {
     try {
-      const stmt = db.prepare('SELECT * FROM orders ORDER BY id DESC');
+      const userId = req.query.user_id ? Number(req.query.user_id) : null;
+      const stmt = userId
+        ? db.prepare('SELECT * FROM orders WHERE user_id = :uid ORDER BY id DESC')
+        : db.prepare('SELECT * FROM orders ORDER BY id DESC');
+      if (userId) stmt.bind({ ':uid': userId });
       const rows: any[] = [];
       while (stmt.step()) {
-        const item = stmt.getAsObject();
+        const item = stmt.getAsObject() as any;
         item.items = typeof item.items_json === 'string' ? JSON.parse(item.items_json as string) : [];
         rows.push(item);
       }
@@ -1282,7 +1286,11 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   app.get('/api/deliveries', (req: Request, res: Response) => {
     try {
-      const stmt = db.prepare('SELECT * FROM shipments ORDER BY id DESC');
+      const userId = req.query.user_id ? Number(req.query.user_id) : null;
+      const stmt = userId
+        ? db.prepare('SELECT * FROM shipments WHERE user_id = :uid ORDER BY id DESC')
+        : db.prepare('SELECT * FROM shipments ORDER BY id DESC');
+      if (userId) stmt.bind({ ':uid': userId });
       const shipments: any[] = [];
       while (stmt.step()) {
         const item = stmt.getAsObject() as any;

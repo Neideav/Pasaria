@@ -40,137 +40,10 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
   const [searchTracking, setSearchTracking] = useState('');
   const [copied, setCopied] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [courierPositionPercent, setCourierPositionPercent] = useState(55); // 0 to 100 on map route
+  const [courierPositionPercent, setCourierPositionPercent] = useState(55);
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string>('');
 
-  // Fallback demo shipments if no order exists
-  const demoShipment1: DeliveryShipment = {
-    id: 'shp-demo-01',
-    order_number: '9945284820',
-    courier_name: 'Shopcart Priority Express',
-    courier_service: 'Guaranteed 24-Hour Express Air & Ground',
-    tracking_number: 'SC-EXP-88492041',
-    status: 'in_transit',
-    status_label: 'In Transit — Moving along Grand Avenue toward local delivery hub',
-    recipient_name: 'Wade Warren',
-    recipient_phone: '+1 (555) 234-5678',
-    delivery_address: '4140 Parker Rd, Allentown, PA 31134',
-    origin_address: 'Central Fulfillment Hub #4, North Logistics Park',
-    estimated_arrival: 'Today by 3:45 PM (~35 mins)',
-    driver_name: 'Marcus Vance (Courier Specialist)',
-    driver_phone: '+1 (555) 987-6543',
-    driver_vehicle: 'Eco Electric Van #EV-428',
-    current_location: 'Grand Ave & 5th Expressway — 2.8 miles away',
-    items_count: 2,
-    items_preview: [
-      { name: 'Airpods- Max', quantity: 1, color: 'Pink', image: 'airpods-max' },
-      { name: 'Bose BT Earphones', quantity: 1, color: 'Triple Black', image: 'bose-bt-earphones' }
-    ],
-    total_amount: 838.0,
-    created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
-    checkpoints: [
-      {
-        id: 'cp-1',
-        title: 'Order Confirmed & Securely Packed',
-        location: 'Shopcart Central Warehouse, Bay 14',
-        timestamp: '10:15 AM',
-        status: 'completed',
-        description: 'Items inspected for quality and barcode scanned for shipment dispatch.'
-      },
-      {
-        id: 'cp-2',
-        title: 'Picked Up by Courier Specialist',
-        location: 'Shopcart Express Logistics Hub',
-        timestamp: '11:40 AM',
-        status: 'completed',
-        description: 'Handed over to carrier. Airway bill assigned and initial security clearance cleared.'
-      },
-      {
-        id: 'cp-3',
-        title: 'In Transit — Vehicle En Route',
-        location: 'Grand Ave Expressway, Approaching Sector 7',
-        timestamp: '01:25 PM',
-        status: 'current',
-        description: 'Package currently in transport on Eco Van #EV-428 moving toward your neighborhood.'
-      },
-      {
-        id: 'cp-4',
-        title: 'Out for Final Delivery',
-        location: 'Local Delivery Unit, Allentown',
-        timestamp: 'Estimated 02:45 PM',
-        status: 'upcoming',
-        description: 'Driver will contact your phone upon arrival at front door.'
-      },
-      {
-        id: 'cp-5',
-        title: 'Delivered to Recipient',
-        location: 'Destination Address',
-        timestamp: 'Estimated 03:45 PM',
-        status: 'upcoming',
-        description: 'Photo proof and contactless confirmation upon handover.'
-      }
-    ]
-  };
-
-  const demoShipment2: DeliveryShipment = {
-    id: 'shp-demo-02',
-    order_number: '9931847190',
-    courier_name: 'FedEx Priority Overnight',
-    courier_service: 'Next-Day Express Air Delivery',
-    tracking_number: 'FDX-AIR-90412847',
-    status: 'out_for_delivery',
-    status_label: 'Out for Final Delivery — Courier Driver is in your area (0.6 miles)',
-    recipient_name: 'Wade Warren',
-    recipient_phone: '+1 (555) 234-5678',
-    delivery_address: '4140 Parker Rd, Allentown, PA 31134',
-    origin_address: 'FedEx Airport Sort Facility, Terminal B',
-    estimated_arrival: 'Within 20 minutes',
-    driver_name: 'David K. (FedEx Courier)',
-    driver_phone: '+1 (555) 888-2341',
-    driver_vehicle: 'FedEx Sprinter Van #F-102',
-    current_location: 'Park Avenue, Near Main Gate',
-    items_count: 1,
-    items_preview: [
-      { name: 'TAGRY Bluetooth Earbuds', quantity: 1, color: 'White', image: 'tagry-bluetooth' }
-    ],
-    total_amount: 49.99,
-    created_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-    checkpoints: [
-      {
-        id: 'cp-21',
-        title: 'Order Confirmed & Processed',
-        location: 'Shopcart Warehouse',
-        timestamp: 'Yesterday 04:00 PM',
-        status: 'completed',
-        description: 'Order confirmed and packed.'
-      },
-      {
-        id: 'cp-22',
-        title: 'Arrived at Regional Air Hub',
-        location: 'FedEx Airport Sort Facility',
-        timestamp: 'Today 06:30 AM',
-        status: 'completed',
-        description: 'Sorted for morning delivery run.'
-      },
-      {
-        id: 'cp-23',
-        title: 'Out for Delivery with Courier',
-        location: 'Local Neighborhood Route',
-        timestamp: 'Today 09:15 AM',
-        status: 'current',
-        description: 'Courier David K. is out delivering packages in your area.'
-      },
-      {
-        id: 'cp-24',
-        title: 'Package Delivered',
-        location: '4140 Parker Rd, Allentown',
-        timestamp: 'Estimated in 20 mins',
-        status: 'upcoming',
-        description: 'Recipient signature requested.'
-      }
-    ]
-  };
-
-  // Build available shipments from orders or fallback demo list
+  // Build available shipments from active shipment and orders
   const availableShipments: DeliveryShipment[] = [];
   if (activeShipment) {
     availableShipments.push(activeShipment);
@@ -251,16 +124,35 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
     }
   });
 
+  // Only show real shipments — no demo fallback
   if (availableShipments.length === 0) {
-    availableShipments.push(demoShipment1, demoShipment2);
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 py-20 text-center">
+        <div className="flex flex-col items-center gap-5">
+          <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center">
+            <Truck className="w-9 h-9 text-slate-300" />
+          </div>
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-800 mb-2">Belum Ada Pengiriman</h2>
+            <p className="text-sm text-slate-500 max-w-xs mx-auto">
+              Pengiriman akan muncul di sini setelah kamu melakukan pembelian. Yuk mulai belanja!
+            </p>
+          </div>
+          <button
+            onClick={onNavigateHome}
+            className="px-6 py-2.5 rounded-full bg-[#003d29] text-white text-sm font-bold hover:bg-[#064e3b] transition-colors cursor-pointer"
+          >
+            Mulai Belanja
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  const [selectedShipmentId, setSelectedShipmentId] = useState<string>(
-    availableShipments[0]?.id || 'shp-demo-01'
-  );
+  const resolvedShipmentId = selectedShipmentId || availableShipments[0]?.id || '';
 
   const currentShipment =
-    availableShipments.find((s) => s.id === selectedShipmentId) || availableShipments[0] || demoShipment1;
+    availableShipments.find((s) => s.id === resolvedShipmentId) || availableShipments[0];
 
   // Real-time live status simulation
   const handleSimulateAdvance = () => {
@@ -322,12 +214,8 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
             <ChevronRight className="w-3 h-3 text-slate-300" />
             <span className="text-slate-800 font-semibold">Delivery & Courier Tracking</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             <span>Live Delivery Tracking</span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-[#003d29] border border-emerald-200/70">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live GPS Sync
-            </span>
           </h1>
         </div>
 

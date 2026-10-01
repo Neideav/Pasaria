@@ -112,9 +112,12 @@ export default function App() {
   const loadCartFromDatabase = async (uid: number) => {
     try {
       const dbItems = await api.getCart(uid);
-      if (dbItems && Array.isArray(dbItems) && dbItems.length > 0) {
+      if (dbItems && Array.isArray(dbItems)) {
         setCartItems(dbItems);
         localStorage.setItem('shopcart_cart', JSON.stringify(dbItems));
+      } else {
+        setCartItems([]);
+        localStorage.removeItem('shopcart_cart');
       }
     } catch (e) {
       console.warn('Load cart from db note:', e);
@@ -124,8 +127,12 @@ export default function App() {
   const loadDeliveriesFromDatabase = async (uid: number) => {
     try {
       const shipments = await api.getDeliveries(uid);
-      if (shipments && shipments.length > 0 && !activeShipment) {
+      if (shipments && Array.isArray(shipments) && shipments.length > 0) {
         setActiveShipment(shipments[0]);
+        localStorage.setItem('shopcart_active_shipment', JSON.stringify(shipments[0]));
+      } else {
+        setActiveShipment(null);
+        localStorage.removeItem('shopcart_active_shipment');
       }
     } catch (e) {
       console.warn('Load deliveries note:', e);
@@ -150,10 +157,13 @@ export default function App() {
 
   // Load orders and user-specific data on mount/login
   useEffect(() => {
-    loadOrders();
     if (user) {
+      loadOrders(user.id);
       loadCartFromDatabase(user.id);
       loadDeliveriesFromDatabase(user.id);
+    } else {
+      // User logged out — clear user-specific data
+      setOrders([]);
     }
   }, [user?.id]);
 
@@ -173,9 +183,9 @@ export default function App() {
     }
   };
 
-  const loadOrders = async () => {
+  const loadOrders = async (userId?: number) => {
     try {
-      const data = await api.getOrders();
+      const data = await api.getOrders(userId);
       setOrders(data);
     } catch (err) {
       console.error('Failed to load orders:', err);
@@ -384,35 +394,51 @@ export default function App() {
       localStorage.setItem('shopcart_user', JSON.stringify(loggedUser));
     } catch {}
 
+    // Load user orders from database
+    loadOrders(loggedUser.id);
+
     // Load user cart from database
+    let userCart: CartItem[] = [];
     try {
       const dbCart = await api.getCart(loggedUser.id);
-      if (dbCart && Array.isArray(dbCart) && dbCart.length > 0) {
+      if (dbCart && Array.isArray(dbCart)) {
+        userCart = dbCart;
         setCartItems(dbCart);
-      } else if (cartItems.length > 0) {
-        await api.syncCart(loggedUser.id, cartItems);
+        localStorage.setItem('shopcart_cart', JSON.stringify(dbCart));
+      } else {
+        setCartItems([]);
+        localStorage.removeItem('shopcart_cart');
       }
-    } catch (_) {}
+    } catch (_) {
+      setCartItems([]);
+    }
 
     // Load user deliveries from database
     try {
       const dbShipments = await api.getDeliveries(loggedUser.id);
-      if (dbShipments && dbShipments.length > 0) {
+      if (dbShipments && Array.isArray(dbShipments) && dbShipments.length > 0) {
         setActiveShipment(dbShipments[0]);
+        localStorage.setItem('shopcart_active_shipment', JSON.stringify(dbShipments[0]));
+      } else {
+        setActiveShipment(null);
+        localStorage.removeItem('shopcart_active_shipment');
       }
-    } catch (_) {}
+    } catch (_) {
+      setActiveShipment(null);
+      localStorage.removeItem('shopcart_active_shipment');
+    }
 
     if (pendingCartAction) {
       const { type, product, quantity, color } = pendingCartAction;
-      const existingIdx = cartItems.findIndex(
+      const existingIdx = userCart.findIndex(
         (item) => item.product.id === product.id && item.selectedColor === color
       );
       let next: CartItem[] = [];
       if (existingIdx > -1) {
-        next = [...cartItems];
+        next = [...userCart];
         next[existingIdx].quantity += quantity;
       } else {
-        next = [...cartItems, { product, quantity, selectedColor: color }];
+        next = [...userCart, { product, quantity, selectedColor: color }];
       }
       setCartItems(next);
       syncCartToDatabase(next, loggedUser.id);
@@ -433,6 +459,7 @@ export default function App() {
     } catch {}
     setCartItems([]);
     setActiveShipment(null);
+    setOrders([]);
     handleNavigateHome();
   };
 
@@ -874,18 +901,25 @@ export default function App() {
         isOpen={checkoutModalOpen}
         onClose={() => setCheckoutModalOpen(false)}
         onOrderSuccess={async (orderNum, shipment, openDeliveryView) => {
-          loadOrders();
-          setCartItems([]);
           if (user) {
+            loadOrders(user.id);
             await api.clearCart(user.id);
+          } else {
+            loadOrders();
           }
+          setCartItems([]);
+          localStorage.removeItem('shopcart_cart');
           if (shipment) {
             try {
+              if (user) {
+                shipment.user_id = user.id;
+              }
               await api.saveDelivery(shipment);
             } catch (e) {
               console.warn('Save delivery db note:', e);
             }
             setActiveShipment(shipment);
+            localStorage.setItem('shopcart_active_shipment', JSON.stringify(shipment));
           }
           if (openDeliveryView) {
             setView('delivery');
