@@ -360,7 +360,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
               <div className="space-y-1">
                 <div className="text-[11px] uppercase tracking-wider font-extrabold text-[#003d29] flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>Status Lokasi Terkini (Real-Time)</span>
+                  <span>Status Lokasi Terkini</span>
                 </div>
                 <div className="text-sm sm:text-base font-bold text-slate-900">
                   {currentShipment.status_label}
@@ -445,7 +445,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                   <Compass className="w-4 h-4 text-[#003d29]" />
-                  <span>Peta Rute & Posisi Kurir Real-Time</span>
+                  <span>Peta Rute & Posisi Kurir</span>
                 </h4>
               </div>
 
