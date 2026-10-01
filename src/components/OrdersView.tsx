@@ -1,5 +1,5 @@
-import React from 'react';
-import { Package, ArrowLeft, CheckCircle2, Clock, Truck } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Package, CheckCircle2, Clock, Truck } from 'lucide-react';
 import { Order } from '../types';
 import { ProductVisual } from './ProductVisual';
 
@@ -8,6 +8,7 @@ interface OrdersViewProps {
   onNavigateHome: () => void;
   onSelectProductBySlug: (slug: string) => void;
   onTrackDelivery?: (order: Order) => void;
+  onRefreshOrders?: () => void;
 }
 
 export const OrdersView: React.FC<OrdersViewProps> = ({
@@ -15,7 +16,35 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   onNavigateHome,
   onSelectProductBySlug,
   onTrackDelivery,
+  onRefreshOrders,
 }) => {
+  // Refresh orders each time this view is opened so newly placed orders appear
+  useEffect(() => {
+    if (onRefreshOrders) {
+      onRefreshOrders();
+    }
+  }, []);
+
+  const getStatusStyle = (status: string) => {
+    const s = (status || 'Processing').toLowerCase();
+    if (s.includes('delivered') || s.includes('complete')) {
+      return {
+        cls: 'bg-emerald-50 text-emerald-800',
+        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
+      };
+    }
+    if (s.includes('transit') || s.includes('ship') || s.includes('picked') || s.includes('out for')) {
+      return {
+        cls: 'bg-blue-50 text-blue-800',
+        icon: <Truck className="w-3.5 h-3.5 text-blue-600" />,
+      };
+    }
+    return {
+      cls: 'bg-amber-50 text-amber-800',
+      icon: <Clock className="w-3.5 h-3.5 text-amber-600" />,
+    };
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 text-left">
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
@@ -51,77 +80,80 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs space-y-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 text-xs">
-                <div>
-                  <span className="text-slate-400">Order ID: </span>
-                  <span className="font-bold text-slate-900 tabular-nums">#{order.order_number}</span>
-                </div>
-                <div className="text-slate-400">
-                  {new Date(order.created_at || Date.now()).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{order.status || 'In Transit'}</span>
-                </div>
-              </div>
-
-              {/* Items */}
-              <div className="space-y-3">
-                {order.items?.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg bg-[#f8f9fa] flex items-center justify-center p-1 border border-slate-100 shrink-0">
-                        <ProductVisual imageKey={item.image || 'airpods-max'} name={item.name} size="sm" />
-                      </div>
-                      <div>
-                        <div
-                          onClick={() => item.slug && onSelectProductBySlug(item.slug)}
-                          className="font-bold text-slate-900 hover:text-[#003d29] cursor-pointer"
-                        >
-                          {item.name}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          Qty: {item.quantity} {item.color ? `· Color: ${item.color}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="font-semibold text-slate-900 tabular-nums">
-                      ${((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
-                    </div>
+          {orders.map((order) => {
+            const statusStyle = getStatusStyle(order.status || 'Processing');
+            return (
+              <div
+                key={order.id}
+                className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs space-y-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 text-xs">
+                  <div>
+                    <span className="text-slate-400">Order ID: </span>
+                    <span className="font-bold text-slate-900 tabular-nums">#{order.order_number}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="text-slate-400">
+                    {new Date(order.created_at || Date.now()).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </div>
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold ${statusStyle.cls}`}>
+                    {statusStyle.icon}
+                    <span>{order.status || 'Processing'}</span>
+                  </div>
+                </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 text-xs">
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-500">
-                    Paid via <span className="font-medium text-slate-700">{order.payment_method}</span>
-                  </span>
-                  {onTrackDelivery && (
-                    <button
-                      onClick={() => onTrackDelivery(order)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-[#003d29] bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
-                    >
-                      <Truck className="w-3.5 h-3.5" />
-                      <span>Track Delivery</span>
-                    </button>
-                  )}
+                {/* Items */}
+                <div className="space-y-3">
+                  {order.items?.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-[#f8f9fa] flex items-center justify-center p-1 border border-slate-100 shrink-0">
+                          <ProductVisual imageKey={item.image || 'airpods-max'} name={item.name} size="sm" />
+                        </div>
+                        <div>
+                          <div
+                            onClick={() => item.slug && onSelectProductBySlug(item.slug)}
+                            className="font-bold text-slate-900 hover:text-[#003d29] cursor-pointer"
+                          >
+                            {item.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            Qty: {item.quantity} {item.color ? `· Color: ${item.color}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="font-semibold text-slate-900 tabular-nums">
+                        ${((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-sm font-extrabold text-slate-900">
-                  Total: <span className="text-[#003d29] tabular-nums">${(Number(order.total) || 0).toFixed(2)}</span>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="text-slate-500">
+                      Paid via <span className="font-medium text-slate-700">{order.payment_method}</span>
+                    </span>
+                    {onTrackDelivery && (
+                      <button
+                        onClick={() => onTrackDelivery(order)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-[#003d29] bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+                      >
+                        <Truck className="w-3.5 h-3.5" />
+                        <span>Track Delivery</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-sm font-extrabold text-slate-900">
+                    Total: <span className="text-[#003d29] tabular-nums">${(Number(order.total) || 0).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

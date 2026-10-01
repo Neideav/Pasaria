@@ -788,6 +788,7 @@ export default function App() {
           <OrdersView
             orders={orders}
             onNavigateHome={handleNavigateHome}
+            onRefreshOrders={() => user && loadOrders(user.id)}
             onSelectProductBySlug={async (slug) => {
               try {
                 const data = await api.getProductBySlug(slug);

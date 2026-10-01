@@ -241,6 +241,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          user_id: user?.id,
+          order_number: newTransactionId,
           customer_name: `${firstName} ${lastName}`.trim(),
           customer_email: email,
           shipping_address: `${address}, ${city}, ${zipCode}`,
@@ -257,10 +259,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           discount: discountAmount,
           shipping_cost: shippingCost,
           total,
-          courier: selectedCourier.name,
-          courier_service: selectedCourier.service,
-          tracking_number: trackingNumber,
-          estimated_delivery: selectedCourier.eta,
+          status: 'In Transit',
           items: items.map((i) => ({
             id: i.product.id,
             name: i.product.name,
