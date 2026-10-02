@@ -17,4 +17,4 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            /var/www/shopcart/auto-deploy.sh
+            bash /var/www/shopcart/auto-deploy.sh
