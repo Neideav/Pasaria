@@ -7,20 +7,13 @@ cd /var/www/shopcart
 echo "Pulling latest code..."
 git pull origin main
 
-echo "Installing PHP dependencies..."
-composer install --no-dev --optimize-autoloader
+echo "Building Docker image..."
+docker compose build shopcart
 
-echo "Installing/building frontend..."
-npm ci
-npm run build
+echo "Recreating container..."
+docker compose up -d --force-recreate shopcart
 
-echo "Running migrations..."
-php artisan migrate --force
-
-echo "Clearing/rebuilding Laravel cache..."
-php artisan optimize
-
-echo "Reloading Apache..."
-sudo systemctl reload apache2
+echo "Cleaning unused Docker images..."
+docker image prune -f
 
 echo "Deployment complete!"
