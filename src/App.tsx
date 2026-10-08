@@ -16,13 +16,35 @@ import { DeliveryView } from './components/DeliveryView';
 import { ShopDashboardView } from './components/ShopDashboardView';
 import { ShopProfileView } from './components/ShopProfileView';
 import { SettingsView } from './components/SettingsView';
-import { Product, CartItem, User, Order, DeliveryShipment, Shop } from './types';
+import { WishlistView } from './components/WishlistView';
+import { FollowingShopsView } from './components/FollowingShopsView';
+import { ChatModal } from './components/ChatModal';
+import { ReviewModal } from './components/ReviewModal';
+import { ReturnModal } from './components/ReturnModal';
+import { AdminDashboardView } from './components/AdminDashboardView';
+import { Product, CartItem, User, Order, DeliveryShipment, Shop, OrderItemType } from './types';
 import { api } from './services/api';
 import { Language, translations } from './i18n/translations';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function App() {
-  const [view, setView] = useState<'home' | 'product' | 'search' | 'category' | 'cart' | 'profile' | 'orders' | 'delivery' | 'shop_dashboard' | 'shop_profile' | 'settings'>('home');
+  const [view, setView] = useState<
+    | 'home'
+    | 'product'
+    | 'search'
+    | 'category'
+    | 'cart'
+    | 'profile'
+    | 'orders'
+    | 'delivery'
+    | 'shop_dashboard'
+    | 'shop_profile'
+    | 'settings'
+    | 'wishlist'
+    | 'following'
+    | 'admin'
+  >('home');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedShopProfile, setSelectedShopProfile] = useState<Shop | null>(null);
@@ -32,8 +54,8 @@ export default function App() {
 
   const [lang, setLang] = useState<Language>(() => {
     try {
-      const saved = localStorage.getItem('shopcart_lang');
-      return (saved === 'en' || saved === 'id') ? saved : 'id';
+      const saved = localStorage.getItem('pasaria_lang') || localStorage.getItem('shopcart_lang');
+      return saved === 'en' || saved === 'id' ? saved : 'id';
     } catch {
       return 'id';
     }
@@ -44,13 +66,13 @@ export default function App() {
   const handleLanguageChange = (newLang: Language) => {
     setLang(newLang);
     try {
-      localStorage.setItem('shopcart_lang', newLang);
+      localStorage.setItem('pasaria_lang', newLang);
     } catch {}
   };
 
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('shopcart_cart');
+      const saved = localStorage.getItem('pasaria_cart') || localStorage.getItem('shopcart_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -59,7 +81,7 @@ export default function App() {
 
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const saved = localStorage.getItem('shopcart_user');
+      const saved = localStorage.getItem('pasaria_user') || localStorage.getItem('shopcart_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -68,7 +90,7 @@ export default function App() {
 
   const [activeShipment, setActiveShipment] = useState<DeliveryShipment | null>(() => {
     try {
-      const saved = localStorage.getItem('shopcart_active_shipment');
+      const saved = localStorage.getItem('pasaria_active_shipment') || localStorage.getItem('shopcart_active_shipment');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -81,17 +103,63 @@ export default function App() {
     product: Product;
     quantity: number;
     color?: string;
+    variantId?: number;
   } | null>(null);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
 
+  // New Modals
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [chatShopId, setChatShopId] = useState<number | undefined>(undefined);
+
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<{
+    productId: number;
+    productName: string;
+    orderId?: number;
+    orderItemId?: number;
+  } | null>(null);
+
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnOrder, setReturnOrder] = useState<Order | null>(null);
+
+  // Filter & pagination state
+  const [filters, setFilters] = useState({
+    category: 'all',
+    minPrice: 0,
+    maxPrice: 999999999,
+    minRating: 0,
+    sort: 'popular',
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const productsPerPage = 8;
+
+  // On mount: authenticate with Sanctum session & load data
+  useEffect(() => {
+    bootstrapSession();
+  }, []);
+
+  const bootstrapSession = async () => {
+    try {
+      if (api.isAuthenticated()) {
+        const me = await api.getMe();
+        if (me && me.id) {
+          setUser(me);
+          localStorage.setItem('pasaria_user', JSON.stringify(me));
+        }
+      }
+    } catch (e) {
+      console.warn('Session bootstrap note:', e);
+    }
+  };
+
   // Sync active shipment to localStorage
   useEffect(() => {
     if (activeShipment) {
       try {
-        localStorage.setItem('shopcart_active_shipment', JSON.stringify(activeShipment));
+        localStorage.setItem('pasaria_active_shipment', JSON.stringify(activeShipment));
       } catch {}
     }
   }, [activeShipment]);
@@ -100,7 +168,7 @@ export default function App() {
   const syncCartToDatabase = async (items: CartItem[], currentUid?: number) => {
     const uid = currentUid || user?.id || 1;
     try {
-      localStorage.setItem('shopcart_cart', JSON.stringify(items));
+      localStorage.setItem('pasaria_cart', JSON.stringify(items));
       if (user) {
         await api.syncCart(uid, items);
       }
@@ -114,10 +182,10 @@ export default function App() {
       const dbItems = await api.getCart(uid);
       if (dbItems && Array.isArray(dbItems)) {
         setCartItems(dbItems);
-        localStorage.setItem('shopcart_cart', JSON.stringify(dbItems));
+        localStorage.setItem('pasaria_cart', JSON.stringify(dbItems));
       } else {
         setCartItems([]);
-        localStorage.removeItem('shopcart_cart');
+        localStorage.removeItem('pasaria_cart');
       }
     } catch (e) {
       console.warn('Load cart from db note:', e);
@@ -129,26 +197,15 @@ export default function App() {
       const shipments = await api.getDeliveries(uid);
       if (shipments && Array.isArray(shipments) && shipments.length > 0) {
         setActiveShipment(shipments[0]);
-        localStorage.setItem('shopcart_active_shipment', JSON.stringify(shipments[0]));
+        localStorage.setItem('pasaria_active_shipment', JSON.stringify(shipments[0]));
       } else {
         setActiveShipment(null);
-        localStorage.removeItem('shopcart_active_shipment');
+        localStorage.removeItem('pasaria_active_shipment');
       }
     } catch (e) {
       console.warn('Load deliveries note:', e);
     }
   };
-
-  // Filter & pagination state
-  const [filters, setFilters] = useState({
-    category: 'all',
-    minPrice: 0,
-    maxPrice: 999999,
-    minRating: 0,
-    sort: 'popular',
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const productsPerPage = 8;
 
   // Load products when filters/search change
   useEffect(() => {
@@ -162,7 +219,6 @@ export default function App() {
       loadCartFromDatabase(user.id);
       loadDeliveriesFromDatabase(user.id);
     } else {
-      // User logged out — clear user-specific data
       setOrders([]);
     }
   }, [user?.id]);
@@ -177,40 +233,9 @@ export default function App() {
         maxPrice: filters.maxPrice,
         minRating: filters.minRating,
       });
-      let serverProducts = res.products || [];
-
-      // Merge with custom products from local storage so they are NEVER lost even before DB migration
-      try {
-        const savedCustom = localStorage.getItem('shopcart_custom_products');
-        if (savedCustom) {
-          const customList: Product[] = JSON.parse(savedCustom);
-          if (Array.isArray(customList) && customList.length > 0) {
-            const serverSlugs = new Set(serverProducts.map((p) => p.slug));
-            const serverIds = new Set(serverProducts.map((p) => String(p.id)));
-            const missing = customList.filter(
-              (cp) => !serverSlugs.has(cp.slug) && !serverIds.has(String(cp.id))
-            );
-            serverProducts = [...missing, ...serverProducts];
-          }
-        }
-      } catch {}
-
-      setProducts(serverProducts);
+      setProducts(res.products || []);
     } catch (err) {
       console.error('Failed to load products:', err);
-      try {
-        const savedCustom = localStorage.getItem('shopcart_custom_products');
-        if (savedCustom) {
-          const customList: Product[] = JSON.parse(savedCustom);
-          if (Array.isArray(customList) && customList.length > 0) {
-            setProducts((prev) => {
-              const prevIds = new Set(prev.map((p) => String(p.id)));
-              const missing = customList.filter((cp) => !prevIds.has(String(cp.id)));
-              return [...missing, ...prev];
-            });
-          }
-        }
-      } catch {}
     }
   };
 
@@ -235,7 +260,7 @@ export default function App() {
     try {
       const data = await api.getProductBySlug(product.slug);
       setSelectedProduct(data.product);
-      setRelatedProducts(data.related);
+      setRelatedProducts(data.related || []);
       setView('product');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
@@ -253,10 +278,10 @@ export default function App() {
 
   const handleNavigateCategory = (catName: string) => {
     if (catName === 'Deals') {
-      setFilters((prev) => ({ ...prev, minPrice: 0, maxPrice: 150 }));
+      setFilters((prev) => ({ ...prev, minPrice: 0, maxPrice: 1500000 }));
       setActiveCategory('all');
       setView('category');
-    } else if (catName === 'What\'s New') {
+    } else if (catName === "What's New") {
       setFilters((prev) => ({ ...prev, sort: 'newest' }));
       setActiveCategory('all');
       setView('category');
@@ -273,7 +298,7 @@ export default function App() {
 
   const handleNavigateShop = () => {
     if (!user) {
-      setAuthMessage('Silakan masuk atau buat akun untuk membuka dan mengelola toko Anda.');
+      setAuthMessage('Silakan masuk atau buat akun untuk membuka dan mengelola toko Anda di PASARIA.');
       setAuthModalOpen(true);
       return;
     }
@@ -281,126 +306,46 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleViewShopPublic = (shopName: string, shopId?: number) => {
+  const handleViewShopPublic = async (shopName: string, shopId?: number) => {
     if (user?.shop && (user.shop.name === shopName || user.shop.id === shopId)) {
       setSelectedShopProfile(user.shop);
     } else {
-      setSelectedShopProfile({
-        id: shopId || 99,
-        user_id: 0,
-        name: shopName,
-        slug: shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        slogan: 'Penyedia Produk Original & Terpercaya',
-        city: 'Jakarta Pusat',
-        phone: '+62 812-8888-9999',
-        description: `Selamat datang di ${shopName}! Kami menyediakan berbagai produk audio, aksesoris, dan gadget original dengan garansi resmi dan pengiriman super cepat.`,
-        logo: '',
-        banner: '',
-        rating: 5.0,
-        review_count: 128,
-        verified: true
-      });
+      try {
+        if (shopId) {
+          const s = await api.getShop(shopId);
+          setSelectedShopProfile(s);
+        } else {
+          setSelectedShopProfile({
+            id: shopId || 1,
+            user_id: 1,
+            name: shopName,
+            slug: shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            slogan: 'Penyedia Produk Original & Terpercaya',
+            city: 'Jakarta Pusat',
+            phone: '+62 812-8888-9999',
+            description: `Selamat datang di toko ${shopName}! Kami menyediakan berbagai produk original dengan garansi resmi dan pengiriman cepat di PASARIA.`,
+            rating: 5.0,
+            review_count: 85,
+            is_verified: true,
+          });
+        }
+      } catch {
+        setSelectedShopProfile({
+          id: shopId || 1,
+          user_id: 1,
+          name: shopName,
+          slug: shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          city: 'Jakarta',
+          rating: 5.0,
+          is_verified: true,
+        });
+      }
     }
     setView('shop_profile');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCreateShop = async (shopData: Partial<Shop>) => {
-    if (!user) return;
-    const newShop: Shop = {
-      id: Date.now(),
-      user_id: user.id,
-      name: shopData.name || 'My Store',
-      slug: (shopData.name || 'my-store').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      slogan: shopData.slogan || '',
-      city: shopData.city || 'Jakarta',
-      phone: shopData.phone || user.phone || '',
-      description: shopData.description || '',
-      logo: shopData.logo || '',
-      banner: shopData.banner || '',
-      rating: 5.0,
-      review_count: 0,
-      verified: true,
-      created_at: new Date().toISOString()
-    };
-
-    try {
-      await api.createShop(newShop);
-    } catch (err) {
-      console.warn('API createShop note:', err);
-    }
-
-    const updatedUser: User = {
-      ...user,
-      shop: newShop
-    };
-    setUser(updatedUser);
-    try {
-      localStorage.setItem('shopcart_user', JSON.stringify(updatedUser));
-    } catch {}
-  };
-
-  const handleAddProduct = async (productData: Partial<Product>) => {
-    const rawPrice = Number(productData.price) || 99;
-    const newProduct: Product = {
-      id: productData.id || Date.now(),
-      title: productData.title || productData.name || 'Produk Baru',
-      name: productData.name || productData.title || 'Produk Baru',
-      slug: productData.slug || ((productData.name || 'produk').toLowerCase().replace(/[^a-z0-9]+/g, '-')) + '-' + Date.now(),
-      category: productData.category || 'Headphones',
-      price: rawPrice,
-      original_price: productData.original_price,
-      monthly_price: productData.monthly_price,
-      short_desc: productData.short_desc,
-      rating: productData.rating || 5.0,
-      review_count: productData.review_count || 0,
-      stock: Number(productData.stock) || 20,
-      description: productData.description || 'Produk berkualitas tinggi bergaransi resmi.',
-      image: productData.image || 'airpods-max',
-      colors: productData.colors && productData.colors.length > 0 ? productData.colors : [{ name: 'Default', hex: '#003d29' }],
-      specs: productData.specs,
-      badge: 'NEW ARRIVAL',
-      shop_id: productData.shop_id || user?.shop?.id || 1,
-      shop_name: productData.shop_name || user?.shop?.name || user?.name + ' Store',
-      shop_logo: productData.shop_logo || user?.shop?.logo,
-      shop_city: productData.shop_city || user?.shop?.city,
-      created_at: new Date().toISOString()
-    };
-
-    // Save immediately to local storage custom products
-    try {
-      const saved = localStorage.getItem('shopcart_custom_products');
-      const list: Product[] = saved ? JSON.parse(saved) : [];
-      const updatedList = [
-        newProduct,
-        ...list.filter((p) => p.slug !== newProduct.slug && String(p.id) !== String(newProduct.id)),
-      ];
-      localStorage.setItem('shopcart_custom_products', JSON.stringify(updatedList));
-    } catch {}
-
-    try {
-      const res = await api.addProduct(newProduct);
-      if (res && res.product) {
-        setProducts((prev) => [
-          res.product,
-          ...prev.filter((p) => p.slug !== res.product.slug && String(p.id) !== String(res.product.id)),
-        ]);
-        // Update custom products storage with returned DB product
-        try {
-          const saved = localStorage.getItem('shopcart_custom_products');
-          const list: Product[] = saved ? JSON.parse(saved) : [];
-          const updatedList = [
-            res.product,
-            ...list.filter((p) => p.slug !== res.product.slug && String(p.id) !== String(res.product.id)),
-          ];
-          localStorage.setItem('shopcart_custom_products', JSON.stringify(updatedList));
-        } catch {}
-        return;
-      }
-    } catch (err) {
-      console.warn('API addProduct note:', err);
-    }
-
+  const handleAddProduct = async (newProduct: Product) => {
     setProducts((prev) => [newProduct, ...prev]);
   };
 
@@ -410,108 +355,69 @@ export default function App() {
     } catch (err) {
       console.warn('API deleteProduct error:', err);
     }
-    // Remove from local storage cache
-    try {
-      const saved = localStorage.getItem('shopcart_custom_products');
-      if (saved) {
-        const list: Product[] = JSON.parse(saved);
-        const filtered = list.filter((p) => String(p.id) !== String(productId));
-        localStorage.setItem('shopcart_custom_products', JSON.stringify(filtered));
-      }
-    } catch {}
     setProducts((prev) => prev.filter((p) => String(p.id) !== String(productId)));
   };
 
   // Cart operations
-  const handleAddToCart = (product: Product, quantity = 1, color?: string): boolean => {
+  const handleAddToCart = (product: Product, quantity = 1, color?: string, variantId?: number): boolean => {
     if (!user) {
-      setAuthMessage('Please sign in or create an account to add items to your cart.');
-      setPendingCartAction({ type: 'add', product, quantity, color });
+      setAuthMessage('Silakan masuk ke akun PASARIA Anda untuk memasukkan produk ke keranjang belanja.');
+      setPendingCartAction({ type: 'add', product, quantity, color, variantId });
       setAuthModalOpen(true);
       return false;
     }
 
     const existingIdx = cartItems.findIndex(
-      (item) => item.product.id === product.id && item.selectedColor === color
+      (item) => item.product.id === product.id && item.selectedColor === color && item.variant_id === variantId
     );
     let next: CartItem[] = [];
     if (existingIdx > -1) {
       next = [...cartItems];
       next[existingIdx].quantity += quantity;
     } else {
-      next = [...cartItems, { product, quantity, selectedColor: color }];
+      next = [...cartItems, { product, quantity, selectedColor: color, variant_id: variantId }];
     }
     setCartItems(next);
     syncCartToDatabase(next, user.id);
     return true;
   };
 
-  const handleBuyNow = (product: Product, quantity = 1, color?: string) => {
+  const handleBuyNow = (product: Product, quantity = 1, color?: string, variantId?: number) => {
     if (!user) {
-      setAuthMessage('Please sign in or create an account to proceed with purchase.');
-      setPendingCartAction({ type: 'buy', product, quantity, color });
+      setAuthMessage('Silakan masuk ke akun PASARIA Anda untuk langsung melanjutkan pembelian.');
+      setPendingCartAction({ type: 'buy', product, quantity, color, variantId });
       setAuthModalOpen(true);
       return;
     }
-    handleAddToCart(product, quantity, color);
+    handleAddToCart(product, quantity, color, variantId);
     setCheckoutModalOpen(true);
   };
 
   const handleLoginSuccess = async (loggedUser: User) => {
     setUser(loggedUser);
-    try {
-      localStorage.setItem('shopcart_user', JSON.stringify(loggedUser));
-    } catch {}
+    localStorage.setItem('pasaria_user', JSON.stringify(loggedUser));
 
-    // Load user orders from database
     loadOrders(loggedUser.id);
 
-    // Load user cart from database
-    let userCart: CartItem[] = [];
     try {
       const dbCart = await api.getCart(loggedUser.id);
       if (dbCart && Array.isArray(dbCart)) {
-        userCart = dbCart;
         setCartItems(dbCart);
-        localStorage.setItem('shopcart_cart', JSON.stringify(dbCart));
-      } else {
-        setCartItems([]);
-        localStorage.removeItem('shopcart_cart');
+        localStorage.setItem('pasaria_cart', JSON.stringify(dbCart));
       }
-    } catch (_) {
-      setCartItems([]);
-    }
+    } catch (_) {}
 
-    // Load user deliveries from database
     try {
       const dbShipments = await api.getDeliveries(loggedUser.id);
       if (dbShipments && Array.isArray(dbShipments) && dbShipments.length > 0) {
         setActiveShipment(dbShipments[0]);
-        localStorage.setItem('shopcart_active_shipment', JSON.stringify(dbShipments[0]));
-      } else {
-        setActiveShipment(null);
-        localStorage.removeItem('shopcart_active_shipment');
+        localStorage.setItem('pasaria_active_shipment', JSON.stringify(dbShipments[0]));
       }
-    } catch (_) {
-      setActiveShipment(null);
-      localStorage.removeItem('shopcart_active_shipment');
-    }
+    } catch (_) {}
 
     if (pendingCartAction) {
-      const { type, product, quantity, color } = pendingCartAction;
-      const existingIdx = userCart.findIndex(
-        (item) => item.product.id === product.id && item.selectedColor === color
-      );
-      let next: CartItem[] = [];
-      if (existingIdx > -1) {
-        next = [...userCart];
-        next[existingIdx].quantity += quantity;
-      } else {
-        next = [...userCart, { product, quantity, selectedColor: color }];
-      }
-      setCartItems(next);
-      syncCartToDatabase(next, loggedUser.id);
-
+      const { type, product, quantity, color, variantId } = pendingCartAction;
+      handleAddToCart(product, quantity, color, variantId);
       if (type === 'buy') {
         setCheckoutModalOpen(true);
       }
@@ -519,13 +425,14 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
     try {
-      localStorage.removeItem('shopcart_user');
-      localStorage.removeItem('shopcart_cart');
-      localStorage.removeItem('shopcart_active_shipment');
-    } catch {}
+      await api.logout();
+    } catch (_) {}
+    setUser(null);
+    localStorage.removeItem('pasaria_user');
+    localStorage.removeItem('pasaria_cart');
+    localStorage.removeItem('pasaria_active_shipment');
     setCartItems([]);
     setActiveShipment(null);
     setOrders([]);
@@ -553,15 +460,14 @@ export default function App() {
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
 
-  // Pagination slicing for Home page
+  // Pagination for Home page
   const totalPages = Math.ceil(products.length / productsPerPage) || 1;
   const currentProducts = products.slice(
     (currentPage - 1) * productsPerPage,
     currentPage * productsPerPage
   );
 
-  // Weekly popular slice (items 12 to 16)
-  const weeklyProducts = products.slice(12, 16);
+  const weeklyProducts = products.slice(0, 4);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fcfcfc] text-[#1c2a23]">
@@ -580,7 +486,7 @@ export default function App() {
         }}
         onNavigateProfile={() => {
           if (!user) {
-            setAuthMessage('Please sign in to view your profile.');
+            setAuthMessage('Silakan masuk untuk melihat profil akun Anda.');
             setAuthModalOpen(true);
           } else {
             setView('profile');
@@ -589,17 +495,43 @@ export default function App() {
         }}
         onNavigateOrders={() => {
           if (!user) {
-            setAuthMessage('Please sign in to view your order history.');
+            setAuthMessage('Silakan masuk untuk melihat riwayat pesanan Anda.');
             setAuthModalOpen(true);
           } else {
             setView('orders');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }
         }}
+        onNavigateWishlist={() => {
+          if (!user) {
+            setAuthMessage('Silakan masuk untuk melihat daftar produk favorit Anda.');
+            setAuthModalOpen(true);
+          } else {
+            setView('wishlist');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}
+        onNavigateFollowing={() => {
+          if (!user) {
+            setAuthMessage('Silakan masuk untuk melihat toko yang Anda ikuti.');
+            setAuthModalOpen(true);
+          } else {
+            setView('following');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}
         onNavigateShop={handleNavigateShop}
+        onNavigateAdmin={() => {
+          setView('admin');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         onNavigateSettings={() => {
           setView('settings');
           window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenChat={() => {
+          setChatShopId(undefined);
+          setChatModalOpen(true);
         }}
         onOpenAuth={() => {
           setAuthMessage('');
@@ -613,7 +545,6 @@ export default function App() {
       <main className="flex-1">
         {view === 'home' && (
           <div>
-            {/* Hero Promotional Banner */}
             <HeroBanner
               onBuyNow={() => {
                 if (products.length > 0) {
@@ -622,7 +553,6 @@ export default function App() {
               }}
             />
 
-            {/* Pill Filters Bar */}
             <ProductFilterBar
               filters={filters}
               onChangeFilters={(f) => setFilters((prev) => ({ ...prev, ...f }))}
@@ -630,19 +560,24 @@ export default function App() {
                 setFilters({
                   category: 'all',
                   minPrice: 0,
-                  maxPrice: 999999,
+                  maxPrice: 999999999,
                   minRating: 0,
                   sort: 'popular',
                 })
               }
             />
 
-            {/* Main Product Grid: "Headphones For You!" */}
+            {/* Main Product Grid */}
             <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                  {t.headphonesForYou}
-                </h2>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                    Rekomendasi Pilihan untuk Anda
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Produk original berkualitas dari official store dan seller terverifikasi PASARIA.
+                  </p>
+                </div>
               </div>
 
               {currentProducts.length > 0 ? (
@@ -658,11 +593,11 @@ export default function App() {
                 </div>
               ) : (
                 <div className="py-12 text-center text-slate-500 text-sm">
-                  No products match the selected filters.
+                  Tidak ada produk yang cocok dengan filter yang dipilih.
                 </div>
               )}
 
-              {/* Numbered Pagination (1, 2, 3 > as shown in video) */}
+              {/* Numbered Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2 mt-10">
                   <button
@@ -702,12 +637,12 @@ export default function App() {
               )}
             </section>
 
-            {/* Weekly Popular Products Section (matching image 2 & video 0:08) */}
+            {/* Weekly Popular Products */}
             {weeklyProducts.length > 0 && (
               <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left border-t border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                    {t.weeklyPopular}
+                    Produk Terlaris Minggu Ini
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -723,13 +658,13 @@ export default function App() {
               </section>
             )}
 
-            {/* Services Section ("Services To Help You Shop") */}
+            {/* Services Section */}
             <ServicesSection
               onLearnMore={(serviceTitle) => {
-                if (serviceTitle.includes('Payment')) {
+                if (serviceTitle.includes('Payment') || serviceTitle.includes('Bayar')) {
                   setView('cart');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
-                } else if (serviceTitle.includes('Delivery')) {
+                } else if (serviceTitle.includes('Delivery') || serviceTitle.includes('Kirim')) {
                   setView('delivery');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
@@ -749,6 +684,17 @@ export default function App() {
             onSelectProduct={handleSelectProduct}
             onBackToHome={handleNavigateHome}
             onViewShop={handleViewShopPublic}
+            onOpenChatWithShop={(sId) => {
+              setChatShopId(sId);
+              setChatModalOpen(true);
+            }}
+            onOpenReviewModal={(prod) => {
+              setReviewTarget({
+                productId: prod.id,
+                productName: prod.name,
+              });
+              setReviewModalOpen(true);
+            }}
           />
         )}
 
@@ -766,7 +712,7 @@ export default function App() {
               setFilters({
                 category: 'all',
                 minPrice: 0,
-                maxPrice: 999999,
+                maxPrice: 999999999,
                 minRating: 0,
                 sort: 'popular',
               })
@@ -781,7 +727,7 @@ export default function App() {
             onRemoveItem={handleRemoveCartItem}
             onProceedToCheckout={() => {
               if (!user) {
-                setAuthMessage('Please sign in or create an account to proceed to checkout.');
+                setAuthMessage('Silakan masuk ke akun Anda untuk menyelesaikan proses pembayaran.');
                 setAuthModalOpen(true);
               } else {
                 setCheckoutModalOpen(true);
@@ -791,14 +737,27 @@ export default function App() {
           />
         )}
 
+        {view === 'wishlist' && (
+          <WishlistView
+            onNavigateHome={handleNavigateHome}
+            onSelectProduct={handleSelectProduct}
+            onAddToCart={(p) => handleAddToCart(p, 1)}
+          />
+        )}
+
+        {view === 'following' && (
+          <FollowingShopsView
+            onNavigateHome={handleNavigateHome}
+            onViewShop={handleViewShopPublic}
+          />
+        )}
+
         {view === 'profile' && (
           <ProfileView
             user={user}
             onUpdateUser={(updated) => {
               setUser(updated);
-              try {
-                localStorage.setItem('shopcart_user', JSON.stringify(updated));
-              } catch {}
+              localStorage.setItem('pasaria_user', JSON.stringify(updated));
             }}
             onNavigateHome={handleNavigateHome}
           />
@@ -826,10 +785,7 @@ export default function App() {
             products={products}
             onUpdateUser={(updated) => {
               setUser(updated);
-              try { localStorage.setItem('shopcart_user', JSON.stringify(updated)); } catch {}
-              if (updated.shop) {
-                api.createShop({ ...updated.shop, user_id: updated.id }).catch(() => {});
-              }
+              localStorage.setItem('pasaria_user', JSON.stringify(updated));
             }}
             onAddProduct={handleAddProduct}
             onDeleteProduct={handleDeleteProduct}
@@ -850,6 +806,10 @@ export default function App() {
             onSelectProduct={handleSelectProduct}
             onAddToCart={(p) => handleAddToCart(p, 1)}
             onBackToHome={handleNavigateHome}
+            onOpenChatWithShop={(sId) => {
+              setChatShopId(sId);
+              setChatModalOpen(true);
+            }}
           />
         )}
 
@@ -862,87 +822,33 @@ export default function App() {
               try {
                 const data = await api.getProductBySlug(slug);
                 setSelectedProduct(data.product);
-                setRelatedProducts(data.related);
+                setRelatedProducts(data.related || []);
                 setView('product');
               } catch (_) {}
             }}
             onTrackDelivery={(order) => {
-              if (activeShipment && activeShipment.order_number === order.order_number) {
-                setView('delivery');
-              } else {
-                const orderShipment: DeliveryShipment = {
-                  id: `shp-${order.order_number}`,
-                  order_number: order.order_number,
-                  courier_name: order.courier || 'Shopcart Express Priority',
-                  courier_service: order.courier_service || 'Fast Local & Ground Tracking',
-                  tracking_number: order.tracking_number || `SC-TRK-${order.order_number}`,
-                  status: 'in_transit',
-                  status_label: 'In Transit — Live GPS Tracking Active',
-                  recipient_name: order.customer_name,
-                  recipient_phone: user?.phone || '+1 (555) 234-5678',
-                  delivery_address: order.shipping_address,
-                  origin_address: 'Central Fulfillment Center #4, North Hub',
-                  estimated_arrival: order.estimated_delivery || 'Tomorrow by 2:00 PM',
-                  driver_name: 'Marcus Vance (Courier Specialist)',
-                  driver_phone: '+1 (555) 987-6543',
-                  driver_vehicle: 'Eco Delivery Van #EV-428',
-                  current_location: 'Regional Distribution Center, Sector 7',
-                  items_count: order.items?.reduce((s, i) => s + i.quantity, 0) || 1,
-                  items_preview: order.items?.map((i) => ({
-                    name: i.name,
-                    quantity: i.quantity,
-                    image: i.image,
-                    color: i.color,
-                  })),
-                  total_amount: order.total,
-                  created_at: order.created_at || new Date().toISOString(),
-                  checkpoints: [
-                    {
-                      id: 'cp-1',
-                      title: 'Order Confirmed & Processed',
-                      location: 'Shopcart Central Fulfillment Center',
-                      timestamp: '10:00 AM',
-                      status: 'completed',
-                      description: 'Order confirmed and packed with security seal.'
-                    },
-                    {
-                      id: 'cp-2',
-                      title: 'Picked Up by Courier Specialist',
-                      location: 'Logistics Facility',
-                      timestamp: '11:30 AM',
-                      status: 'completed',
-                      description: 'Airway bill barcode scanned and assigned.'
-                    },
-                    {
-                      id: 'cp-3',
-                      title: 'In Transit — En Route to Local Hub',
-                      location: 'Regional Logistics Expressway',
-                      timestamp: 'Active Now',
-                      status: 'current',
-                      description: 'Vehicle GPS active. Approaching destination area.'
-                    },
-                    {
-                      id: 'cp-4',
-                      title: 'Out for Final Delivery',
-                      location: order.shipping_address,
-                      timestamp: order.estimated_delivery || 'Tomorrow',
-                      status: 'upcoming',
-                      description: 'Driver will arrive at front door with contactless delivery.'
-                    },
-                    {
-                      id: 'cp-5',
-                      title: 'Package Delivered',
-                      location: order.shipping_address,
-                      timestamp: order.estimated_delivery || 'Tomorrow',
-                      status: 'upcoming',
-                      description: 'Signed confirmation and photo delivery proof.'
-                    }
-                  ]
-                };
-                setActiveShipment(orderShipment);
-                setView('delivery');
-              }
+              setView('delivery');
               window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenReviewModal={(item, orderId) => {
+              setReviewTarget({
+                productId: item.product_id || 1,
+                productName: item.product_name || item.name || 'Produk',
+                orderId: orderId,
+                orderItemId: item.id,
+              });
+              setReviewModalOpen(true);
+            }}
+            onOpenReturnModal={(order) => {
+              setReturnOrder(order);
+              setReturnModalOpen(true);
+            }}
+            onBuyAgain={(items) => {
+              items.forEach((i) => {
+                const p = products.find((prod) => prod.id === i.product_id);
+                if (p) handleAddToCart(p, i.quantity, i.color);
+              });
+              setView('cart');
             }}
           />
         )}
@@ -956,15 +862,21 @@ export default function App() {
               try {
                 const data = await api.getProductBySlug(slug);
                 setSelectedProduct(data.product);
-                setRelatedProducts(data.related);
+                setRelatedProducts(data.related || []);
                 setView('product');
               } catch (_) {}
             }}
           />
         )}
+
+        {view === 'admin' && (
+          <AdminDashboardView
+            onNavigateHome={handleNavigateHome}
+          />
+        )}
       </main>
 
-      {/* 3. Checkout Modal & Order Placement */}
+      {/* 3. Checkout Modal */}
       <CheckoutModal
         items={cartItems}
         user={user}
@@ -972,7 +884,7 @@ export default function App() {
         onClose={() => setCheckoutModalOpen(false)}
         onOrderSuccess={async (orderNum, shipment, openDeliveryView) => {
           setCartItems([]);
-          localStorage.removeItem('shopcart_cart');
+          localStorage.removeItem('pasaria_cart');
           setCheckoutModalOpen(false);
 
           if (user) {
@@ -989,16 +901,8 @@ export default function App() {
           }
 
           if (shipment) {
-            if (user) {
-              shipment.user_id = user.id;
-            }
-            try {
-              await api.saveDelivery(shipment);
-            } catch (e) {
-              console.warn('Save delivery db note:', e);
-            }
             setActiveShipment(shipment);
-            localStorage.setItem('shopcart_active_shipment', JSON.stringify(shipment));
+            localStorage.setItem('pasaria_active_shipment', JSON.stringify(shipment));
           }
 
           if (openDeliveryView !== false) {
@@ -1009,7 +913,7 @@ export default function App() {
         subtotal={cartSubtotal}
       />
 
-      {/* 4. Authentication Modal */}
+      {/* 4. Auth Modal */}
       <AuthModal
         isOpen={authModalOpen}
         message={authMessage}
@@ -1020,7 +924,49 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
       />
 
-      {/* 5. Clean Minimal Footer */}
+      {/* 5. Chat Modal */}
+      <ChatModal
+        isOpen={chatModalOpen}
+        onClose={() => setChatModalOpen(false)}
+        currentUser={user}
+        initialShopId={chatShopId}
+      />
+
+      {/* 6. Review Modal */}
+      {reviewTarget && (
+        <ReviewModal
+          isOpen={reviewModalOpen}
+          onClose={() => {
+            setReviewModalOpen(false);
+            setReviewTarget(null);
+          }}
+          productId={reviewTarget.productId}
+          orderId={reviewTarget.orderId}
+          orderItemId={reviewTarget.orderItemId}
+          productName={reviewTarget.productName}
+          onReviewSubmitted={() => {
+            if (user) loadOrders(user.id);
+            loadProducts();
+          }}
+        />
+      )}
+
+      {/* 7. Return Modal */}
+      {returnOrder && (
+        <ReturnModal
+          isOpen={returnModalOpen}
+          onClose={() => {
+            setReturnModalOpen(false);
+            setReturnOrder(null);
+          }}
+          order={returnOrder}
+          onReturnSubmitted={() => {
+            if (user) loadOrders(user.id);
+          }}
+        />
+      )}
+
+      {/* 8. Footer */}
       <Footer />
     </div>
   );

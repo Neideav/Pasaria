@@ -1,7 +1,8 @@
 import React from 'react';
-import { Minus, Plus, Trash2, ArrowLeft, ArrowRight, ShoppingBag } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowLeft, ArrowRight, ShoppingBag, Store, ShieldCheck } from 'lucide-react';
 import { CartItem } from '../types';
 import { ProductVisual } from './ProductVisual';
+import { formatRupiah } from '../utils/formatters';
 
 interface CartPageProps {
   items: CartItem[];
@@ -18,8 +19,18 @@ export const CartPage: React.FC<CartPageProps> = ({
   onProceedToCheckout,
   onContinueShopping,
 }) => {
+  // Group items by seller/shop
+  const shopGroups: Record<string, CartItem[]> = {};
+  items.forEach((item) => {
+    const shopKey = item.product.shop_name || 'PASARIA Official Store';
+    if (!shopGroups[shopKey]) {
+      shopGroups[shopKey] = [];
+    }
+    shopGroups[shopKey].push(item);
+  });
+
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const tax = subtotal * 0.1;
+  const tax = Math.round(subtotal * 0.11); // PPN 11%
   const total = subtotal + tax;
 
   if (items.length === 0) {
@@ -28,14 +39,14 @@ export const CartPage: React.FC<CartPageProps> = ({
         <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
           <ShoppingBag className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Your cart is empty</h2>
-        <p className="text-sm text-slate-500 mb-6">Looks like you haven't added anything to your cart yet.</p>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Keranjang Belanja Kosong</h2>
+        <p className="text-xs text-slate-500 mb-6">Anda belum menambahkan produk ke keranjang belanja.</p>
         <button
           onClick={onContinueShopping}
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] transition-all cursor-pointer"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] transition-all cursor-pointer shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Continue Shopping</span>
+          <span>Mulai Belanja di PASARIA</span>
         </button>
       </div>
     );
@@ -44,103 +55,128 @@ export const CartPage: React.FC<CartPageProps> = ({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Shopping Cart ({items.reduce((s, i) => s + i.quantity, 0)} items)
-        </h1>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Keranjang Belanja ({items.reduce((s, i) => s + i.quantity, 0)} Produk)
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Pesanan dari berbagai toko akan diproses secara multi-vendor terpadu.
+          </p>
+        </div>
         <button
           onClick={onContinueShopping}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Continue Shopping</span>
+          <span>Lanjut Belanja</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left: Cart Items List */}
-        <div className="lg:col-span-8 space-y-4">
-          {items.map((item) => (
+        {/* Left: Cart Items Grouped by Store */}
+        <div className="lg:col-span-8 space-y-6">
+          {Object.entries(shopGroups).map(([shopName, shopItems]) => (
             <div
-              key={`${item.product.id}-${item.selectedColor}`}
-              className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 rounded-2xl bg-white border border-slate-100 shadow-2xs gap-4"
+              key={shopName}
+              className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs space-y-4"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-xl bg-[#f8f9fa] flex items-center justify-center p-2 shrink-0">
-                  <ProductVisual imageKey={item.product.image} name={item.product.name} size="sm" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-1">
-                    {item.product.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 mb-1">
-                    {item.product.category} {item.selectedColor ? `· Color: ${item.selectedColor}` : ''}
-                  </p>
-                  <div className="text-sm font-bold text-slate-900 tabular-nums">
-                    ${item.product.price.toFixed(2)}
-                  </div>
-                </div>
+              {/* Store Header */}
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <Store className="w-4 h-4 text-[#003d29]" />
+                <h3 className="text-sm font-extrabold text-slate-900">{shopName}</h3>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[10px] text-slate-400 ml-auto">
+                  {shopItems.length} Produk
+                </span>
               </div>
 
-              {/* Quantity Stepper & Remove */}
-              <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                <div className="flex items-center bg-slate-100/90 rounded-full px-3 py-1 border border-slate-200/60">
-                  <button
-                    onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
-                    className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
+              {/* Items in this shop */}
+              <div className="divide-y divide-slate-100">
+                {shopItems.map((item) => (
+                  <div
+                    key={`${item.product.id}-${item.selectedColor}-${item.variant_id}`}
+                    className="py-4 first:pt-1 last:pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span className="w-7 text-center text-xs font-bold text-slate-900 tabular-nums">
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
-                    className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </div>
+                    <div className="flex items-center gap-4">
+                      <div className="w-18 h-18 rounded-2xl bg-[#f8f9fa] flex items-center justify-center p-2 shrink-0 border border-slate-100">
+                        <ProductVisual imageKey={item.product.image} name={item.product.name} size="sm" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 line-clamp-1">
+                          {item.product.name}
+                        </h4>
+                        <div className="text-xs text-slate-500 mb-1">
+                          {item.selectedColor ? `Warna: ${item.selectedColor}` : item.product.category}
+                        </div>
+                        <div className="text-sm font-extrabold text-[#003d29] tabular-nums">
+                          {formatRupiah(item.product.price)}
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="text-sm font-bold text-slate-900 tabular-nums min-w-[70px] text-right">
-                  ${(item.product.price * item.quantity).toFixed(2)}
-                </div>
+                    {/* Stepper & Subtotal */}
+                    <div className="flex items-center justify-between sm:justify-end gap-5 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      <div className="flex items-center bg-slate-100 rounded-full px-2.5 py-1 border border-slate-200/60">
+                        <button
+                          onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
+                          className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="w-8 text-center text-xs font-bold text-slate-900 tabular-nums">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
+                          className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
 
-                <button
-                  onClick={() => onRemoveItem(item.product.id)}
-                  className="w-8 h-8 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 flex items-center justify-center transition-colors cursor-pointer"
-                  title="Remove item"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                      <div className="text-sm font-extrabold text-slate-900 tabular-nums min-w-[90px] text-right">
+                        {formatRupiah(item.product.price * item.quantity)}
+                      </div>
+
+                      <button
+                        onClick={() => onRemoveItem(item.product.id)}
+                        className="w-8 h-8 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 flex items-center justify-center transition-colors cursor-pointer"
+                        title="Hapus"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
         </div>
 
         {/* Right: Summary Card */}
-        <div className="lg:col-span-4">
-          <div className="p-6 rounded-3xl bg-white border border-slate-100 shadow-2xs space-y-4">
-            <h3 className="text-base font-bold text-slate-900 pb-3 border-b border-slate-100">
-              Order Summary
+        <div className="lg:col-span-4 sticky top-24">
+          <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-4">
+            <h3 className="text-sm font-extrabold text-slate-900 pb-3 border-b border-slate-100">
+              Ringkasan Belanja
             </h3>
 
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>Subtotal</span>
-                <span className="font-semibold text-slate-900 tabular-nums">${subtotal.toFixed(2)}</span>
+                <span>Total Harga ({items.reduce((s, i) => s + i.quantity, 0)} barang)</span>
+                <span className="font-semibold text-slate-900 tabular-nums">{formatRupiah(subtotal)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Estimated Tax (10%)</span>
-                <span className="font-semibold text-slate-900 tabular-nums">${tax.toFixed(2)}</span>
+                <span>Pajak PPN (11%)</span>
+                <span className="font-semibold text-slate-900 tabular-nums">{formatRupiah(tax)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Estimated Shipping</span>
-                <span className="font-semibold text-emerald-600">Free</span>
+                <span>Estimasi Biaya Pengiriman</span>
+                <span className="font-semibold text-emerald-700">Dihitung di checkout</span>
               </div>
               <div className="border-t border-slate-100 pt-3 flex justify-between items-baseline text-sm font-bold text-slate-900">
-                <span>Total</span>
-                <span className="text-xl font-extrabold text-[#003d29] tabular-nums">
-                  ${total.toFixed(2)}
+                <span>Total Tagihan</span>
+                <span className="text-xl font-black text-[#003d29] tabular-nums">
+                  {formatRupiah(total)}
                 </span>
               </div>
             </div>
@@ -149,7 +185,7 @@ export const CartPage: React.FC<CartPageProps> = ({
               onClick={onProceedToCheckout}
               className="w-full py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] shadow-md shadow-emerald-950/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <span>Proceed to Checkout</span>
+              <span>Lanjut ke Pembayaran</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

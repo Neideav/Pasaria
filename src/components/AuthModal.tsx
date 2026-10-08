@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User as UserIcon, ArrowRight, Info } from 'lucide-react';
+import { X, Lock, Mail, User as UserIcon, ArrowRight, Info, Check } from 'lucide-react';
 import { User } from '../types';
+import { api } from '../services/api';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -37,21 +38,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg('');
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Invalid username or password.');
-      }
-
+      const data = await api.login(username.trim(), password);
       onLoginSuccess(data.user);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to sign in. Please try again.');
+      setErrorMsg(err.message || 'Gagal masuk. Periksa kembali email dan kata sandi Anda.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +51,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regPassword !== regConfirmPassword) {
-      setErrorMsg('Passwords do not match.');
+      setErrorMsg('Konfirmasi kata sandi tidak cocok.');
       return;
     }
 
@@ -68,33 +59,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg('');
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: regName,
-          username: regUsername,
-          email: regEmail,
-          password: regPassword
-        })
+      const data = await api.register({
+        name: regName.trim(),
+        username: regUsername.trim(),
+        email: regEmail.trim(),
+        password: regPassword,
       });
-      const data = await res.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to create account.');
-      }
 
       onLoginSuccess(data.user);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Registration failed.');
+      setErrorMsg(err.message || 'Pendaftaran gagal. Pastikan email belum pernah terdaftar.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
       <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 border border-slate-100 text-left">
         {/* Close Button */}
         <button
@@ -106,17 +88,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Brand header */}
         <div className="mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-7 h-7 rounded-xl bg-emerald-50 text-[#003d29] flex items-center justify-center font-black text-sm">
+              P
+            </span>
+            <span className="font-black text-[#003d29] text-sm tracking-wider">PASARIA</span>
+          </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-            {tab === 'login' ? 'Sign in to Shopcart' : 'Create an Account'}
+            {tab === 'login' ? 'Masuk ke Akun Anda' : 'Daftar Akun Baru'}
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-normal">
             {tab === 'login'
-              ? 'Access your orders, saved items, and personalized recommendations.'
-              : 'Join thousands of satisfied shoppers today.'}
+              ? 'Akses pesanan, pelacakan resi, wishlist, dan toko Anda.'
+              : 'Bergabunglah bersama ribuan pembeli dan seller terpercaya di PASARIA.'}
           </p>
         </div>
 
-        {/* Notice message (e.g. prompt to login before adding to cart) */}
+        {/* Notice message */}
         {message && !errorMsg && (
           <div className="p-3.5 mb-5 rounded-2xl bg-[#003d29]/5 border border-[#003d29]/20 text-[#003d29] text-xs font-medium flex items-center gap-3 shadow-2xs animate-in fade-in">
             <div className="w-6 h-6 rounded-full bg-[#003d29]/10 flex items-center justify-center shrink-0 text-[#003d29]">
@@ -138,14 +126,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                Email / Username
+                Email atau Username
               </label>
               <div className="relative">
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder="customer@pasaria.id"
                   required
                   className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[#003d29]"
                 />
@@ -155,10 +143,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] font-semibold text-slate-700">Password</label>
-                <a href="#forgot" className="text-[11px] text-[#003d29] hover:underline">
-                  Forgot Password?
-                </a>
+                <label className="text-[11px] font-semibold text-slate-700">Kata Sandi</label>
+                <span className="text-[11px] text-[#003d29] hover:underline cursor-pointer">
+                  Lupa Sandi?
+                </span>
               </div>
               <div className="relative">
                 <input
@@ -178,11 +166,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               disabled={loading}
               className="w-full py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-2"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Memproses Masuk...' : 'Masuk ke PASARIA'}
             </button>
 
             <div className="text-center pt-3 text-slate-500">
-              Don't have an account?{' '}
+              Belum punya akun?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -191,7 +179,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }}
                 className="font-bold text-[#003d29] hover:underline cursor-pointer"
               >
-                Create Account
+                Daftar Sekarang
               </button>
             </div>
           </form>
@@ -199,12 +187,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           /* Register Form */
           <form onSubmit={handleRegisterSubmit} className="space-y-3 text-xs">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Full Name</label>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Lengkap</label>
               <input
                 type="text"
                 value={regName}
                 onChange={(e) => setRegName(e.target.value)}
-                placeholder="Jane Doe"
+                placeholder="Budi Santoso"
                 required
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
               />
@@ -216,7 +204,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 type="text"
                 value={regUsername}
                 onChange={(e) => setRegUsername(e.target.value)}
-                placeholder="janedoe"
+                placeholder="budisantoso"
                 required
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
               />
@@ -228,7 +216,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 type="email"
                 value={regEmail}
                 onChange={(e) => setRegEmail(e.target.value)}
-                placeholder="jane@example.com"
+                placeholder="budi@example.com"
                 required
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
               />
@@ -236,7 +224,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Password</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kata Sandi</label>
                 <input
                   type="password"
                   value={regPassword}
@@ -247,7 +235,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Confirm</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Ulangi Sandi</label>
                 <input
                   type="password"
                   value={regConfirmPassword}
@@ -264,11 +252,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               disabled={loading}
               className="w-full py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-3"
             >
-              {loading ? 'Creating...' : 'Create Account'}
+              {loading ? 'Mendaftarkan...' : 'Buat Akun Baru'}
             </button>
 
             <div className="text-center pt-2 text-slate-500">
-              Already have an account?{' '}
+              Sudah memiliki akun?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -277,7 +265,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }}
                 className="font-bold text-[#003d29] hover:underline cursor-pointer"
               >
-                Sign In
+                Masuk di Sini
               </button>
             </div>
           </form>

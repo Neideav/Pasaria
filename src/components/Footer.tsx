@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, ShieldCheck, Heart, Store, Truck } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -13,55 +13,69 @@ export const Footer: React.FC = () => {
                 <ShoppingCart className="w-4 h-4 text-[#003d29]" strokeWidth={2.2} />
               </div>
               <span className="text-xl font-bold tracking-tight text-[#003d29]">
-                Shopcart
+                PASARIA
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 max-w-sm font-normal leading-relaxed">
-              Shopcart is your modern destination for premium audio gear, everyday essentials, and tech accessories designed for effortless living.
+              PASARIA adalah platform modern multi-vendor marketplace terpercaya di Indonesia. Menghubungkan pembeli, penjual resmi, dan UMKM dengan transaksi yang aman, transparan, dan terintegrasi.
             </p>
+            <div className="flex items-center gap-3 pt-2 text-xs text-slate-600 font-medium">
+              <span className="flex items-center gap-1">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                100% Proteksi Transaksi
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <Truck className="w-4 h-4 text-[#003d29]" />
+                Lacak Resi Real-Time
+              </span>
+            </div>
           </div>
 
-          {/* Column 1: Shop */}
+          {/* Column 1: Marketplace */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Shop</h4>
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Kategori</h4>
             <ul className="space-y-2 text-xs text-slate-500">
-              <li><a href="#headphones" className="hover:text-[#003d29] transition-colors">Headphones</a></li>
-              <li><a href="#speakers" className="hover:text-[#003d29] transition-colors">Speakers</a></li>
-              <li><a href="#accessories" className="hover:text-[#003d29] transition-colors">Accessories</a></li>
-              <li><a href="#deals" className="hover:text-[#003d29] transition-colors">Special Offers</a></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Elektronik & Gadget</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Audio & Headphone</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Pakaian & Sepatu</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Perlengkapan Rumah</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Promo Kilat & Flash Sale</span></li>
             </ul>
           </div>
 
-          {/* Column 2: Customer Service */}
+          {/* Column 2: Layanan Pelanggan */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Customer Service</h4>
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Layanan Pelanggan</h4>
             <ul className="space-y-2 text-xs text-slate-500">
-              <li><a href="#contact" className="hover:text-[#003d29] transition-colors">Contact Us</a></li>
-              <li><a href="#orders" className="hover:text-[#003d29] transition-colors">Track Order</a></li>
-              <li><a href="#returns" className="hover:text-[#003d29] transition-colors">Returns & Refunds</a></li>
-              <li><a href="#faq" className="hover:text-[#003d29] transition-colors">Shipping Information</a></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Pusat Bantuan</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Lacak Pengiriman</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Kebijakan Pengembalian</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Metode Pembayaran</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Hubungi Kami</span></li>
             </ul>
           </div>
 
-          {/* Column 3: About & Help */}
+          {/* Column 3: Seller & Bisnis */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">About</h4>
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Mitra & Seller</h4>
             <ul className="space-y-2 text-xs text-slate-500">
-              <li><a href="#about" className="hover:text-[#003d29] transition-colors">Our Company</a></li>
-              <li><a href="#privacy" className="hover:text-[#003d29] transition-colors">Privacy Policy</a></li>
-              <li><a href="#terms" className="hover:text-[#003d29] transition-colors">Terms of Service</a></li>
-              <li><a href="#security" className="hover:text-[#003d29] transition-colors">Trust & Safety</a></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Daftar Seller Center</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Panduan Berjualan</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Official Store Program</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Syarat & Ketentuan Seller</span></li>
+              <li><span className="hover:text-[#003d29] cursor-pointer">Kebijakan Privasi</span></li>
             </ul>
           </div>
         </div>
 
         {/* Bottom Bar */}
         <div className="border-t border-slate-100 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-          <p>© 2026 Shopcart. All rights reserved.</p>
+          <p>© 2026 PASARIA. Seluruh hak cipta dilindungi undang-undang.</p>
           <div className="flex items-center gap-6">
-            <a href="#privacy" className="hover:text-slate-600 transition-colors">Privacy</a>
-            <a href="#terms" className="hover:text-slate-600 transition-colors">Terms</a>
-            <a href="#security" className="hover:text-slate-600 transition-colors">Security</a>
+            <span className="hover:text-slate-600 cursor-pointer">Privasi</span>
+            <span className="hover:text-slate-600 cursor-pointer">Syarat Penggunaan</span>
+            <span className="hover:text-slate-600 cursor-pointer">Keamanan & Audit</span>
           </div>
         </div>
       </div>

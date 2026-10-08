@@ -1,12 +1,13 @@
 {
-    "name": "shopcart/ecommerce-demo",
+    "name": "pasaria/marketplace",
     "type": "project",
-    "description": "Shopcart Modern E-Commerce Platform with Local SQLi Educational Demo",
-    "keywords": ["laravel", "ecommerce", "blade", "tailwind"],
+    "description": "PASARIA — Modern Multi-Vendor E-Commerce Marketplace Platform",
+    "keywords": ["laravel", "marketplace", "ecommerce", "multi-vendor", "sanctum"],
     "license": "MIT",
     "require": {
         "php": "^8.2",
-        "laravel/framework": "^11.0|^10.0"
+        "laravel/framework": "^11.0|^10.0",
+        "laravel/sanctum": "^4.0"
     },
     "autoload": {
         "psr-4": {
@@ -21,6 +22,7 @@
         }
     },
     "scripts": {
+        "test": "./vendor/bin/phpunit",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump"
         ]
@@ -36,5 +38,9 @@
         "sort-packages": true
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "require-dev": {
+        "mockery/mockery": "*",
+        "phpunit/phpunit": "11.0"
+    }
 }
