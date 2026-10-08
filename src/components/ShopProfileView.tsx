@@ -15,6 +15,7 @@ import {
 import { Shop, Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface ShopProfileViewProps {
   shop: Shop;
@@ -33,6 +34,7 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
   onBackToHome,
   onOpenChatWithShop,
 }) => {
+  const { showToast } = useToast();
   const [isFollowing, setIsFollowing] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(false);
 
@@ -164,7 +166,7 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
             <button
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href);
-                alert(`Tautan toko ${shop.name} berhasil disalin!`);
+                showToast(`Tautan toko ${shop.name} berhasil disalin!`, 'success');
               }}
               className="p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
               title="Bagikan Toko"

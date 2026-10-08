@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { DeliveryShipment, Order } from '../types';
 import { ProductVisual } from './ProductVisual';
+import { useToast } from '../context/ToastContext';
 
 interface DeliveryViewProps {
   activeShipment: DeliveryShipment | null;
@@ -37,6 +38,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
   orders = [],
   onNavigateHome,
 }) => {
+  const { showToast } = useToast();
   const [searchTracking, setSearchTracking] = useState('');
   const [copied, setCopied] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -181,7 +183,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
       setSelectedShipmentId(found.id);
       setSearchTracking('');
     } else {
-      alert(`Tracking number "${searchTracking}" loaded into live GPS monitor!`);
+      showToast(`Nomor resi "${searchTracking}" dimuat ke monitor GPS langsung.`, 'info');
     }
   };
 
@@ -679,8 +681,9 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
               </a>
               <button
                 onClick={() =>
-                  alert(
-                    `Pesan terkirim ke ${currentShipment.driver_name}: "Kurir sedang fokus berkendara dan akan tiba di lokasi sesuai estimasi."`
+                  showToast(
+                    `Pesan terkirim ke ${currentShipment.driver_name}: "Kurir sedang fokus berkendara dan akan tiba di lokasi sesuai estimasi."`,
+                    'success'
                   )
                 }
                 className="flex-1 py-2.5 px-3 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"

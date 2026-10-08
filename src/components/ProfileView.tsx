@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, MapPin, Phone, Mail, Shield, Check, Camera, Plus, Trash2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { User as UserType, UserAddress } from '../types';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface ProfileViewProps {
   user: UserType | null;
@@ -14,6 +15,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onUpdateUser,
   onNavigateHome,
 }) => {
+  const { showToast } = useToast();
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [address, setAddress] = useState(user?.address || '');
@@ -123,17 +125,46 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setNewAddressLine('');
       setNewCity('');
       setNewPostalCode('');
+      showToast('Alamat baru berhasil ditambahkan.', 'success');
     } catch (err: any) {
-      alert(err.message || 'Gagal menambahkan alamat');
+      showToast(err.message || 'Gagal menambahkan alamat', 'error');
     }
   };
 
   const handleDeleteAddress = async (id: number) => {
+    const addressToDelete = addresses.find((a) => a.id === id);
     try {
       await api.deleteAddress(id);
       setAddresses((prev) => prev.filter((a) => a.id !== id));
+
+      if (addressToDelete) {
+        showToast('Alamat berhasil dihapus.', 'info', {
+          duration: 6000,
+          action: {
+            label: 'Urungkan',
+            onClick: async () => {
+              try {
+                const restored = await api.addAddress({
+                  recipient_name: addressToDelete.recipient_name,
+                  phone: addressToDelete.phone,
+                  address_line: addressToDelete.address_line,
+                  city: addressToDelete.city,
+                  postal_code: addressToDelete.postal_code,
+                  is_default: addressToDelete.is_default,
+                });
+                setAddresses((prev) => [restored, ...prev]);
+                showToast('Alamat berhasil dipulihkan.', 'success');
+              } catch (err: any) {
+                showToast(err.message || 'Gagal mengembalikan alamat', 'error');
+              }
+            },
+          },
+        });
+      } else {
+        showToast('Alamat berhasil dihapus.', 'info');
+      }
     } catch (err: any) {
-      alert(err.message || 'Gagal menghapus alamat');
+      showToast(err.message || 'Gagal menghapus alamat', 'error');
     }
   };
 

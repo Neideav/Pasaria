@@ -19,6 +19,7 @@ import {
   Clock
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { formatRupiah, formatDateTime } from '../utils/formatters';
 
 interface AdminDashboardViewProps {
@@ -28,6 +29,7 @@ interface AdminDashboardViewProps {
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   onNavigateHome,
 }) => {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sellers' | 'reviews' | 'disputes' | 'reports' | 'audit'>('overview');
   const [metrics, setMetrics] = useState<any>(null);
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -89,44 +91,52 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     const nextStatus = currentStatus === 'suspended' ? 'active' : 'suspended';
     try {
       await api.toggleUserStatus(userId, nextStatus);
-      setActionMsg(`Status pengguna #${userId} berhasil diubah ke ${nextStatus}`);
+      const msg = `Status pengguna #${userId} berhasil diubah ke ${nextStatus}`;
+      setActionMsg(msg);
+      showToast(msg, 'success');
       loadUsers();
       setTimeout(() => setActionMsg(''), 3000);
     } catch (e: any) {
-      alert(e.message || 'Gagal mengubah status pengguna');
+      showToast(e.message || 'Gagal mengubah status pengguna', 'error');
     }
   };
 
   const handleApproveSeller = async (shopId: number, status: 'approved' | 'rejected') => {
     try {
       await api.approveSeller(shopId, status);
-      setActionMsg(`Toko #${shopId} berhasil di-${status === 'approved' ? 'setujui' : 'tolak'}`);
+      const msg = `Toko #${shopId} berhasil di-${status === 'approved' ? 'setujui' : 'tolak'}`;
+      setActionMsg(msg);
+      showToast(msg, 'success');
       loadDashboard();
       setTimeout(() => setActionMsg(''), 3000);
     } catch (e: any) {
-      alert(e.message || 'Gagal memperbarui status seller');
+      showToast(e.message || 'Gagal memperbarui status seller', 'error');
     }
   };
 
   const handleModerateReview = async (reviewId: number, status: 'approved' | 'hidden' | 'active') => {
     try {
       await api.moderateReview(reviewId, status);
-      setActionMsg(`Ulasan #${reviewId} telah diatur ke status ${status}`);
+      const msg = `Ulasan #${reviewId} telah diatur ke status ${status}`;
+      setActionMsg(msg);
+      showToast(msg, 'success');
       loadDashboard();
       setTimeout(() => setActionMsg(''), 3000);
     } catch (e: any) {
-      alert(e.message || 'Gagal memoderasi ulasan');
+      showToast(e.message || 'Gagal memoderasi ulasan', 'error');
     }
   };
 
   const handleResolveDispute = async (disputeId: number, resolution: string) => {
     try {
       await api.resolveDispute(disputeId, resolution, 'Keputusan oleh Tim Resolusi PASARIA');
-      setActionMsg(`Sengketa #${disputeId} berhasil diselesaikan (${resolution})`);
+      const msg = `Sengketa #${disputeId} berhasil diselesaikan (${resolution})`;
+      setActionMsg(msg);
+      showToast(msg, 'success');
       loadDashboard();
       setTimeout(() => setActionMsg(''), 3000);
     } catch (e: any) {
-      alert(e.message || 'Gagal menyelesaikan sengketa');
+      showToast(e.message || 'Gagal menyelesaikan sengketa', 'error');
     }
   };
 

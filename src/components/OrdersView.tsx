@@ -4,6 +4,7 @@ import { Order, OrderItemType, Product } from '../types';
 import { ProductVisual } from './ProductVisual';
 import { formatRupiah, formatDateTime } from '../utils/formatters';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface OrdersViewProps {
   orders: Order[];
@@ -26,8 +27,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   onOpenReturnModal,
   onBuyAgain,
 }) => {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<string>('all');
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
 
   useEffect(() => {
     if (onRefreshOrders) {
@@ -72,16 +75,15 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     };
   };
 
-  const handleCancel = async (orderId: number) => {
-    if (!confirm('Apakah Anda yakin ingin membatalkan pesanan ini? Stok akan dikembalikan secara otomatis.')) {
-      return;
-    }
+  const handleExecuteCancel = async (orderId: number) => {
     setCancellingId(orderId);
     try {
       await api.cancelOrder(orderId, 'Dibatalkan oleh pembeli');
+      showToast('Pesanan berhasil dibatalkan.', 'success');
+      setConfirmCancelId(null);
       if (onRefreshOrders) onRefreshOrders();
     } catch (err: any) {
-      alert(err.message || 'Gagal membatalkan pesanan.');
+      showToast(err.message || 'Gagal membatalkan pesanan.', 'error');
     } finally {
       setCancellingId(null);
     }
@@ -233,7 +235,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {/* Track Delivery */}
                     {onTrackDelivery && (
                       <button
@@ -269,13 +271,35 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
                     {/* Cancel Order */}
                     {canCancel && (
-                      <button
-                        onClick={() => handleCancel(order.id)}
-                        disabled={cancellingId === order.id}
-                        className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors cursor-pointer disabled:opacity-40"
-                      >
-                        {cancellingId === order.id ? 'Membatalkan...' : 'Batalkan'}
-                      </button>
+                      confirmCancelId === order.id ? (
+                        <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl">
+                          <span className="text-[11px] font-medium text-rose-800">
+                            Yakin batalkan pesanan ini? Stok akan dikembalikan secara otomatis.
+                          </span>
+                          <button
+                            onClick={() => handleExecuteCancel(order.id)}
+                            disabled={cancellingId === order.id}
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            {cancellingId === order.id ? 'Memproses...' : 'Ya, Batalkan'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmCancelId(null)}
+                            disabled={cancellingId === order.id}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmCancelId(order.id)}
+                          disabled={cancellingId === order.id}
+                          className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors cursor-pointer disabled:opacity-40"
+                        >
+                          Batalkan
+                        </button>
+                      )
                     )}
                   </div>
                 </div>

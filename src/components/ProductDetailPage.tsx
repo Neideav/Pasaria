@@ -22,6 +22,7 @@ import { ProductVisual } from './ProductVisual';
 import { ProductCard } from './ProductCard';
 import { formatRupiah, formatDateTime } from '../utils/formatters';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface ProductDetailPageProps {
   product: Product;
@@ -46,6 +47,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onOpenChatWithShop,
   onOpenReviewModal,
 }) => {
+  const { showToast } = useToast();
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     product.variants && product.variants.length > 0 ? product.variants[0] : null
   );
@@ -157,9 +159,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       setQuestions((prev) => [res, ...prev]);
       setNewQuestionText('');
       setQuestionSuccess(true);
+      showToast('Pertanyaan berhasil dikirim!', 'success');
       setTimeout(() => setQuestionSuccess(false), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal mengirim pertanyaan. Silakan masuk terlebih dahulu.');
+      showToast(err.message || 'Gagal mengirim pertanyaan. Silakan masuk terlebih dahulu.', 'error');
     } finally {
       setSubmittingQuestion(false);
     }
@@ -195,7 +198,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
-                  alert('Tautan produk berhasil disalin!');
+                  showToast('Tautan produk berhasil disalin ke papan klip!', 'success');
                 }}
                 className="w-10 h-10 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                 title="Bagikan"

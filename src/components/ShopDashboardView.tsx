@@ -27,6 +27,7 @@ import {
 import { User, Shop, Product, Order, Review } from '../types';
 import { ProductVisual } from './ProductVisual';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { formatRupiah, formatDateTime } from '../utils/formatters';
 
 interface ShopDashboardViewProps {
@@ -50,6 +51,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   onViewShopPublic,
   onSelectProduct,
 }) => {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'inventory' | 'orders' | 'reviews' | 'finances' | 'add_product' | 'register'>('overview');
 
   // Shop registration state
@@ -152,12 +154,14 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       };
 
       onUpdateUser(updatedUser);
-      setActionSuccess('Selamat! Toko Anda berhasil didaftarkan dan siap berjualan di PASARIA.');
+      const msg = 'Selamat! Toko Anda berhasil didaftarkan dan siap berjualan di PASARIA.';
+      setActionSuccess(msg);
+      showToast(msg, 'success');
       setActiveTab('overview');
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 4000);
     } catch (err: any) {
-      alert(err.message || 'Gagal mendaftarkan toko.');
+      showToast(err.message || 'Gagal mendaftarkan toko.', 'error');
     } finally {
       setIsRegistering(false);
     }
@@ -184,7 +188,9 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       });
 
       onAddProduct(created.product || created);
-      setActionSuccess('Produk baru berhasil ditambahkan ke etalase toko Anda!');
+      const msg = 'Produk baru berhasil ditambahkan ke etalase toko Anda!';
+      setActionSuccess(msg);
+      showToast(msg, 'success');
       setActiveTab('products');
       setProdName('');
       setProdPrice('');
@@ -193,7 +199,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal menambahkan produk');
+      showToast(err.message || 'Gagal menambahkan produk', 'error');
     } finally {
       setProdCreating(false);
     }
@@ -206,8 +212,9 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       setInventoryList((prev) =>
         prev.map((i) => (i.id === variantId ? { ...i, stock: next } : i))
       );
+      showToast('Stok produk berhasil diperbarui.', 'success');
     } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui stok');
+      showToast(err.message || 'Gagal memperbarui stok', 'error');
     }
   };
 
@@ -215,11 +222,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
     try {
       const trk = `PSR-EXP-${Math.floor(10000000 + Math.random() * 90000000)}`;
       await api.updateOrderStatus(orderId, nextStatus, trk, 'PASARIA Express Priority');
-      setActionSuccess(`Pesanan #${orderId} berhasil diproses ke status: ${nextStatus}`);
+      const msg = `Pesanan #${orderId} berhasil diproses ke status: ${nextStatus}`;
+      setActionSuccess(msg);
+      showToast(msg, 'success');
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui status pesanan');
+      showToast(err.message || 'Gagal memperbarui status pesanan', 'error');
     }
   };
 
@@ -229,12 +238,14 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
     try {
       await api.replyReview(reviewId, text.trim());
-      setActionSuccess('Balasan ulasan berhasil dipublikasikan!');
+      const msg = 'Balasan ulasan berhasil dipublikasikan!';
+      setActionSuccess(msg);
+      showToast(msg, 'success');
       setReplyTextMap((prev) => ({ ...prev, [reviewId]: '' }));
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal membalas ulasan');
+      showToast(err.message || 'Gagal membalas ulasan', 'error');
     }
   };
 
@@ -252,12 +263,14 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
         account_holder: payoutHolder,
       });
 
-      setActionSuccess(`Permintaan penarikan dana ${formatRupiah(amt)} berhasil diajukan.`);
+      const msg = `Permintaan penarikan dana ${formatRupiah(amt)} berhasil diajukan.`;
+      setActionSuccess(msg);
+      showToast(msg, 'success');
       setPayoutAmount('');
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal mengajukan penarikan saldo');
+      showToast(err.message || 'Gagal mengajukan penarikan saldo', 'error');
     } finally {
       setPayoutLoading(false);
     }
