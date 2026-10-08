@@ -1,8 +1,33 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-primary: #003d29;
+  --color-brand-hover: #064e3b;
+  --color-brand-surface: #f8faf9;
+  --color-brand-text: #1c2a23;
+  --color-brand-muted: #526058;
+}
+
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family:
+      "Plus Jakarta Sans",
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      Oxygen,
+      Ubuntu,
+      Cantarell,
+      sans-serif;
+    color: var(--color-brand-text);
+    background-color: #fcfcfc;
+  }
+
+  :focus-visible {
+    outline: 2px solid #003d29 !important;
+    outline-offset: 2px !important;
   }
 }
 
@@ -21,4 +46,3 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #003d29;
 }
-
