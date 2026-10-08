@@ -1,15 +1,15 @@
 {
-  "name": "react-example",
+  "name": "pasaria-marketplace",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "tsx server.ts",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "start": "vite"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

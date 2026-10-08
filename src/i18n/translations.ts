@@ -63,7 +63,7 @@ export const translations = {
 
     // Cart
     reviewYourCart: 'Review Your Cart',
-    freeDeliveryThreshold: 'Spend $50 more to get FREE Standard Delivery!',
+    freeDeliveryThreshold: 'Spend Rp50.000 more to get FREE Standard Delivery!',
     emptyCart: 'Your cart is empty',
     startShopping: 'Explore our latest gadgets and add items to your bag.',
     exploreCatalog: 'Explore Catalog',
@@ -229,7 +229,7 @@ export const translations = {
 
     // Cart
     reviewYourCart: 'Keranjang Belanja Anda',
-    freeDeliveryThreshold: 'Belanja $50 lagi untuk mendapatkan GRATIS Ongkir!',
+    freeDeliveryThreshold: 'Belanja Rp50.000 lagi untuk mendapatkan GRATIS Ongkir!',
     emptyCart: 'Keranjang belanja Anda masih kosong',
     startShopping: 'Temukan berbagai produk gadget & audio terbaik sekarang.',
     exploreCatalog: 'Jelajahi Katalog',
@@ -294,7 +294,7 @@ export const translations = {
     addProduct: 'Tambah Barang Jualan',
     productName: 'Nama Produk',
     productCategory: 'Kategori Produk',
-    productPrice: 'Harga Jual ($)',
+    productPrice: 'Harga Jual (Rp)',
     discountPercent: 'Diskon (%)',
     productStock: 'Stok Awal',
     productPhoto: 'Foto Produk',

@@ -39,10 +39,41 @@ class Product extends Model
         'rating' => 'float',
         'review_count' => 'integer',
         'stock' => 'integer',
+        'shop_id' => 'integer',
     ];
 
     public function categoryModel()
     {
         return $this->belongsTo(Category::class, 'category', 'name');
+    }
+
+    public function shop()
+    {
+        return $this->belongsTo(Shop::class);
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class)->where('status', 'approved');
+    }
+
+    public function allReviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function questions()
+    {
+        return $this->hasMany(ProductQuestion::class)->where('status', 'approved');
     }
 }

@@ -1,5 +1,5 @@
 # =========================================================
-# Stage 1 — React/Vite build
+# Stage 1 — React/Vite build (PASARIA Frontend)
 # =========================================================
 
 FROM node:22-bookworm-slim AS frontend
@@ -16,7 +16,7 @@ RUN npm run build
 
 
 # =========================================================
-# Stage 2 — Laravel + Apache
+# Stage 2 — Laravel + Apache (PASARIA Backend & API)
 # =========================================================
 
 FROM php:8.2-apache
@@ -74,9 +74,9 @@ RUN printf '%s\n' \
     '    AllowOverride All' \
     '    Require all granted' \
     '</Directory>' \
-    > /etc/apache2/conf-available/shopcart.conf
+    > /etc/apache2/conf-available/pasaria.conf
 
-RUN a2enconf shopcart
+RUN a2enconf pasaria
 
 # Entrypoint script for runtime permissions
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -93,6 +93,10 @@ RUN chmod -R 775 \
     /var/www/html/bootstrap/cache
 
 EXPOSE 80
+
+# Healthcheck endpoint (GET /up)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost/up || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["apache2-foreground"]

@@ -10,6 +10,26 @@ export interface ProductSpecs {
   [key: string]: Record<string, string> | undefined;
 }
 
+export interface ProductVariant {
+  id: number;
+  product_id: number;
+  sku?: string;
+  name: string;
+  attributes_json?: any;
+  price: number;
+  stock: number;
+  weight_grams?: number;
+  image?: string;
+}
+
+export interface ProductImage {
+  id: number;
+  product_id: number;
+  image_url: string;
+  sort_order: number;
+  is_primary: boolean;
+}
+
 export interface Shop {
   id: number;
   user_id: number;
@@ -25,10 +45,13 @@ export interface Shop {
   rating: number;
   review_count?: number;
   product_count?: number;
+  products_count?: number;
+  followers_count?: number;
   total_sales?: number;
   joined_date?: string;
   is_verified?: boolean;
   verified?: boolean;
+  status?: string;
   created_at?: string;
 }
 
@@ -53,8 +76,11 @@ export interface Product {
   shop_logo?: string;
   colors?: ColorOption[];
   specs?: ProductSpecs;
+  variants?: ProductVariant[];
+  images?: ProductImage[];
   badge?: string;
   discount_percent?: number;
+  is_wishlisted?: boolean;
   created_at?: string;
 }
 
@@ -70,6 +96,19 @@ export interface CartItem {
   product: Product;
   quantity: number;
   selectedColor?: string;
+  variant_id?: number;
+}
+
+export interface UserAddress {
+  id: number;
+  user_id: number;
+  recipient_name: string;
+  phone: string;
+  address_line: string;
+  city: string;
+  province?: string;
+  postal_code: string;
+  is_default: boolean;
 }
 
 export interface User {
@@ -82,15 +121,39 @@ export interface User {
   city?: string;
   zip?: string;
   phone?: string;
-  role: 'customer' | 'admin' | 'seller';
+  role: 'customer' | 'admin' | 'seller' | 'support';
+  status?: 'active' | 'suspended';
   shop?: Shop | null;
+  addresses?: UserAddress[];
+}
+
+export interface OrderItemType {
+  id: number;
+  order_id: number;
+  shop_id?: number;
+  product_id?: number;
+  variant_id?: number;
+  name?: string;
+  slug?: string;
+  product_name: string;
+  product_slug?: string;
+  price: number;
+  quantity: number;
+  color?: string;
+  image?: string;
+  subtotal?: number;
+  review?: Review | null;
 }
 
 export interface Order {
   id: number;
   order_number: string;
+  master_order_number?: string;
+  user_id: number;
+  shop_id?: number;
   customer_name: string;
   customer_email: string;
+  customer_phone?: string;
   shipping_address: string;
   payment_method: string;
   subtotal: number;
@@ -103,15 +166,9 @@ export interface Order {
   courier_service?: string;
   tracking_number?: string;
   estimated_delivery?: string;
-  items?: Array<{
-    id: number;
-    name: string;
-    slug: string;
-    price: number;
-    quantity: number;
-    color?: string;
-    image?: string;
-  }>;
+  voucher_code?: string;
+  voucher_discount?: number;
+  items?: OrderItemType[];
   created_at: string;
 }
 
@@ -126,7 +183,9 @@ export interface TrackingCheckpoint {
 
 export interface DeliveryShipment {
   id: string;
+  shipment_id?: string;
   order_number: string;
+  user_id?: number;
   courier_name: string;
   courier_service: string;
   courier_logo?: string;
@@ -144,7 +203,7 @@ export interface DeliveryShipment {
   current_location: string;
   items_count: number;
   items_preview?: Array<{
-    name: string;
+    name?: string;
     quantity: number;
     image?: string;
     color?: string;
@@ -152,4 +211,128 @@ export interface DeliveryShipment {
   total_amount: number;
   created_at: string;
   checkpoints: TrackingCheckpoint[];
+}
+
+export interface ReviewMedia {
+  id: number;
+  review_id: number;
+  media_url: string;
+  media_type: 'image' | 'video';
+}
+
+export interface Review {
+  id: number;
+  user_id: number;
+  order_id?: number;
+  order_item_id?: number;
+  product_id: number;
+  shop_id?: number;
+  rating: number;
+  review_text?: string;
+  is_anonymous: boolean;
+  is_verified_purchase: boolean;
+  status: string;
+  seller_reply?: string;
+  replied_at?: string;
+  created_at: string;
+  user?: User;
+  media?: ReviewMedia[];
+}
+
+export interface ProductAnswer {
+  id: number;
+  question_id: number;
+  user_id: number;
+  shop_id?: number;
+  answer: string;
+  status: string;
+  created_at: string;
+  shop?: Shop;
+}
+
+export interface ProductQuestion {
+  id: number;
+  product_id: number;
+  user_id: number;
+  question: string;
+  is_public: boolean;
+  status: string;
+  created_at: string;
+  user?: User;
+  answers?: ProductAnswer[];
+}
+
+export interface Voucher {
+  id: number;
+  code: string;
+  name: string;
+  type: 'percentage' | 'fixed_amount' | 'free_shipping';
+  discount_value: number;
+  min_purchase: number;
+  max_discount?: number;
+  usage_limit: number;
+  usage_count: number;
+  is_active: boolean;
+}
+
+export interface Message {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  sender_type: 'customer' | 'seller';
+  message: string;
+  attachment_url?: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: number;
+  shop_id: number;
+  customer_id: number;
+  last_message_at?: string;
+  last_message?: string;
+  unread_count?: number;
+  shop?: Shop;
+  customer?: User;
+}
+
+export interface OrderReturn {
+  id: number;
+  order_id: number;
+  user_id: number;
+  shop_id?: number;
+  status: 'requested' | 'approved' | 'rejected' | 'in_transit' | 'received' | 'refunded' | 'disputed';
+  reason: string;
+  description: string;
+  evidence_urls_json?: string[];
+  requested_amount: number;
+  refund_amount: number;
+  seller_note?: string;
+  admin_note?: string;
+  created_at: string;
+  order?: Order;
+}
+
+export interface Dispute {
+  id: number;
+  return_id: number;
+  order_id: number;
+  user_id: number;
+  shop_id?: number;
+  status: 'open' | 'under_review' | 'resolved' | 'closed';
+  resolution?: string;
+  resolution_note?: string;
+  created_at: string;
+}
+
+export interface NotificationItem {
+  id: number;
+  user_id: number;
+  title: string;
+  message: string;
+  type: string;
+  action_url?: string;
+  is_read: boolean;
+  created_at: string;
 }

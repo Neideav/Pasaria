@@ -1,274 +1,174 @@
-# Shopcart - Modern E-Commerce Platform
+# PASARIA — Modern Multi-Vendor Marketplace Platform
 
-A clean, modern e-commerce storefront built with Laravel, Blade, Tailwind CSS, and SQLite.
-This project is styled after modern high-end consumer retail sites (warm ivory, dark forest emerald `#003d29`, soft rounded corners, unboxed typography, and spacious layouts).
-
-> **Note for Local Educational Demonstration:**
-> The backend contains an educational demonstration for SQL Injection on the product search and authentication queries, controlled via the `DEMO_SQLI_MODE` environment variable. The frontend UI remains 100% normal with zero visual indicators, CTF badges, or cybersecurity references.
+> **PASARIA: Your Everyday Marketplace**  
+> Platform marketplace multi-vendor modern, aman, dan scalable yang menghubungkan pembeli (Customer), penjual resmi (Seller), dan tim operasional (Administrator/Support) se-Indonesia.
 
 ---
 
-## 1. Docker Deployment Guide (Ubuntu / AWS EC2)
+## 1. Arsitektur Sistem
 
-Panduan deployment Shopcart menggunakan Docker & Docker Compose dengan database AWS RDS MariaDB.
+PASARIA menggunakan arsitektur modular terpadu dengan **Laravel 11 API sebagai Single Source of Truth** untuk business logic, autentikasi sesi Sanctum, dan persistensi database relasional:
 
-### Langkah 1: Persiapan Database di AWS RDS
-
-Install MariaDB client untuk membuat database awal di instance RDS:
-```bash
-sudo apt update
-sudo apt install -y mariadb-client
-
-# Masuk ke RDS MySQL/MariaDB
-mysql -h YOUR_RDS_ENDPOINT -P 3306 -u admin -p
-
-# Buat database
-CREATE DATABASE database_name;
-exit
+```text
+               ┌────────────────────────────────────────────────────────┐
+               │              React 19 + TypeScript + Vite              │
+               │   (Single-Page App, Tailwind CSS, Centralized API)    │
+               └───────────────────────────┬────────────────────────────┘
+                                           │
+                                HTTPS / REST API / Bearer Token
+                                           │
+               ┌───────────────────────────▼────────────────────────────┐
+               │                   Laravel 11 API                       │
+               │  ├── Sanctum Authentication & Role Authorization       │
+               │  ├── FormRequest Validation & IDOR Protection          │
+               │  ├── PricingService & Atomic CheckoutService           │
+               │  ├── Multi-Vendor Sub-Orders & Escrow Logic            │
+               │  └── Real Eloquent Models & Database Transactions      │
+               └───────────────────────────┬────────────────────────────┘
+                                           │
+                           MariaDB / MySQL (AWS RDS / Local)
+                                           │
+         ┌─────────────┬─────────────┬─────────────┬─────────────┬─────────────┐
+         ▼             ▼             ▼             ▼             ▼             ▼
+       Users         Shops       Products        Orders       Shipments     Reviews
+     Addresses      Wallets      Variants      Sub-Orders     Tracking        Q&A
 ```
 
 ---
 
-### Langkah 2: Instalasi Docker di Server (Ubuntu)
+## 2. Matriks Fitur Lengkap
 
-1. **Install dependensi & keyring Docker:**
-   ```bash
-   sudo apt update
-   sudo apt install -y ca-certificates curl
-   sudo install -m 0755 -d /etc/apt/keyrings
-   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-   sudo chmod a+r /etc/apt/keyrings/docker.asc
-   ```
+### A. Fitur Pembeli (Customer)
+- **Katalog & Navigasi**: Beranda responsif, filter harga/kategori/rating, pencarian autocomplete instan, dan pagination bernomor.
+- **Detail Produk & Varian**: Pemilihan varian (warna, memori, model) yang otomatis memperbarui SKU, harga, dan ketersediaan stok.
+- **Keranjang Multi-Vendor**: Keranjang belanja tersimpan di database dan dikelompokkan otomatis per toko penjual.
+- **Checkout Server-Controlled**: Kalkulasi subtotal, ongkir per kurir (PASARIA Express, SiCepat, GoSend), PPN 11%, dan validasi kode promo (contoh: `PASARIA50`) dihitung 100% oleh server.
+- **Manajemen Pesanan**: Pemisahan sub-order per toko, pelacakan resi real-time dengan rute kurir interaktif, tombol pembatalan pesanan aman, dan pembelian ulang (*Buy Again*).
+- **Ulasan & Rating Terverifikasi**: Hanya pembeli yang telah menerima barang yang dapat memberikan ulasan bintang 1–5. Dilengkapi rincian grafik kepuasan dan balasan penjual.
+- **Tanya Jawab Publik (Q&A)**: Pembeli dapat mengajukan pertanyaan publik yang dijawab langsung oleh toko penjual resmi.
+- **Wishlist & Follow Toko**: Simpan produk favorit dan ikuti toko resmi untuk mendapatkan notifikasi pembaruan promo.
+- **Retur & Komplain**: Pengajuan pengembalian dana/barang dengan bukti kendala dan mediasi sengketa.
+- **Chat Real-Time**: Fitur kirim pesan langsung antara pembeli dan penjual dengan balasan cepat (*quick replies*).
+- **Profil & Alamat**: Kelola data diri, upload foto profil, dan simpan banyak alamat pengiriman di buku alamat.
 
-2. **Tambahkan Docker Repository:**
-   ```bash
-   sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-   Types: deb
-   URIs: https://download.docker.com/linux/ubuntu
-   Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-   Components: stable
-   Architectures: $(dpkg --print-architecture)
-   Signed-By: /etc/apt/keyrings/docker.asc
-   EOF
-   ```
+### B. Fitur Penjual (Seller Center)
+- **Onboarding Toko**: Pendaftaran toko resmi dengan nama, slogan, domisili kota, dan verifikasi dokumen.
+- **Dashboard Statistik Real**: Pendapatan kotor, total pesanan masuk, produk aktif, dan peringatan stok menipis dari database.
+- **Manajemen Produk & SKU**: Tambah produk baru beserta spesifikasi, varian harga, stok awal, dan foto.
+- **Manajemen Inventaris**: Penyesuaian stok kilat (+5, +20, manual) langsung ke database.
+- **Pemrosesan Pesanan**: Perbarui status pesanan dari diproses menjadi dikirim dan terbitkan nomor resi kurir.
+- **Pusat Ulasan**: Pantau ulasan pelanggan dan tulis balasan resmi toko.
+- **Keuangan & Payout**: Buku kas transaksi penjualan, saldo escrow tertahan, dan pengajuan penarikan dana ke rekening bank (BCA, Mandiri, BRI, BNI).
 
-3. **Install Docker Engine & Docker Compose Plugin:**
-   ```bash
-   sudo apt update
-   sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-   ```
-
-4. **Verifikasi instalasi & beri permission ke user:**
-   ```bash
-   docker --version
-   docker compose version
-   sudo usermod -aG docker $USER
-   exit  # Log out dan login kembali agar group docker aktif
-   ```
+### C. Fitur Administrator & Operasional
+- **Admin Portal Terpadu**: Metrik perputaran transaksi (GMV), total order, total pengguna, dan toko terdaftar.
+- **Manajemen Pengguna**: Audit pengguna dan kontrol pembekuan (*suspend/activate*) akun.
+- **Verifikasi Merchant**: Tinjau pengajuan toko baru, setujui atau tolak izin berjualan.
+- **Moderasi Ulasan**: Sembunyikan atau setujui ulasan yang dilaporkan pengguna.
+- **Pusat Resolusi Sengketa**: Pengambilan keputusan komplain retur antara pembeli dan penjual.
+- **Log Audit**: Riwayat tindakan administratif yang tercatat permanen di database.
 
 ---
 
-### Langkah 3: Clone Repository
+## 3. Akun Pengujian Development (Seeded Accounts)
 
-```bash
-docker ps  # pastikan docker berjalan tanpa sudo
-sudo mkdir -p /var/www
-sudo git clone https://github.com/Neideav/shopcart.git /var/www/shopcart
-sudo chown -R ubuntu:ubuntu /var/www/shopcart
-cd /var/www/shopcart
-```
+Database development telah dilengkapi akun seeder siap pakai untuk setiap peran:
+
+| Peran | Email | Kata Sandi | Keterangan |
+| :--- | :--- | :--- | :--- |
+| **Customer** | `customer@pasaria.id` | `password` | Pembeli aktif dengan riwayat transaksi & alamat |
+| **Seller** | `seller@pasaria.id` | `password` | Pemilik toko resmi *PASARIA Audio Official* |
+| **Admin** | `admin@pasaria.id` | `password` | Akses penuh ke Portal Administrator |
+| **Support** | `support@pasaria.id` | `password` | Akses tim penanganan sengketa & moderasi |
+
+*Catatan Keamanan: Jangan gunakan kredensial demo ini di lingkungan server production!*
 
 ---
 
-### Langkah 4: Konfigurasi Environment (`.env`)
+## 4. Panduan Menjalankan Secara Lokal
 
-Salin file template `.env.example` ke `.env`:
+### Kebutuhan Sistem
+- PHP 8.2+ dengan ekstensi `pdo_sqlite`, `pdo_mysql`, `mbstring`, `intl`, `bcmath`
+- Composer 2+
+- Node.js 20+ & npm
+
+### Langkah 1: Backend Laravel
 ```bash
+# 1. Install dependensi PHP
+composer install
+
+# 2. Siapkan file environment
 cp .env.example .env
-nano .env
+php artisan key:generate
+
+# 3. Jalankan migrasi dan seeder data awal
+php artisan migrate:fresh --seed
+
+# 4. Jalankan server Laravel API (Port 8000)
+php artisan serve
 ```
 
-Pastikan variabel berikut disesuaikan dengan server dan RDS Anda:
-```env
-APP_NAME="shopcart"
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=
-APP_TIMEZONE=UTC
-APP_URL=http://EC2_PUBLIC_IP
+### Langkah 2: Frontend React + Vite
+```bash
+# 1. Install dependensi frontend
+npm install
 
-APP_LOCALE=en
-APP_FALLBACK_LOCALE=en
-APP_FAKER_LOCALE=en_US
-
-DB_CONNECTION=mariadb
-DB_HOST=YOUR_RDS_ENDPOINT
-DB_PORT=3306
-DB_DATABASE=database_name
-DB_USERNAME=admin
-DB_PASSWORD=YOUR_RDS_PASSWORD
-MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
-
-SESSION_DRIVER=file
-SESSION_LIFETIME=120
-CACHE_DRIVER=file
-
-DEMO_SQLI_MODE=true
+# 2. Jalankan development server (Port 3000)
+npm run dev
 ```
+
+Buka peramban di `http://localhost:3000`. Vite akan secara otomatis meneruskan permintaan API (`/api`, `/sanctum`, `/up`) ke backend Laravel di port 8000.
 
 ---
 
-### Langkah 5: Build & Jalankan Docker Container
+## 5. Pengujian Otomatis & Verifikasi Kualitas
+
+Aplikasi telah dilengkapi unit & feature test komprehensif:
 
 ```bash
-# Build image Docker (Multi-stage build frontend React + backend Laravel)
-docker compose build
+# Menjalankan PHPUnit Feature & Unit Tests (14 Tests, 39 Assertions)
+composer test
+# atau
+vendor/bin/phpunit
 
-# Jalankan container di background
-docker compose up -d
+# Menjalankan TypeScript Lint & Typecheck
+npm run lint
 
-# Cek status container
-docker compose ps
-
-# (Opsional) Cek log container
-docker compose logs -f shopcart
+# Menjalankan Build Produksi Vite
+npm run build
 ```
 
-**Verifikasi awal container:**
+---
+
+## 6. Deployment dengan Docker & AWS EC2
+
+### Menjalankan dengan Docker Compose
 ```bash
-curl -I http://localhost
-# Atau buka browser: http://EC2_PUBLIC_IP
+# Build dan jalankan container PASARIA
+docker compose build pasaria
+docker compose up -d pasaria
+
+# Jalankan migrasi di dalam container
+docker compose exec pasaria php artisan migrate --force
+
+# Cek status kesehatan container
+curl -i http://localhost/up
 ```
 
----
-
-### Langkah 6: Konfigurasi & Inisialisasi Laravel
-
-Jalankan perintah berikut untuk menginisialisasi aplikasi Laravel di dalam container:
-
-1. **Generate Encryption Key:**
-   ```bash
-   docker exec -it shopcart bash
-   php -v
-   php artisan --version
-   php artisan about
-   php artisan key:generate
-   exit
-   ```
-
-2. **Jalankan Database Migration & Seeder:**
-   ```bash
-   docker exec shopcart php artisan migrate --force
-   docker exec shopcart php artisan db:seed --force
-   ```
-
-3. **Optimasi Cache Laravel untuk Production:**
-   ```bash
-   docker exec shopcart php artisan config:cache
-   docker exec shopcart php artisan route:cache
-   docker exec shopcart php artisan view:cache
-   docker exec shopcart php artisan config:clear
-   docker exec shopcart php artisan config:cache
-   ```
-
----
-
-### Langkah 7: Pengujian & Verifikasi
-
-Uji endpoint API dari terminal atau browser:
+### Script Otomatis `auto-deploy.sh`
+Server produksi EC2 menggunakan script *zero-downtime* deployment:
 ```bash
-curl http://EC2_PUBLIC_IP/api/products
+bash auto-deploy.sh
 ```
-Buka aplikasi melalui web browser: `http://EC2_PUBLIC_IP`
+Script ini mengeksekusi:
+1. `set -euo pipefail` untuk keamanan eksekusi
+2. Git pull kode terbaru dari branch `main`
+3. Docker image build & container recreate
+4. Eksekusi `php artisan migrate --force`
+5. Optimalisasi cache Laravel (`config:cache`, `route:cache`, `view:cache`)
+6. Verifikasi endpoint `/up` hingga status *healthy* tercapai
 
 ---
 
-## 2. Seeded Demo Accounts
-
-| Role | Username / Email | Password |
-|---|---|---|
-| Customer | `customer@shopcart.com` or `wadewarren` | `password123` |
-| Administrator | `admin@shopcart.com` or `admin` | `admin123` |
-
----
-
-## 3. SQL Injection Demonstration Guide
-
-Toggle between vulnerable and secure implementations in `.env`:
-
-### MODE A: Intentionally Vulnerable (`DEMO_SQLI_MODE=true`)
-When `DEMO_SQLI_MODE=true`, the backend executes raw SQL string concatenation:
-
-1. **Product Search (`/search?q=...`)**
-   - Location: `app/Services/StoreQueryService.php` (`searchProducts()`)
-   - Code pattern:
-     ```php
-     // INTENTIONALLY VULNERABLE FOR LOCAL EDUCATIONAL DEMONSTRATION
-     $rawQuery = "SELECT * FROM products WHERE (name LIKE '%" . $keyword . "%' OR description LIKE '%" . $keyword . "%') ...";
-     $results = DB::select(DB::raw($rawQuery));
-     ```
-   - Demonstration Payload Example:
-     ```text
-     ' OR 1=1 #
-     ' OR '1'='1' -- 
-     ```
-
-2. **Login Query (`/login`)**
-   - Location: `app/Services/StoreQueryService.php` (`authenticateUser()`)
-   - Code pattern:
-     ```php
-     // INTENTIONALLY VULNERABLE FOR LOCAL EDUCATIONAL DEMONSTRATION
-     $rawQuery = "SELECT * FROM users WHERE (email = '" . $identifier . "' OR username = '" . $identifier . "') AND password = '" . $password . "' LIMIT 1";
-     $results = DB::select(DB::raw($rawQuery));
-     ```
-   - Demonstration Payload Example:
-     - Username: `admin'#` atau `admin@shopcart.com'#` (pada MariaDB tanda `#` memotong sisa query tanpa perlu spasi tambahan)
-     - Username alternatif: `admin@shopcart.com' -- `
-     - Password: `(bebas / sembarang)`
-
-### MODE B: Secure Implementation (`DEMO_SQLI_MODE=false`)
-When `DEMO_SQLI_MODE=false`, the backend uses parameterized prepared queries via Eloquent / Query Builder:
-- Code pattern:
-  ```php
-  // SECURE IMPLEMENTATION USING PARAMETERIZED QUERY
-  Product::where(function ($query) use ($keyword) {
-      $query->where('name', 'LIKE', '%' . $keyword . '%')
-            ->orWhere('description', 'LIKE', '%' . $keyword . '%');
-  })->get();
-  ```
-All user input is treated strictly as data literals.
-
----
-
-## 4. Architecture Overview
-
-```
-app/
-├── Http/Controllers/
-│   ├── HomeController.php      # Catalog & featured collections
-│   ├── ProductController.php   # Product detail page & specifications
-│   ├── SearchController.php    # Search routing
-│   ├── AuthController.php      # Sign in, registration & session
-│   ├── CartController.php      # Session-based cart
-│   ├── ProfileController.php   # Customer profile
-│   └── OrderController.php     # Checkout & orders
-├── Models/
-│   ├── User.php
-│   ├── Product.php
-│   ├── Category.php
-│   ├── Order.php
-│   └── OrderItem.php
-└── Services/
-    └── StoreQueryService.php   # Search & Auth query handling (Vulnerable vs Secure)
-
-resources/views/
-├── layouts/app.blade.php
-├── home.blade.php
-├── products/show.blade.php
-├── search/index.blade.php
-├── auth/login.blade.php
-├── auth/register.blade.php
-├── cart/index.blade.php
-├── profile/index.blade.php
-└── orders/index.blade.php
-```
+## 7. Lisensi & Hak Cipta
+Hak Cipta © 2026 PASARIA. Seluruh hak cipta dilindungi undang-undang.

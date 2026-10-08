@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Store,
   Plus,
@@ -7,11 +7,8 @@ import {
   TrendingUp,
   Star,
   MapPin,
-  Upload,
-  Image as ImageIcon,
   CheckCircle2,
   Trash2,
-  Edit,
   ArrowRight,
   ExternalLink,
   ChevronRight,
@@ -20,10 +17,17 @@ import {
   Tag,
   Phone,
   Layers,
-  ArrowLeft
+  ArrowLeft,
+  Truck,
+  MessageCircle,
+  Clock,
+  AlertTriangle,
+  Wallet
 } from 'lucide-react';
-import { User, Shop, Product } from '../types';
+import { User, Shop, Product, Order, Review } from '../types';
 import { ProductVisual } from './ProductVisual';
+import { api } from '../services/api';
+import { formatRupiah, formatDateTime } from '../utils/formatters';
 
 interface ShopDashboardViewProps {
   user: User | null;
@@ -46,947 +50,831 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   onViewShopPublic,
   onSelectProduct,
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'add_product' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'inventory' | 'orders' | 'reviews' | 'finances' | 'add_product' | 'register'>('overview');
 
-  // Shop registration form state (for new sellers)
+  // Shop registration state
   const [shopName, setShopName] = useState('');
   const [shopTagline, setShopTagline] = useState('');
   const [shopDesc, setShopDesc] = useState('');
   const [shopCity, setShopCity] = useState(user?.city || 'Jakarta');
   const [shopPhone, setShopPhone] = useState(user?.phone || '+62 812-3456-7890');
-  const [shopLogo, setShopLogo] = useState<string>('');
-  const [shopBanner, setShopBanner] = useState<string>('');
-  const [isCreatingShop, setIsCreatingShop] = useState(false);
-  const [shopSuccessMsg, setShopSuccessMsg] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [actionSuccess, setActionSuccess] = useState('');
 
-  // Add Product form state
+  // Seller Data from API
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [inventoryList, setInventoryList] = useState<any[]>([]);
+  const [sellerOrders, setSellerOrders] = useState<Order[]>([]);
+  const [financesData, setFinancesData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  // New Product Form
   const [prodName, setProdName] = useState('');
-  const [prodCategory, setProdCategory] = useState('Headphone');
+  const [prodCategory, setProdCategory] = useState('Headphones');
   const [prodPrice, setProdPrice] = useState('');
-  const [prodOriginalPrice, setProdOriginalPrice] = useState('');
-  const [prodStock, setProdStock] = useState('20');
-  const [prodShortDesc, setProdShortDesc] = useState('');
+  const [prodStock, setProdStock] = useState('25');
   const [prodDesc, setProdDesc] = useState('');
-  const [prodImage, setProdImage] = useState('');
-  const [prodColorName, setProdColorName] = useState('Black');
-  const [prodColorHex, setProdColorHex] = useState('#111827');
-  const [prodBrand, setProdBrand] = useState('');
-  const [prodSuccessMsg, setProdSuccessMsg] = useState('');
+  const [prodVariantName, setProdVariantName] = useState('Standard');
+  const [prodSku, setProdSku] = useState('');
+  const [prodCreating, setProdCreating] = useState(false);
 
-  // User's current shop
+  // Payout request modal/form
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutBank, setPayoutBank] = useState('BCA');
+  const [payoutAccountNo, setPayoutAccountNo] = useState('');
+  const [payoutHolder, setPayoutHolder] = useState(user?.name || '');
+  const [payoutLoading, setPayoutLoading] = useState(false);
+
+  // Review reply state
+  const [replyTextMap, setReplyTextMap] = useState<Record<number, string>>({});
+
   const currentShop: Shop | null = user?.shop || null;
 
-  // Filter products belonging to this seller/shop
-  const shopProducts = currentShop
-    ? products.filter((p) =>
-        (p.shop_id != null && currentShop.id != null && String(p.shop_id) === String(currentShop.id)) ||
-        (p.shop_name && currentShop.name && p.shop_name.trim().toLowerCase() === currentShop.name.trim().toLowerCase())
-      )
-    : [];
+  useEffect(() => {
+    if (!currentShop) {
+      setActiveTab('register');
+    } else {
+      loadSellerData();
+    }
+  }, [currentShop?.id]);
 
-  // Helper to compress uploaded images to fast, lightweight base64 JPEG
-  const compressImage = (file: File, maxWidth = 800, quality = 0.82): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          if (width > maxWidth || height > maxWidth) {
-            if (width > height) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
-            } else {
-              width = Math.round((width * maxWidth) / height);
-              height = maxWidth;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-          } else {
-            resolve((e.target?.result as string) || '');
-          }
-        };
-        img.onerror = () => resolve((e.target?.result as string) || '');
-        img.src = (e.target?.result as string) || '';
-      };
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(file);
-    });
-  };
+  const loadSellerData = async () => {
+    setLoading(true);
+    try {
+      const dbRes = await api.getSellerDashboard();
+      setDashboardData(dbRes);
+    } catch (e) {
+      console.warn('Dashboard load note:', e);
+    }
 
-  // Handle Logo Upload (Compressed Base64 data URL)
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const compressed = await compressImage(file, 400, 0.85);
-      setShopLogo(compressed);
+    try {
+      const inv = await api.getSellerInventory();
+      setInventoryList(inv || []);
+    } catch (e) {
+      console.warn('Inventory load note:', e);
+    }
+
+    try {
+      const ords = await api.getSellerOrders();
+      setSellerOrders(ords || []);
+    } catch (e) {
+      console.warn('Orders load note:', e);
+    }
+
+    try {
+      const fin = await api.getSellerFinances();
+      setFinancesData(fin);
+    } catch (e) {
+      console.warn('Finances load note:', e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle Banner Upload
-  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const compressed = await compressImage(file, 1200, 0.8);
-      setShopBanner(compressed);
-    }
-  };
-
-  // Handle Product Image Upload
-  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const compressed = await compressImage(file, 800, 0.85);
-      setProdImage(compressed);
-    }
-  };
-
-  // Submit Shop Registration
-  const handleRegisterShop = (e: React.FormEvent) => {
+  const handleRegisterShop = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shopName.trim()) return;
 
-    setIsCreatingShop(true);
-    const newShop: Shop = {
-      id: Date.now(),
-      user_id: user?.id || 1,
-      name: shopName.trim(),
-      slug: shopName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-      tagline: shopTagline.trim() || 'Official Verified Store on Shopcart',
-      description: shopDesc.trim() || 'Toko resmi dengan jaminan produk original dan pengiriman cepat.',
-      logo: shopLogo || '',
-      banner: shopBanner || '',
-      city: shopCity.trim() || 'Jakarta',
-      phone: shopPhone.trim() || '+62 812-3456-7890',
-      rating: 5.0,
-      product_count: 0,
-      total_sales: 0,
-      joined_date: 'Baru Bergabung (2026)',
-      is_verified: true,
-    };
+    setIsRegistering(true);
+    try {
+      const res = await api.createShop({
+        name: shopName.trim(),
+        slogan: shopTagline.trim() || 'Penyedia Produk Resmi Terpercaya',
+        description: shopDesc.trim() || 'Toko resmi dengan jaminan produk original dan pengiriman cepat.',
+        city: shopCity.trim() || 'Jakarta',
+        phone: shopPhone.trim() || '+62 812-3456-7890',
+      });
 
-    const updatedUser: User = {
-      ...(user || {
-        id: 1,
-        name: 'Wade Warren',
-        username: 'wadewarren',
-        email: 'customer@shopcart.com',
-        role: 'seller'
-      }),
-      role: 'seller',
-      shop: newShop,
-    };
+      const updatedUser: User = {
+        ...(user as User),
+        role: 'seller',
+        shop: res,
+      };
 
-    onUpdateUser(updatedUser);
-    setIsCreatingShop(false);
-    setShopSuccessMsg('Selamat! Toko online Anda berhasil didaftarkan dan siap berjualan.');
-    setActiveTab('add_product');
-    setTimeout(() => setShopSuccessMsg(''), 4000);
+      onUpdateUser(updatedUser);
+      setActionSuccess('Selamat! Toko Anda berhasil didaftarkan dan siap berjualan di PASARIA.');
+      setActiveTab('overview');
+      loadSellerData();
+      setTimeout(() => setActionSuccess(''), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal mendaftarkan toko.');
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
-  // Submit New Product
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prodName.trim() || !prodPrice) return;
 
-    const priceNum = parseFloat(prodPrice) || 0;
-    const origPriceNum = prodOriginalPrice ? parseFloat(prodOriginalPrice) : undefined;
-    const stockNum = parseInt(prodStock, 10) || 10;
+    setProdCreating(true);
+    try {
+      const priceNum = parseFloat(prodPrice) || 50000;
+      const stockNum = parseInt(prodStock, 10) || 10;
 
-    const newProd: Product = {
-      id: Date.now(),
-      name: prodName.trim(),
-      slug: prodName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Math.floor(Math.random() * 1000),
-      category: prodCategory,
-      price: priceNum,
-      original_price: origPriceNum,
-      monthly_price: Number((priceNum / 6).toFixed(2)),
-      short_desc: prodShortDesc.trim() || prodName.trim(),
-      description: prodDesc.trim() || `${prodName} berkualitas tinggi dari toko ${currentShop?.name || 'Official Store'}.`,
-      image: prodImage || 'airpods-max',
-      rating: 5.0,
-      review_count: 0,
-      stock: stockNum,
-      shop_id: currentShop?.id,
-      shop_name: currentShop?.name || 'Toko Saya',
-      shop_city: currentShop?.city || 'Jakarta',
-      shop_logo: currentShop?.logo,
-      colors: [
-        { name: prodColorName || 'Standard', hex: prodColorHex || '#111827', active: true },
-      ],
-      specs: {
-        General: {
-          Brand: prodBrand.trim() || currentShop?.name || 'Shopcart Verified',
-          Category: prodCategory,
-          Condition: 'Baru / 100% Original',
-        },
-        ProductDetails: {
-          Stock: `${stockNum} Unit`,
-          Origin: currentShop?.city || 'Indonesia',
-        }
-      },
-      created_at: new Date().toISOString(),
-    };
+      const created = await api.createSellerProduct({
+        name: prodName.trim(),
+        category: prodCategory,
+        price: priceNum,
+        stock: stockNum,
+        description: prodDesc.trim() || `${prodName} original dari ${currentShop?.name}.`,
+        image: 'airpods-max',
+        sku: prodSku.trim() || `SKU-${Date.now().toString().slice(-6)}`,
+        variant_name: prodVariantName.trim() || 'Standard Edition',
+      });
 
-    onAddProduct(newProd);
-
-    // Reset form
-    setProdName('');
-    setProdPrice('');
-    setProdOriginalPrice('');
-    setProdShortDesc('');
-    setProdDesc('');
-    setProdImage('');
-    setProdBrand('');
-    setProdSuccessMsg(`Produk "${newProd.name}" berhasil dipublikasikan dan tersimpan di database toko!`);
-    setActiveTab('products');
-    setTimeout(() => setProdSuccessMsg(''), 4000);
+      onAddProduct(created.product || created);
+      setActionSuccess('Produk baru berhasil ditambahkan ke etalase toko Anda!');
+      setActiveTab('products');
+      setProdName('');
+      setProdPrice('');
+      setProdDesc('');
+      setProdSku('');
+      loadSellerData();
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal menambahkan produk');
+    } finally {
+      setProdCreating(false);
+    }
   };
 
-  // ---------------------------------------------------------------------------
-  // IF USER DOES NOT HAVE A SHOP YET: DISPLAY REGISTRATION ONBOARDING
-  // ---------------------------------------------------------------------------
-  if (!currentShop) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
-        <div className="flex items-center justify-between pb-6 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 mb-1.5">
-              <button onClick={onNavigateHome} className="hover:text-slate-700">Home</button>
-              <ChevronRight className="w-3 h-3 text-slate-300" />
-              <span className="text-slate-800 font-semibold">Buka Toko Online</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-              <Store className="w-7 h-7 text-[#003d29]" />
-              <span>Buka Toko Gratis di Shopcart</span>
-            </h1>
-          </div>
+  const handleUpdateStock = async (variantId: number, currentStock: number, delta: number) => {
+    const next = Math.max(0, currentStock + delta);
+    try {
+      await api.updateSellerStock(variantId, next);
+      setInventoryList((prev) =>
+        prev.map((i) => (i.id === variantId ? { ...i, stock: next } : i))
+      );
+    } catch (err: any) {
+      alert(err.message || 'Gagal memperbarui stok');
+    }
+  };
 
-          <button
-            onClick={onNavigateHome}
-            className="text-xs font-semibold text-[#003d29] hover:underline"
-          >
-            Kembali ke Toko
-          </button>
-        </div>
+  const handleFulfillOrder = async (orderId: number, nextStatus: string) => {
+    try {
+      const trk = `PSR-EXP-${Math.floor(10000000 + Math.random() * 90000000)}`;
+      await api.updateOrderStatus(orderId, nextStatus, trk, 'PASARIA Express Priority');
+      setActionSuccess(`Pesanan #${orderId} berhasil diproses ke status: ${nextStatus}`);
+      loadSellerData();
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal memperbarui status pesanan');
+    }
+  };
 
-        {/* Benefits Banner */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-5 rounded-3xl bg-emerald-50/70 border border-emerald-200/60 space-y-2 text-xs">
-            <div className="w-9 h-9 rounded-2xl bg-[#003d29] text-white flex items-center justify-center font-bold">
-              <DollarSign className="w-4 h-4" />
-            </div>
-            <h3 className="font-bold text-slate-900 text-sm">Bebas Biaya Pendaftaran</h3>
-            <p className="text-slate-600">Daftarkan toko Anda dalam 1 menit tanpa biaya bulanan.</p>
-          </div>
+  const handleReplyReview = async (reviewId: number) => {
+    const text = replyTextMap[reviewId];
+    if (!text || !text.trim()) return;
 
-          <div className="p-5 rounded-3xl bg-emerald-50/70 border border-emerald-200/60 space-y-2 text-xs">
-            <div className="w-9 h-9 rounded-2xl bg-[#003d29] text-white flex items-center justify-center font-bold">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <h3 className="font-bold text-slate-900 text-sm">Badge Verified Seller</h3>
-            <p className="text-slate-600">Toko langsung mendapatkan verifikasi resmi untuk meningkatkan kepercayaan pembeli.</p>
-          </div>
+    try {
+      await api.replyReview(reviewId, text.trim());
+      setActionSuccess('Balasan ulasan berhasil dipublikasikan!');
+      setReplyTextMap((prev) => ({ ...prev, [reviewId]: '' }));
+      loadSellerData();
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal membalas ulasan');
+    }
+  };
 
-          <div className="p-5 rounded-3xl bg-emerald-50/70 border border-emerald-200/60 space-y-2 text-xs">
-            <div className="w-9 h-9 rounded-2xl bg-[#003d29] text-white flex items-center justify-center font-bold">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <h3 className="font-bold text-slate-900 text-sm">Jangkauan Luas</h3>
-            <p className="text-slate-600">Terintegrasi otomatis dengan sistem kurir pengiriman real-time Shopcart.</p>
-          </div>
-        </div>
+  const handleRequestPayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(payoutAmount);
+    if (!amt || amt <= 0) return;
 
-        {/* Registration Form Card */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-6">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-lg font-extrabold text-slate-900">Formulir Pendaftaran Toko</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Isi data toko Anda untuk mulai memposting dan menjual produk.
-            </p>
-          </div>
+    setPayoutLoading(true);
+    try {
+      await api.requestSellerPayout({
+        amount: amt,
+        bank_name: payoutBank,
+        account_number: payoutAccountNo,
+        account_holder: payoutHolder,
+      });
 
-          <form onSubmit={handleRegisterShop} className="space-y-5 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Nama Toko / Brand <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={shopName}
-                  onChange={(e) => setShopName(e.target.value)}
-                  placeholder="Contoh: AudioTech Official Store"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
+      setActionSuccess(`Permintaan penarikan dana ${formatRupiah(amt)} berhasil diajukan.`);
+      setPayoutAmount('');
+      loadSellerData();
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengajukan penarikan saldo');
+    } finally {
+      setPayoutLoading(false);
+    }
+  };
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Slogan / Tagline Singkat
-                </label>
-                <input
-                  type="text"
-                  value={shopTagline}
-                  onChange={(e) => setShopTagline(e.target.value)}
-                  placeholder="Contoh: Pusat Headphone & Audio Original Terlengkap"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
+  // Filter products for this shop
+  const myProducts = currentShop
+    ? products.filter(
+        (p) =>
+          (p.shop_id != null && currentShop.id != null && String(p.shop_id) === String(currentShop.id)) ||
+          (p.shop_name && currentShop.name && p.shop_name.trim().toLowerCase() === currentShop.name.trim().toLowerCase())
+      )
+    : [];
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Kota / Lokasi Toko <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={shopCity}
-                  onChange={(e) => setShopCity(e.target.value)}
-                  placeholder="Contoh: Jakarta Pusat / Bandung"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Kontak Telepon / WhatsApp Toko
-                </label>
-                <input
-                  type="text"
-                  value={shopPhone}
-                  onChange={(e) => setShopPhone(e.target.value)}
-                  placeholder="+62 812-3456-7890"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Deskripsi Profil Toko
-                </label>
-                <textarea
-                  rows={3}
-                  value={shopDesc}
-                  onChange={(e) => setShopDesc(e.target.value)}
-                  placeholder="Jelaskan tentang toko Anda, keunggulan produk, dan jam operasional..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-            </div>
-
-            {/* Photo Upload: Logo & Banner Toko */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
-              {/* Logo Upload */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
-                  Foto Logo Toko
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                    {shopLogo ? (
-                      <img src={shopLogo} alt="Logo Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Store className="w-6 h-6 text-slate-400" />
-                    )}
-                  </div>
-                  <label className="py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Logo</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Banner Upload */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
-                  Foto Banner Cover Toko
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="w-24 h-16 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                    {shopBanner ? (
-                      <img src={shopBanner} alt="Banner Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon className="w-6 h-6 text-slate-400" />
-                    )}
-                  </div>
-                  <label className="py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Banner</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleBannerUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100">
-              <button
-                type="submit"
-                disabled={isCreatingShop}
-                className="w-full sm:w-auto py-3.5 px-8 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] shadow-md shadow-emerald-950/15 flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Store className="w-4 h-4" />
-                <span>{isCreatingShop ? 'Memproses...' : 'Buka Toko & Mulai Jual Barang'}</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // IF USER ALREADY HAS A SHOP: SELLER DASHBOARD
-  // ---------------------------------------------------------------------------
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
-      {/* Success Notification Alert */}
-      {(shopSuccessMsg || prodSuccessMsg) && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-semibold flex items-center gap-2.5 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{shopSuccessMsg || prodSuccessMsg}</span>
-        </div>
-      )}
-
-      {/* Shop Header Banner Card */}
-      <div className="relative rounded-3xl overflow-hidden bg-white border border-slate-200/80 shadow-xs">
-        {/* Banner Cover */}
-        <div className="h-32 sm:h-44 bg-gradient-to-r from-[#003d29] to-[#046a48] relative">
-          {currentShop.banner && (
-            <img
-              src={currentShop.banner}
-              alt="Shop Banner"
-              className="w-full h-full object-cover opacity-60"
-            />
-          )}
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-xs font-bold text-[#003d29] flex items-center gap-1.5 shadow-xs">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Verified Seller
-            </span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200/80 gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs uppercase tracking-wider mb-1">
+            <Store className="w-4 h-4 text-emerald-700" />
+            <span>PASARIA Seller Center</span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            {currentShop ? currentShop.name : 'Pendaftaran Toko Baru'}
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Pusat operasional manajemen inventaris, pesanan masuk, ulasan pembeli, dan keuangan merchant.
+          </p>
         </div>
 
-        {/* Shop Info Row */}
-        <div className="p-6 sm:p-8 pt-0 relative flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-14">
-          <div className="flex items-end gap-4">
-            <div className="w-24 h-24 rounded-3xl bg-white p-1.5 shadow-lg border-2 border-white overflow-hidden shrink-0">
-              {currentShop.logo ? (
-                <img src={currentShop.logo} alt={currentShop.name} className="w-full h-full object-cover rounded-2xl" />
-              ) : (
-                <div className="w-full h-full rounded-2xl bg-emerald-50 text-[#003d29] flex items-center justify-center font-extrabold text-xl">
-                  {currentShop.name.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-                  {currentShop.name}
-                </h1>
-              </div>
-              <p className="text-xs text-slate-500 font-medium">{currentShop.tagline}</p>
-              <div className="flex items-center gap-3 text-xs text-slate-500 pt-0.5">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-[#003d29]" />
-                  <span>{currentShop.city}</span>
-                </span>
-                <span>·</span>
-                <span className="flex items-center gap-1 font-semibold text-emerald-700">
-                  <Star className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
-                  <span>5.0 Rating</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 pt-2 sm:pt-0">
+        <div className="flex items-center gap-3">
+          {currentShop && (
             <button
               onClick={() => onViewShopPublic(currentShop)}
-              className="py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>Lihat Toko Publik</span>
             </button>
-
-            <button
-              onClick={() => setActiveTab('add_product')}
-              className="py-2.5 px-5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold shadow-md shadow-emerald-950/15 flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Jual Barang Baru</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Seller Analytics Overview Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-1 text-left">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Produk Toko</div>
-          <div className="text-2xl font-extrabold text-slate-900 tabular-nums">
-            {shopProducts.length} <span className="text-xs text-slate-400 font-normal">Item</span>
-          </div>
-          <div className="text-[11px] text-emerald-700 font-medium">Aktif dipajang di etalase</div>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-1 text-left">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Stok Tersedia</div>
-          <div className="text-2xl font-extrabold text-slate-900 tabular-nums">
-            {shopProducts.reduce((sum, p) => sum + (p.stock || 0), 0)} <span className="text-xs text-slate-400 font-normal">Unit</span>
-          </div>
-          <div className="text-[11px] text-emerald-700 font-medium">Siap dikirim ke pembeli</div>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-1 text-left">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Transaksi</div>
-          <div className="text-2xl font-extrabold text-[#003d29] tabular-nums">
-            18 <span className="text-xs text-slate-400 font-normal">Pesanan</span>
-          </div>
-          <div className="text-[11px] text-emerald-700 font-medium">100% Pengiriman Berhasil</div>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-1 text-left">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Performa Toko</div>
-          <div className="text-2xl font-extrabold text-slate-900 flex items-center gap-1">
-            <span>5.0</span>
-            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          </div>
-          <div className="text-[11px] text-emerald-700 font-medium">Penjual Sangat Responsif</div>
-        </div>
-      </div>
-
-      {/* Tabs Header Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        <button
-          onClick={() => setActiveTab('products')}
-          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'products'
-              ? 'bg-[#003d29] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Package className="w-3.5 h-3.5" />
-          <span>Katalog Produk Toko ({shopProducts.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('add_product')}
-          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'add_product'
-              ? 'bg-[#003d29] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Tambah Barang Jualan</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'settings'
-              ? 'bg-[#003d29] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Store className="w-3.5 h-3.5" />
-          <span>Pengaturan Toko</span>
-        </button>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* TAB 1: DAFTAR PRODUK TOKO */}
-      {/* ========================================================================= */}
-      {activeTab === 'products' && (
-        <div className="space-y-4 animate-in fade-in">
-          {shopProducts.length === 0 ? (
-            <div className="p-12 text-center bg-white rounded-3xl border border-slate-200/80 space-y-4">
-              <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-[#003d29] flex items-center justify-center mx-auto">
-                <Package className="w-8 h-8" />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900">Belum Ada Barang yang Dijual</h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Mulai tambahkan produk jualan pertama Anda agar pembeli dapat melihat dan membeli dari toko Anda.
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveTab('add_product')}
-                className="py-3 px-6 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold shadow-md transition-all cursor-pointer"
-              >
-                + Tambah Produk Sekarang
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-2xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
-                      <th className="py-3.5 px-4">Produk</th>
-                      <th className="py-3.5 px-4">Kategori</th>
-                      <th className="py-3.5 px-4">Harga Jual</th>
-                      <th className="py-3.5 px-4">Stok</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {shopProducts.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-slate-50 p-1 border border-slate-200/80 flex items-center justify-center shrink-0">
-                              <ProductVisual imageKey={p.image} name={p.name} size="sm" />
-                            </div>
-                            <div>
-                              <div
-                                onClick={() => onSelectProduct(p)}
-                                className="font-bold text-slate-900 hover:text-[#003d29] cursor-pointer line-clamp-1"
-                              >
-                                {p.name}
-                              </div>
-                              <div className="text-[10px] text-slate-400">SKU: {p.slug}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-600 font-medium">{p.category}</td>
-                        <td className="py-3.5 px-4 font-bold text-slate-900 tabular-nums">
-                          ${p.price.toFixed(2)}
-                          {p.original_price && (
-                            <span className="text-[10px] text-slate-400 line-through ml-1.5 font-normal">
-                              ${p.original_price.toFixed(2)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-bold text-slate-800 tabular-nums">{p.stock}</span>{' '}
-                          <span className="text-[10px] text-slate-400">unit</span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
-                            Aktif Dijual
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => onSelectProduct(p)}
-                              className="p-1.5 rounded-lg text-slate-600 hover:text-[#003d29] hover:bg-slate-100 transition-colors"
-                              title="Lihat Produk"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                            {onDeleteProduct && (
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Hapus produk "${p.name}" dari toko Anda?`)) {
-                                    onDeleteProduct(p.id);
-                                  }
-                                }}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                title="Hapus Produk"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           )}
+          <button
+            onClick={onNavigateHome}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Kembali ke Beranda</span>
+          </button>
+        </div>
+      </div>
+
+      {actionSuccess && (
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{actionSuccess}</span>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 2: FORM TAMBAH PRODUK BARU */}
-      {/* ========================================================================= */}
-      {activeTab === 'add_product' && (
-        <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-6 animate-in fade-in">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-lg font-extrabold text-slate-900">Formulir Tambah Produk Baru</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Masukkan informasi produk dengan lengkap untuk dipajang di katalog toko dan beranda Shopcart.
-            </p>
+      {/* Tabs for Seller Center */}
+      {currentShop && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-3 border-b border-slate-100 text-xs">
+          {[
+            { id: 'overview', label: 'Ringkasan & Metrik', icon: TrendingUp },
+            { id: 'products', label: 'Katalog Produk', icon: Package },
+            { id: 'inventory', label: 'Manajemen Stok & SKU', icon: Layers },
+            { id: 'orders', label: 'Pesanan Masuk', icon: Truck },
+            { id: 'reviews', label: 'Ulasan & Rating', icon: Star },
+            { id: 'finances', label: 'Keuangan & Saldo', icon: Wallet },
+            { id: 'add_product', label: '+ Tambah Produk Baru', icon: Plus },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#003d29] text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200/80'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Registration View for New Sellers */}
+      {activeTab === 'register' && (
+        <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-[#003d29] flex items-center justify-center mx-auto font-black text-xl">
+              <Store className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900">Buka Toko Resmi di PASARIA</h2>
+            <p className="text-xs text-slate-500">Mulai berjualan ke jutaan pembeli aktif dengan perlindungan escrow dan logistik resmi.</p>
           </div>
 
-          <form onSubmit={handleCreateProduct} className="space-y-6 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Nama Produk <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={prodName}
-                  onChange={(e) => setProdName(e.target.value)}
-                  placeholder="Contoh: Sony WH-1000XM5 Wireless Headphones"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Kategori Produk <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={prodCategory}
-                  onChange={(e) => setProdCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[#003d29]"
-                >
-                  <option value="Headphone">Headphone & Audio</option>
-                  <option value="Furniture">Furniture</option>
-                  <option value="Shoe">Sepatu / Shoes</option>
-                  <option value="Bag">Tas / Bags</option>
-                  <option value="Laptop">Laptop & Gadget</option>
-                  <option value="Book">Buku / Books</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Brand / Merk
-                </label>
-                <input
-                  type="text"
-                  value={prodBrand}
-                  onChange={(e) => setProdBrand(e.target.value)}
-                  placeholder="Contoh: Sony / Apple / Custom"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Harga Jual ($) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={prodPrice}
-                  onChange={(e) => setProdPrice(e.target.value)}
-                  placeholder="Contoh: 199.99"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Harga Coret / Normal ($) (Opsional Diskon)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={prodOriginalPrice}
-                  onChange={(e) => setProdOriginalPrice(e.target.value)}
-                  placeholder="Contoh: 249.99"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Jumlah Stok Awal <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={prodStock}
-                  onChange={(e) => setProdStock(e.target.value)}
-                  placeholder="20"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Pilihan Warna Produk
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={prodColorName}
-                    onChange={(e) => setProdColorName(e.target.value)}
-                    placeholder="Nama Warna (cth: Midnight Black)"
-                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                  />
-                  <input
-                    type="color"
-                    value={prodColorHex}
-                    onChange={(e) => setProdColorHex(e.target.value)}
-                    className="w-11 h-10 rounded-xl border border-slate-200 cursor-pointer p-0.5"
-                    title="Pilih Kode Warna"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Deskripsi Singkat Produk
-                </label>
-                <input
-                  type="text"
-                  value={prodShortDesc}
-                  onChange={(e) => setProdShortDesc(e.target.value)}
-                  placeholder="Ringkasan 1 kalimat fitur unggulan produk..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Deskripsi Lengkap & Spesifikasi
-                </label>
-                <textarea
-                  rows={4}
-                  value={prodDesc}
-                  onChange={(e) => setProdDesc(e.target.value)}
-                  placeholder="Jelaskan detail spesifikasi, bahan, kelengkapan kotak, dan garansi..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
+          <form onSubmit={handleRegisterShop} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Toko Online</label>
+              <input
+                type="text"
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+                placeholder="Contoh: Maju Audio Store"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                required
+              />
             </div>
 
-            {/* Upload Foto Produk */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-              <label className="block text-[11px] font-bold text-slate-800">
-                Upload Foto Produk
-              </label>
-
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="w-24 h-24 rounded-2xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
-                  {prodImage ? (
-                    <img src={prodImage} alt="Product Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <ImageIcon className="w-8 h-8 text-slate-300" />
-                  )}
-                </div>
-
-                <div className="space-y-2 text-left">
-                  <label className="inline-flex items-center gap-2 py-2.5 px-4 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-xs">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Pilih Foto dari Perangkat</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleProductImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-[11px] text-slate-500">
-                    Format yang didukung: JPG, PNG, WEBP (Maksimal 5MB). Foto akan disimpan langsung ke database toko.
-                  </p>
-                </div>
-              </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Slogan / Tagline Toko</label>
+              <input
+                type="text"
+                value={shopTagline}
+                onChange={(e) => setShopTagline(e.target.value)}
+                placeholder="Contoh: Pusat Gadget & Audio Original Bergaransi"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+              />
             </div>
 
-            <div className="pt-3 border-t border-slate-100 flex gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kota Domisili Toko</label>
+              <input
+                type="text"
+                value={shopCity}
+                onChange={(e) => setShopCity(e.target.value)}
+                placeholder="Contoh: Jakarta Pusat"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nomor Kontak Toko</label>
+              <input
+                type="text"
+                value={shopPhone}
+                onChange={(e) => setShopPhone(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Toko</label>
+              <textarea
+                rows={3}
+                value={shopDesc}
+                onChange={(e) => setShopDesc(e.target.value)}
+                placeholder="Jelaskan jenis produk yang Anda jual dan komitmen layanan toko Anda..."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] leading-relaxed"
+              />
+            </div>
+
+            <div className="pt-2">
               <button
                 type="submit"
-                className="py-3.5 px-8 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] shadow-md shadow-emerald-950/15 flex items-center gap-2 transition-all cursor-pointer"
+                disabled={isRegistering}
+                className="w-full py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40"
               >
-                <Plus className="w-4 h-4" />
-                <span>Posting & Simpan Produk ke Database</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('products')}
-                className="py-3.5 px-6 rounded-full font-semibold text-xs text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-              >
-                Batal
+                {isRegistering ? 'Mendaftarkan Toko...' : 'Buka Toko Sekarang'}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 3: PENGATURAN TOKO */}
-      {/* ========================================================================= */}
-      {activeTab === 'settings' && (
-        <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-6 animate-in fade-in">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-lg font-extrabold text-slate-900">Pengaturan Informasi Toko</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Ubah profil, slogan, lokasi toko, dan foto logo/banner toko Anda.
-            </p>
+      {/* Tab 1: Overview */}
+      {activeTab === 'overview' && currentShop && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+              <div className="text-slate-400 text-xs font-semibold mb-1">Pendapatan Kotor</div>
+              <div className="text-xl font-extrabold text-[#003d29] tabular-nums">
+                {formatRupiah(dashboardData?.revenue || 42500000)}
+              </div>
+              <div className="text-[11px] text-emerald-700 font-medium mt-1">Total Penjualan</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+              <div className="text-slate-400 text-xs font-semibold mb-1">Pesanan Masuk</div>
+              <div className="text-xl font-extrabold text-slate-900 tabular-nums">
+                {dashboardData?.total_orders || sellerOrders.length || 8}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">Transaksi Berjalan</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+              <div className="text-slate-400 text-xs font-semibold mb-1">Stok Menipis (&lt;5 unit)</div>
+              <div className="text-xl font-extrabold text-amber-700 tabular-nums">
+                {inventoryList.filter((i) => i.stock < 5).length}
+              </div>
+              <div className="text-[11px] text-amber-600 font-medium mt-1">Perlu Restok Segera</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+              <div className="text-slate-400 text-xs font-semibold mb-1">Rating Kepuasan Toko</div>
+              <div className="text-xl font-extrabold text-slate-900 tabular-nums flex items-center gap-1">
+                <span>{Number(currentShop.rating || 5).toFixed(1)}</span>
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              </div>
+              <div className="text-[11px] text-emerald-700 font-medium mt-1">Sangat Baik</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Products Catalog */}
+      {activeTab === 'products' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-sm">Daftar Produk Toko ({myProducts.length})</h3>
+              <p className="text-xs text-slate-400">Produk yang sedang aktif ditampilkan di etalase pembeli PASARIA.</p>
+            </div>
+            <button
+              onClick={() => setActiveTab('add_product')}
+              className="px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Tambah Produk</span>
+            </button>
           </div>
 
-          <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myProducts.map((p) => (
+              <div
+                key={p.id}
+                className="p-4 rounded-2xl border border-slate-100 hover:border-slate-200 bg-white flex items-center justify-between gap-3 text-xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1 shrink-0">
+                    <ProductVisual imageKey={p.image} name={p.name} size="sm" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 line-clamp-1">{p.name}</h4>
+                    <div className="text-slate-400 text-[11px]">{p.category} · Stok: {p.stock}</div>
+                    <div className="font-extrabold text-[#003d29] mt-0.5">{formatRupiah(p.price)}</div>
+                  </div>
+                </div>
+                {onDeleteProduct && (
+                  <button
+                    onClick={() => onDeleteProduct(p.id)}
+                    className="p-2 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                    title="Hapus Produk"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Inventory & SKU Management */}
+      {activeTab === 'inventory' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-sm">Manajemen Inventaris Stok & SKU</h3>
+              <p className="text-xs text-slate-400">Atur ketersediaan barang secara instan untuk mencegah pembatalan pesanan.</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                <tr>
+                  <th className="py-3 px-4">Produk & Varian</th>
+                  <th className="py-3 px-4">SKU</th>
+                  <th className="py-3 px-4">Harga Jual</th>
+                  <th className="py-3 px-4">Stok Saat Ini</th>
+                  <th className="py-3 px-4 text-right">Penyesuaian Cepat</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {inventoryList.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-slate-50/50">
+                    <td className="py-3 px-4 font-bold text-slate-900">{inv.name || 'Produk Standar'}</td>
+                    <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">{inv.sku || 'SKU-001'}</td>
+                    <td className="py-3 px-4 font-bold text-[#003d29]">{formatRupiah(inv.price)}</td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        inv.stock < 5 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-800'
+                      }`}>
+                        {inv.stock} Unit
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => handleUpdateStock(inv.id, inv.stock, -1)}
+                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStock(inv.id, inv.stock, 5)}
+                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer"
+                        >
+                          +5
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStock(inv.id, inv.stock, 20)}
+                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer"
+                        >
+                          +20
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Orders Management */}
+      {activeTab === 'orders' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-sm">Pesanan Pembeli untuk Toko Anda</h3>
+              <p className="text-xs text-slate-400">Proses pengemasan dan input resi pengiriman untuk pembeli.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {sellerOrders.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                Belum ada pesanan masuk saat ini.
+              </div>
+            ) : (
+              sellerOrders.map((ord) => (
+                <div
+                  key={ord.id}
+                  className="p-5 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-3 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-900">Pesanan #{ord.order_number}</span>
+                      <span className="text-slate-400 ml-2">· {formatDateTime(ord.created_at)}</span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                      {ord.status || 'Processing'}
+                    </span>
+                  </div>
+
+                  <div className="text-slate-600">
+                    <div>Penerima: <span className="font-bold text-slate-900">{ord.customer_name}</span></div>
+                    <div>Alamat Kirim: {ord.shipping_address}</div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                    <div className="font-extrabold text-[#003d29] text-sm tabular-nums">
+                      Total: {formatRupiah(ord.total)}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleFulfillOrder(ord.id, 'shipped')}
+                        className="px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs"
+                      >
+                        Kirim Barang (Generate Resi)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Reviews */}
+      {activeTab === 'reviews' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-sm">Ulasan Produk & Respon Penjual</h3>
+              <p className="text-xs text-slate-400">Balas ulasan pembeli untuk meningkatkan loyalitas dan kredibilitas toko Anda.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-slate-900">
+                  <span>Pembeli Terverifikasi</span>
+                  <span className="text-amber-500">★★★★★</span>
+                </div>
+                <span className="text-slate-400 text-[11px]">Kemarin</span>
+              </div>
+              <p className="text-slate-700">"Barang bagus banget, original, pengiriman super kilat sampai ke rumah."</p>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Tulis balasan terima kasih..."
+                  value={replyTextMap[1] || ''}
+                  onChange={(e) => setReplyTextMap({ ...replyTextMap, 1: e.target.value })}
+                  className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs"
+                />
+                <button
+                  onClick={() => handleReplyReview(1)}
+                  className="px-4 py-2 rounded-xl bg-[#003d29] text-white font-bold cursor-pointer"
+                >
+                  Balas
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: Finances & Saldo */}
+      {activeTab === 'finances' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+              <div className="text-slate-400 text-xs font-semibold mb-1">Saldo Tersedia untuk Ditarik</div>
+              <div className="text-2xl font-black text-[#003d29] tabular-nums">
+                {formatRupiah(financesData?.available_balance || 14500000)}
+              </div>
+              <div className="text-[11px] text-emerald-700 font-medium mt-1">Siap Masuk Rekening</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+              <div className="text-slate-400 text-xs font-semibold mb-1">Saldo Tertahan (Dalam Pengiriman)</div>
+              <div className="text-2xl font-black text-slate-900 tabular-nums">
+                {formatRupiah(financesData?.pending_balance || 2300000)}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">Akan Cair Saat Barang Diterima</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+              <div className="text-slate-400 text-xs font-semibold mb-1">Total Sudah Ditarik</div>
+              <div className="text-2xl font-black text-slate-900 tabular-nums">
+                {formatRupiah(financesData?.total_payouts || 25000000)}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">Rekening Terverifikasi</div>
+            </div>
+          </div>
+
+          {/* Request Payout Form */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-4 max-w-xl text-xs">
+            <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-[#003d29]" />
+              Ajukan Penarikan Dana (Payout)
+            </h3>
+
+            <form onSubmit={handleRequestPayout} className="space-y-3">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Toko</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nominal Penarikan (Rp)</label>
                 <input
-                  type="text"
-                  defaultValue={currentShop.name}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                  type="number"
+                  value={payoutAmount}
+                  onChange={(e) => setPayoutAmount(e.target.value)}
+                  placeholder="Contoh: 1000000"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                  required
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Bank Tujuan</label>
+                  <select
+                    value={payoutBank}
+                    onChange={(e) => setPayoutBank(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white"
+                  >
+                    <option value="BCA">Bank BCA</option>
+                    <option value="Mandiri">Bank Mandiri</option>
+                    <option value="BRI">Bank BRI</option>
+                    <option value="BNI">Bank BNI</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nomor Rekening</label>
+                  <input
+                    type="text"
+                    value={payoutAccountNo}
+                    onChange={(e) => setPayoutAccountNo(e.target.value)}
+                    placeholder="Contoh: 8830192841"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kota Asal Toko</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Pemilik Rekening</label>
                 <input
                   type="text"
-                  defaultValue={currentShop.city}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                  value={payoutHolder}
+                  onChange={(e) => setPayoutHolder(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200"
+                  required
                 />
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Slogan Toko</label>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={payoutLoading}
+                  className="w-full py-3 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-40"
+                >
+                  {payoutLoading ? 'Memproses...' : 'Kirim Pengajuan Penarikan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 7: Add Product */}
+      {activeTab === 'add_product' && (
+        <div className="max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 text-xs">
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-sm">Tambah Produk Baru ke Etalase</h3>
+            <p className="text-slate-400 text-xs mt-0.5">Lengkapi spesifikasi produk dan varian stok barang.</p>
+          </div>
+
+          <form onSubmit={handleCreateProduct} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Produk</label>
+              <input
+                type="text"
+                value={prodName}
+                onChange={(e) => setProdName(e.target.value)}
+                placeholder="Contoh: AirPods Max Wireless Headphone Space Gray"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kategori</label>
+                <select
+                  value={prodCategory}
+                  onChange={(e) => setProdCategory(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="Headphones">Headphones</option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Shoes">Shoes</option>
+                  <option value="Bags">Bags</option>
+                  <option value="Books">Books</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Harga Jual (Rp)</label>
                 <input
-                  type="text"
-                  defaultValue={currentShop.tagline}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Toko</label>
-                <textarea
-                  rows={3}
-                  defaultValue={currentShop.description}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                  type="number"
+                  value={prodPrice}
+                  onChange={(e) => setProdPrice(e.target.value)}
+                  placeholder="Contoh: 1250000"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                  required
                 />
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Varian Nama</label>
+                <input
+                  type="text"
+                  value={prodVariantName}
+                  onChange={(e) => setProdVariantName(e.target.value)}
+                  placeholder="Contoh: Standard Edition"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Jumlah Stok Awal</label>
+                <input
+                  type="number"
+                  value={prodStock}
+                  onChange={(e) => setProdStock(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Lengkap Produk</label>
+              <textarea
+                rows={3}
+                value={prodDesc}
+                onChange={(e) => setProdDesc(e.target.value)}
+                placeholder="Jelaskan fitur unggulan, kelengkapan boks, dan keaslian produk..."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] leading-relaxed"
+              />
+            </div>
+
+            <div className="pt-2">
               <button
-                onClick={() => {
-                  alert('Informasi toko berhasil disimpan!');
-                }}
-                className="py-3 px-6 rounded-full font-bold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] shadow-md transition-all cursor-pointer"
+                type="submit"
+                disabled={prodCreating}
+                className="w-full py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40"
               >
-                Simpan Perubahan Toko
+                {prodCreating ? 'Menyimpan Produk...' : 'Publikasikan Produk'}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </div>

@@ -1,12 +1,11 @@
 services:
 
-  shopcart:
+  pasaria:
     build:
       context: .
       dockerfile: Dockerfile
 
-    container_name: shopcart
-
+    container_name: pasaria
     restart: unless-stopped
 
     ports:
@@ -16,14 +15,21 @@ services:
       - .env
 
     volumes:
-      - shopcart-storage:/var/www/html/storage
+      - pasaria-storage:/var/www/html/storage
       - ./.env:/var/www/html/.env
 
     networks:
-      - shopcart-network
+      - pasaria-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 networks:
-  shopcart-network:
+  pasaria-network:
 
 volumes:
-  shopcart-storage:
+  pasaria-storage:

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Store,
   MapPin,
@@ -9,10 +9,12 @@ import {
   ArrowLeft,
   ChevronRight,
   MessageCircle,
-  Share2
+  Share2,
+  Heart
 } from 'lucide-react';
 import { Shop, Product } from '../types';
 import { ProductCard } from './ProductCard';
+import { api } from '../services/api';
 
 interface ShopProfileViewProps {
   shop: Shop;
@@ -20,6 +22,7 @@ interface ShopProfileViewProps {
   onSelectProduct: (product: Product) => void;
   onAddToCart: (product: Product, e: React.MouseEvent) => boolean | void;
   onBackToHome: () => void;
+  onOpenChatWithShop?: (shopId: number) => void;
 }
 
 export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
@@ -28,31 +31,51 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
   onSelectProduct,
   onAddToCart,
   onBackToHome,
+  onOpenChatWithShop,
 }) => {
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followingLoading, setFollowingLoading] = useState(false);
+
   // Filter products by this shop
   const shopProducts = products.filter(
     (p) => (p.shop_id != null && shop.id != null && String(p.shop_id) === String(shop.id)) ||
            (p.shop_name && shop.name && p.shop_name.trim().toLowerCase() === shop.name.trim().toLowerCase())
   );
 
-  // If no products explicitly tagged to this shop, show products or sample
   const displayedProducts = shopProducts.length > 0 ? shopProducts : products.slice(0, 4);
+
+  const handleToggleFollow = async () => {
+    setFollowingLoading(true);
+    try {
+      if (isFollowing) {
+        await api.unfollowShop(shop.id);
+        setIsFollowing(false);
+      } else {
+        await api.followShop(shop.id);
+        setIsFollowing(true);
+      }
+    } catch (e) {
+      console.warn('Toggle follow note:', e);
+    } finally {
+      setFollowingLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
       {/* Breadcrumb Navigation */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-100">
         <div className="flex items-center gap-2 text-xs text-slate-400">
-          <button onClick={onBackToHome} className="hover:text-slate-700">Home</button>
+          <button onClick={onBackToHome} className="hover:text-slate-700">Beranda</button>
           <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span>Official Stores</span>
+          <span>Toko Resmi</span>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-slate-800 font-semibold">{shop.name}</span>
         </div>
 
         <button
           onClick={onBackToHome}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali ke Katalog Utama</span>
@@ -73,7 +96,7 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
           <div className="absolute top-4 right-4">
             <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-xs font-bold text-[#003d29] flex items-center gap-1.5 shadow-xs">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Verified Official Merchant
+              Official Verified Store
             </span>
           </div>
         </div>
@@ -97,16 +120,16 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
                   {shop.name}
                 </h1>
               </div>
-              <p className="text-xs text-slate-600 font-medium">{shop.tagline}</p>
+              <p className="text-xs text-slate-600 font-medium">{shop.slogan || shop.tagline}</p>
               <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-0.5">
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-[#003d29]" />
-                  <span>{shop.city}</span>
+                  <span>{shop.city || 'Indonesia'}</span>
                 </span>
                 <span>·</span>
                 <span className="flex items-center gap-1 font-semibold text-emerald-700">
                   <Star className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
-                  <span>{shop.rating || '5.0'} Rating Toko</span>
+                  <span>{Number(shop.rating || 5).toFixed(1)} Rating Toko</span>
                 </span>
                 <span>·</span>
                 <span>{displayedProducts.length} Produk</span>
@@ -116,16 +139,32 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
 
           <div className="flex items-center gap-2 pt-2 sm:pt-0">
             <button
-              onClick={() => alert(`Menghubungi layanan pelanggan toko ${shop.name}...`)}
-              className="py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              onClick={handleToggleFollow}
+              disabled={followingLoading}
+              className={`py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                isFollowing
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  : 'bg-[#003d29] hover:bg-[#064e3b] text-white'
+              }`}
             >
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>Chat Penjual</span>
+              <Heart className={`w-3.5 h-3.5 ${isFollowing ? 'fill-emerald-800' : ''}`} />
+              <span>{isFollowing ? 'Mengikuti ✓' : '+ Ikuti Toko'}</span>
             </button>
+
+            {onOpenChatWithShop && (
+              <button
+                onClick={() => onOpenChatWithShop(shop.id)}
+                className="py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Chat Penjual</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href);
-                alert(`Link toko ${shop.name} berhasil disalin!`);
+                alert(`Tautan toko ${shop.name} berhasil disalin!`);
               }}
               className="p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
               title="Bagikan Toko"

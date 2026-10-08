@@ -15,18 +15,21 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ onBuyNow }) => {
         <div className="w-full grid grid-cols-1 md:grid-cols-12 items-center gap-6 z-10 px-6 sm:px-12 lg:px-16 py-8">
           {/* Left Column: Headline & CTA */}
           <div className="md:col-span-7 lg:col-span-6 space-y-6 text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100/80 text-[#003d29] text-xs font-bold uppercase tracking-wider">
+              ✨ Pasar Modern Terpercaya
+            </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#003d29] tracking-tight leading-[1.15] text-balance">
-              Grab Upto 50% Off On Selected Headphone
+              PASARIA — Belanja Hemat, Praktis & Aman Setiap Hari
             </h1>
             <p className="text-sm sm:text-base text-stone-600 font-normal max-w-md">
-              Immerse yourself in world-class acoustic engineering with industry-leading noise cancellation and spatial fidelity.
+              Temukan ribuan produk pilihan dari seller resmi terverifikasi se-Indonesia. Jaminan original, garansi pengembalian, dan pengiriman super cepat.
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex items-center gap-3">
               <button
                 onClick={onBuyNow}
                 className="inline-flex items-center justify-center px-8 py-3.5 text-sm sm:text-base font-semibold text-white bg-[#003d29] hover:bg-[#064e3b] active:scale-[0.98] rounded-full shadow-md shadow-emerald-950/10 transition-all cursor-pointer"
               >
-                Buy Now
+                Mulai Belanja
               </button>
             </div>
           </div>
@@ -36,7 +39,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ onBuyNow }) => {
             <div className="relative w-full max-w-[420px] aspect-[4/3] rounded-2xl overflow-hidden shadow-lg border-4 border-white/60">
               <img
                 src={heroImg}
-                alt="Woman enjoying premium sound with over-ear wireless headphones"
+                alt="Pengalaman berbelanja modern di PASARIA"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-center transform transition-transform duration-700 hover:scale-105"
               />
