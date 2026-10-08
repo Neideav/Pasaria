@@ -121,8 +121,8 @@ export interface User {
   city?: string;
   zip?: string;
   phone?: string;
-  role: 'customer' | 'admin' | 'seller' | 'support';
-  status?: 'active' | 'suspended';
+  role: "customer" | "admin" | "seller" | "support";
+  status?: "active" | "suspended";
   shop?: Shop | null;
   addresses?: UserAddress[];
 }
@@ -177,7 +177,7 @@ export interface TrackingCheckpoint {
   title: string;
   location: string;
   timestamp: string;
-  status: 'completed' | 'current' | 'upcoming';
+  status: "completed" | "current" | "upcoming";
   description?: string;
 }
 
@@ -190,7 +190,12 @@ export interface DeliveryShipment {
   courier_service: string;
   courier_logo?: string;
   tracking_number: string;
-  status: 'processing' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered';
+  status:
+    | "processing"
+    | "picked_up"
+    | "in_transit"
+    | "out_for_delivery"
+    | "delivered";
   status_label: string;
   recipient_name: string;
   recipient_phone: string;
@@ -217,7 +222,7 @@ export interface ReviewMedia {
   id: number;
   review_id: number;
   media_url: string;
-  media_type: 'image' | 'video';
+  media_type: "image" | "video";
 }
 
 export interface Review {
@@ -266,7 +271,7 @@ export interface Voucher {
   id: number;
   code: string;
   name: string;
-  type: 'percentage' | 'fixed_amount' | 'free_shipping';
+  type: "percentage" | "fixed_amount" | "free_shipping";
   discount_value: number;
   min_purchase: number;
   max_discount?: number;
@@ -279,7 +284,7 @@ export interface Message {
   id: number;
   conversation_id: number;
   sender_id: number;
-  sender_type: 'customer' | 'seller';
+  sender_type: "customer" | "seller";
   message: string;
   attachment_url?: string;
   is_read: boolean;
@@ -302,7 +307,14 @@ export interface OrderReturn {
   order_id: number;
   user_id: number;
   shop_id?: number;
-  status: 'requested' | 'approved' | 'rejected' | 'in_transit' | 'received' | 'refunded' | 'disputed';
+  status:
+    | "requested"
+    | "approved"
+    | "rejected"
+    | "in_transit"
+    | "received"
+    | "refunded"
+    | "disputed";
   reason: string;
   description: string;
   evidence_urls_json?: string[];
@@ -320,7 +332,7 @@ export interface Dispute {
   order_id: number;
   user_id: number;
   shop_id?: number;
-  status: 'open' | 'under_review' | 'resolved' | 'closed';
+  status: "open" | "under_review" | "resolved" | "closed";
   resolution?: string;
   resolution_note?: string;
   created_at: string;
@@ -336,3 +348,5 @@ export interface NotificationItem {
   is_read: boolean;
   created_at: string;
 }
+
+export * from "./toast";
