@@ -12,7 +12,7 @@ interface ProductCardProps {
   onToggleWishlist?: (product: Product, e: React.MouseEvent) => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({
+const ProductCardComponent: React.FC<ProductCardProps> = ({
   product,
   onSelect,
   onAddToCart,
@@ -21,6 +21,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const [justAdded, setJustAdded] = useState(false);
   const [favorited, setFavorited] = useState(isWishlisted);
+
+  const isCurrentlyFavorited = favorited || Boolean(product.is_wishlisted);
 
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,16 +35,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleHeartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavorited(!favorited);
+    setFavorited(!isCurrentlyFavorited);
     if (onToggleWishlist) {
       onToggleWishlist(product, e);
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect(product);
+    }
+  };
+
   return (
-    <div
+    <article
+      role="article"
+      tabIndex={0}
       onClick={() => onSelect(product)}
-      className="group relative flex flex-col justify-between bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all duration-200 cursor-pointer text-left"
+      onKeyDown={handleKeyDown}
+      className="group relative flex flex-col justify-between bg-white rounded-2xl p-4 border border-slate-100 hover:border-slate-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:ring-offset-2 transition-all duration-200 cursor-pointer text-left"
     >
       {/* Top Section: Badges, Wishlist Heart & Image */}
       <div>
@@ -56,13 +69,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           )}
 
           <button
+            type="button"
             onClick={handleHeartClick}
-            className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
-            aria-label="Wishlist"
+            className="w-12 h-12 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+            aria-label={isCurrentlyFavorited ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}
           >
             <Heart
               className={`w-4 h-4 transition-colors ${
-                favorited || product.is_wishlisted
+                isCurrentlyFavorited
                   ? 'fill-rose-500 text-rose-500'
                   : 'text-slate-400'
               }`}
@@ -70,8 +84,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </button>
         </div>
 
-        {/* Product Image Stage */}
-        <div className="relative w-full h-44 sm:h-48 rounded-xl bg-[#f8f9fa] flex items-center justify-center p-3 mb-4 overflow-hidden group-hover:bg-[#f3f4f6] transition-colors">
+        {/* Product Image Stage - concentric radius rounded-lg with outer rounded-2xl and p-4 */}
+        <div className="relative w-full h-44 sm:h-48 rounded-lg bg-[#f8f9fa] flex items-center justify-center p-3 mb-4 overflow-hidden group-hover:bg-[#f3f4f6] transition-colors">
           <ProductVisual
             imageKey={product.image}
             name={product.name}
@@ -94,9 +108,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#003d29] transition-colors line-clamp-1">
             {product.name}
           </h3>
-          <span className="text-sm sm:text-base font-bold text-[#003d29] tabular-nums shrink-0">
-            {formatRupiah(product.price)}
-          </span>
+          <div className="flex flex-col items-end shrink-0">
+            <span className="text-sm sm:text-base font-bold text-[#003d29] tabular-nums">
+              {formatRupiah(product.price)}
+            </span>
+            {product.original_price && product.original_price > product.price && (
+              <span className="text-xs text-slate-400 line-through tabular-nums">
+                {formatRupiah(product.original_price)}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Short Subtitle */}
@@ -108,14 +129,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex items-center gap-1.5 mb-4">
           <div className="flex items-center text-emerald-600 text-xs font-bold gap-0.5">
             <Star className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" />
-            <span>{Number(product.rating || 5).toFixed(1)}</span>
+            <span className="tabular-nums">{Number(product.rating || 5).toFixed(1)}</span>
           </div>
           <span className="text-xs text-slate-400 font-medium">
-            ({product.review_count || 0} ulasan)
+            (<span className="tabular-nums">{product.review_count || 0}</span> ulasan)
           </span>
           <span className="text-xs text-slate-300">·</span>
           <span className="text-xs text-slate-500 font-medium">
-            Stok: {product.stock}
+            Stok: <span className="tabular-nums">{product.stock}</span>
           </span>
         </div>
       </div>
@@ -123,8 +144,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Bottom Action: Add to Cart Button */}
       <div className="pt-2">
         <button
+          type="button"
           onClick={handleAddClick}
-          className={`w-full py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
+          aria-label="Tambah ke keranjang"
+          className={`w-full py-2.5 px-4 min-h-[44px] rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
             justAdded
               ? 'bg-[#003d29] text-white'
               : 'bg-white hover:bg-slate-900 hover:text-white text-slate-800 border border-slate-300 hover:border-slate-900 shadow-2xs'
@@ -140,6 +163,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </button>
       </div>
-    </div>
+    </article>
   );
 };
+
+export const ProductCard = React.memo(ProductCardComponent);
+ProductCard.displayName = 'ProductCard';

@@ -13,9 +13,7 @@ import {
   Star,
   MessageCircle,
   HelpCircle,
-  User,
   Send,
-  AlertCircle
 } from 'lucide-react';
 import { Product, ProductVariant, Review, ProductQuestion } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -83,19 +81,24 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   }, [product.id]);
 
   const loadReviewsAndQA = async () => {
-    try {
-      const data = await api.getProductReviews(product.id);
-      setReviews(data.reviews || []);
-      setReviewBreakdown(data.breakdown || null);
-    } catch (e) {
-      console.warn('Reviews load note:', e);
+    const [reviewsResult, questionsResult] = await Promise.allSettled([
+      api.getProductReviews(product.id),
+      api.getProductQuestions(product.id),
+    ]);
+
+    if (reviewsResult.status === 'fulfilled') {
+      const data = reviewsResult.value;
+      setReviews(data?.reviews || []);
+      setReviewBreakdown(data?.breakdown || null);
+    } else {
+      console.warn('Reviews load note:', reviewsResult.reason);
     }
 
-    try {
-      const qData = await api.getProductQuestions(product.id);
+    if (questionsResult.status === 'fulfilled') {
+      const qData = questionsResult.value;
       setQuestions(qData || []);
-    } catch (e) {
-      console.warn('Questions load note:', e);
+    } else {
+      console.warn('Questions load note:', questionsResult.reason);
     }
   };
 
@@ -169,7 +172,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 text-left">
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 pb-24 sm:pb-8 text-left">
       {/* Breadcrumb Navigation */}
       <nav className="flex items-center gap-2 text-xs text-slate-400 py-3 mb-4 overflow-x-auto whitespace-nowrap">
         <button onClick={onBackToHome} className="hover:text-slate-800 transition-colors">
@@ -189,19 +192,23 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             {/* Wishlist & Share buttons */}
             <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
               <button
+                type="button"
                 onClick={handleToggleWishlist}
-                className="w-10 h-10 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
                 title="Wishlist"
+                aria-label={isWishlisted ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}
               >
                 <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
               </button>
               <button
+                type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
                   showToast('Tautan produk berhasil disalin ke papan klip!', 'success');
                 }}
-                className="w-10 h-10 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                 title="Bagikan"
+                aria-label="Bagikan produk"
               >
                 <Share2 className="w-4 h-4" />
               </button>
@@ -223,11 +230,12 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               return (
                 <button
                   key={c.name}
+                  type="button"
                   onClick={() => {
                     setSelectedColor(c.name);
                     setSelectedHex(c.hex);
                   }}
-                  className={`rounded-xl bg-[#f8f9fa] p-2 border-2 transition-all flex flex-col items-center justify-center cursor-pointer ${
+                  className={`min-h-[44px] rounded-xl bg-[#f8f9fa] p-2 border-2 transition-all flex flex-col items-center justify-center cursor-pointer ${
                     isSelected
                       ? 'border-[#003d29] shadow-xs'
                       : 'border-transparent hover:border-slate-300'
@@ -267,15 +275,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <div className="flex items-center gap-2 mt-3">
               <div className="flex items-center gap-1 text-emerald-600 text-sm font-bold">
                 <Star className="w-4 h-4 fill-emerald-600 text-emerald-600" />
-                <span>{Number(product.rating || 5).toFixed(1)}</span>
+                <span className="tabular-nums">{Number(product.rating || 5).toFixed(1)}</span>
               </div>
               <span className="text-xs text-slate-300">·</span>
-              <span className="text-xs font-semibold text-slate-500">
-                {product.review_count || reviews.length} Ulasan Terverifikasi
-              </span>
-              <span className="text-xs text-slate-300">·</span>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                Terjual {product.review_count ? product.review_count * 2 + 15 : 24}+
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                <span className="tabular-nums">{product.review_count || reviews.length || 0}</span> ulasan terverifikasi
               </span>
             </div>
           </div>
@@ -289,6 +293,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               {product.original_price && (
                 <span className="text-sm line-through text-slate-400 tabular-nums">
                   {formatRupiah(product.original_price)}
+                </span>
+              )}
+              {product.discount_percent && (
+                <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md tabular-nums">
+                  -{product.discount_percent}%
                 </span>
               )}
             </div>
@@ -306,20 +315,23 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   {selectedVariant ? selectedVariant.name : 'Pilih Varian'}
                 </span>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2.5">
                 {product.variants.map((v) => {
                   const isSelected = selectedVariant?.id === v.id;
                   return (
                     <button
                       key={v.id}
+                      type="button"
                       onClick={() => setSelectedVariant(v)}
-                      className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
+                      className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                         isSelected
                           ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                       }`}
                     >
-                      {v.name} · {formatRupiah(v.price)}
+                      <span>{v.name}</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="tabular-nums">{formatRupiah(v.price)}</span>
                     </button>
                   );
                 })}
@@ -338,20 +350,22 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 return (
                   <button
                     key={c.name}
+                    type="button"
                     onClick={() => {
                       setSelectedColor(c.name);
                       setSelectedHex(c.hex);
                     }}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                    className={`w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center transition-all cursor-pointer ${
                       isSelected
-                        ? 'ring-2 ring-offset-2 ring-[#003d29]'
-                        : 'hover:scale-110'
+                        ? 'ring-2 ring-offset-2 ring-[#003d29] shadow-sm'
+                        : 'hover:scale-105 border border-slate-200/60'
                     }`}
                     style={{ backgroundColor: c.hex }}
                     title={c.name}
+                    aria-label={`Pilih warna ${c.name}`}
                   >
                     {isSelected && (
-                      <span className="w-2 h-2 rounded-full bg-white shadow-xs" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-white shadow-xs" />
                     )}
                   </button>
                 );
@@ -361,23 +375,27 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
           {/* Quantity & Stock */}
           <div className="border-t border-slate-100 pt-5 flex flex-wrap items-center gap-6">
-            <div className="flex items-center bg-slate-100/90 rounded-full px-3 py-1.5 border border-slate-200/60">
+            <div className="flex items-center bg-slate-100/90 rounded-full p-1 border border-slate-200/60">
               <button
+                type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer disabled:opacity-30"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 active:bg-slate-200 transition-colors cursor-pointer disabled:opacity-30 disabled:hover:bg-transparent"
                 disabled={quantity <= 1}
+                aria-label="Kurangi kuantitas"
               >
-                <Minus className="w-3.5 h-3.5" />
+                <Minus className="w-4 h-4" />
               </button>
-              <span className="w-8 text-center text-sm font-bold text-slate-800 tabular-nums">
+              <span className="w-10 text-center text-sm font-bold text-slate-800 tabular-nums">
                 {quantity}
               </span>
               <button
+                type="button"
                 onClick={() => setQuantity(Math.min(currentStock || 99, quantity + 1))}
                 disabled={quantity >= currentStock}
-                className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer disabled:opacity-30"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 active:bg-slate-200 transition-colors cursor-pointer disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label="Tambah kuantitas"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
               </button>
             </div>
 
@@ -391,14 +409,17 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           {/* Primary Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
             <button
+              type="button"
               onClick={handleBuy}
-              className="w-full sm:w-1/2 py-3.5 px-6 rounded-full font-bold text-white bg-[#003d29] hover:bg-[#064e3b] active:scale-[0.99] shadow-md shadow-emerald-950/10 text-sm transition-all cursor-pointer"
+              className="w-full sm:w-1/2 py-3.5 px-6 min-h-[48px] rounded-full font-bold text-white bg-[#003d29] hover:bg-[#064e3b] active:scale-[0.99] shadow-md shadow-emerald-950/10 text-sm transition-all cursor-pointer"
             >
               Beli Sekarang
             </button>
             <button
+              type="button"
               onClick={handleAdd}
-              className={`w-full sm:w-1/2 py-3.5 px-6 rounded-full font-semibold text-sm transition-all border cursor-pointer flex items-center justify-center gap-2 ${
+              aria-label="Tambah ke keranjang belanja"
+              className={`w-full sm:w-1/2 py-3.5 px-6 min-h-[48px] rounded-full font-semibold text-sm transition-all border cursor-pointer flex items-center justify-center gap-2 ${
                 addedSuccess
                   ? 'bg-slate-900 text-white border-slate-900'
                   : 'bg-white text-slate-800 border-slate-300 hover:border-slate-800 hover:bg-slate-50 shadow-2xs'
@@ -435,7 +456,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
                   <span>📍 {product.shop_city || 'Jakarta'}</span>
                   <span>·</span>
-                  <span className="text-emerald-700 font-semibold">★ 5.0 Rating Toko</span>
+                  <span className="text-emerald-700 font-semibold tabular-nums">★ 5.0 Rating Toko</span>
                 </div>
               </div>
             </div>
@@ -443,6 +464,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               {product.shop_id && (
                 <button
+                  type="button"
                   onClick={handleToggleFollowShop}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                     isFollowingShop
@@ -455,6 +477,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               )}
               {onOpenChatWithShop && product.shop_id && (
                 <button
+                  type="button"
                   onClick={() => onOpenChatWithShop(product.shop_id!)}
                   className="p-2 rounded-xl bg-white hover:bg-emerald-50 text-[#003d29] border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
                   title="Chat Penjual"
@@ -464,6 +487,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               )}
               {onViewShop && (
                 <button
+                  type="button"
                   onClick={() => onViewShop(product.shop_name || 'PASARIA Official Store', product.shop_id)}
                   className="py-2 px-3.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
                 >
@@ -544,7 +568,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <dt className="text-slate-500">Stok Tersedia</dt>
-                <dd className="font-semibold text-emerald-700">{currentStock} Unit</dd>
+                <dd className="font-semibold text-emerald-700 tabular-nums">{currentStock} Unit</dd>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <dt className="text-slate-500">Dikirim Dari</dt>
@@ -572,6 +596,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
           {onOpenReviewModal && (
             <button
+              type="button"
               onClick={() => onOpenReviewModal(product)}
               className="px-5 py-2.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
             >
@@ -588,7 +613,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </span>
             <div className="flex text-amber-400 my-2 text-base">★★★★★</div>
             <span className="text-xs text-slate-400">
-              Berdasarkan {reviews.length} ulasan terverifikasi
+              Berdasarkan <span className="tabular-nums">{reviews.length}</span> ulasan terverifikasi
             </span>
           </div>
 
@@ -600,7 +625,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               return (
                 <div key={stars} className="flex items-center gap-3">
                   <span className="w-10 font-bold text-slate-700 flex items-center gap-1">
-                    {stars} <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                    <span className="tabular-nums">{stars}</span> <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                   </span>
                   <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div
@@ -681,7 +706,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
               <HelpCircle className="w-5 h-5 text-[#003d29]" />
-              Tanya Jawab Produk ({questions.length})
+              Tanya Jawab Produk (<span className="tabular-nums">{questions.length}</span>)
             </h2>
             <p className="text-xs text-slate-500 mt-1">
               Ada pertanyaan seputar produk ini? Tanyakan langsung kepada penjual.
@@ -785,6 +810,39 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Sticky Mobile Purchase Action Bar */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white border-t border-slate-200 z-30 flex items-center gap-3 shadow-lg">
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-[10px] text-slate-400 font-medium">Total Harga</span>
+          <span className="text-base font-extrabold text-[#003d29] tabular-nums truncate">
+            {formatRupiah(currentPrice * quantity)}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleAdd}
+          aria-label="Tambah ke keranjang"
+          className={`px-4 py-2.5 min-h-[44px] rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+            addedSuccess
+              ? 'bg-slate-900 text-white border-slate-900'
+              : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
+          }`}
+        >
+          {addedSuccess ? (
+            <Check className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <span>+ Keranjang</span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleBuy}
+          className="px-5 py-2.5 min-h-[44px] rounded-full text-xs font-bold text-white bg-[#003d29] hover:bg-[#064e3b] active:scale-[0.99] transition-all cursor-pointer shrink-0"
+        >
+          Beli Sekarang
+        </button>
+      </div>
     </div>
   );
 };

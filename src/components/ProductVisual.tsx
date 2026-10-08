@@ -8,7 +8,7 @@ interface ProductVisualProps {
   className?: string;
 }
 
-export const ProductVisual: React.FC<ProductVisualProps> = ({
+const ProductVisualComponent: React.FC<ProductVisualProps> = ({
   imageKey,
   name = 'Product',
   colorHex,
@@ -385,3 +385,6 @@ export const ProductVisual: React.FC<ProductVisualProps> = ({
     </div>
   );
 };
+
+export const ProductVisual = React.memo(ProductVisualComponent);
+ProductVisual.displayName = 'ProductVisual';
