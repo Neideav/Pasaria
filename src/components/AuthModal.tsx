@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Lock, Mail, User as UserIcon, ArrowRight, Info, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Lock, Mail, User as UserIcon, ArrowRight, Info, Check, Eye, EyeOff } from 'lucide-react';
 import { User } from '../types';
 import { api } from '../services/api';
 
@@ -19,6 +19,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Register fields
   const [regName, setRegName] = useState('');
@@ -26,9 +27,62 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap and Escape key listener
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      if (modalRef.current) {
+        const firstFocusable = modalRef.current.querySelector<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        firstFocusable?.focus();
+      }
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -76,12 +130,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 border border-slate-100 text-left">
+    <div
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+    >
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-modal-title"
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 border border-slate-100 text-left"
+      >
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+          aria-label="Tutup modal autentikasi"
+          className="absolute right-5 top-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
         >
           <X className="w-4 h-4" />
         </button>
@@ -94,7 +162,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </span>
             <span className="font-black text-[#003d29] text-sm tracking-wider">PASARIA</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+          <h2 id="auth-modal-title" className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
             {tab === 'login' ? 'Masuk ke Akun Anda' : 'Daftar Akun Baru'}
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-normal">
@@ -116,7 +184,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Error message */}
         {errorMsg && (
-          <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+          <div role="alert" className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
             {errorMsg}
           </div>
         )}
@@ -125,46 +193,63 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {tab === 'login' ? (
           <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              <label htmlFor="auth-login-identifier" className="block text-[11px] font-semibold text-slate-700 mb-1">
                 Email atau Username
               </label>
               <div className="relative">
                 <input
+                  id="auth-login-identifier"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="customer@pasaria.id"
+                  autoComplete="username"
                   required
-                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[#003d29]"
+                  className="w-full min-h-[44px] pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] transition-all"
                 />
-                <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] font-semibold text-slate-700">Kata Sandi</label>
-                <span className="text-[11px] text-[#003d29] hover:underline cursor-pointer">
+                <label htmlFor="auth-login-password" className="text-[11px] font-semibold text-slate-700">
+                  Kata Sandi
+                </label>
+                <button
+                  type="button"
+                  className="text-[11px] text-[#003d29] hover:underline cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded"
+                >
                   Lupa Sandi?
-                </span>
+                </button>
               </div>
               <div className="relative">
                 <input
-                  type="password"
+                  id="auth-login-password"
+                  type={showLoginPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
-                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[#003d29]"
+                  className="w-full min-h-[44px] pl-9 pr-11 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] transition-all"
                 />
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword((prev) => !prev)}
+                  aria-label={showLoginPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-2"
+              className="w-full min-h-[44px] py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-2"
             >
               {loading ? 'Memproses Masuk...' : 'Masuk ke PASARIA'}
             </button>
@@ -177,80 +262,119 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   setTab('register');
                   setErrorMsg('');
                 }}
-                className="font-bold text-[#003d29] hover:underline cursor-pointer"
+                className="font-bold text-[#003d29] hover:underline cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded"
               >
                 Daftar Sekarang
               </button>
             </div>
           </form>
         ) : (
-          /* Register Form */
-          <form onSubmit={handleRegisterSubmit} className="space-y-3 text-xs">
+          /* Register Form - Single-Column Linear Layout */
+          <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Lengkap</label>
+              <label htmlFor="auth-reg-name" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Nama Lengkap
+              </label>
               <input
+                id="auth-reg-name"
                 type="text"
                 value={regName}
                 onChange={(e) => setRegName(e.target.value)}
                 placeholder="Budi Santoso"
+                autoComplete="name"
                 required
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Username</label>
+              <label htmlFor="auth-reg-username" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Username
+              </label>
               <input
+                id="auth-reg-username"
                 type="text"
                 value={regUsername}
                 onChange={(e) => setRegUsername(e.target.value)}
                 placeholder="budisantoso"
+                autoComplete="username"
                 required
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Email</label>
+              <label htmlFor="auth-reg-email" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Email
+              </label>
               <input
+                id="auth-reg-email"
                 type="email"
                 value={regEmail}
                 onChange={(e) => setRegEmail(e.target.value)}
                 placeholder="budi@example.com"
+                autoComplete="email"
                 required
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] transition-all"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kata Sandi</label>
+            <div>
+              <label htmlFor="auth-reg-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Kata Sandi
+              </label>
+              <div className="relative">
                 <input
-                  type="password"
+                  id="auth-reg-password"
+                  type={showRegPassword ? 'text' : 'password'}
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   required
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                  className="w-full min-h-[44px] pl-3.5 pr-11 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowRegPassword((prev) => !prev)}
+                  aria-label={showRegPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                >
+                  {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Ulangi Sandi</label>
+            </div>
+
+            <div>
+              <label htmlFor="auth-reg-confirm-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Ulangi Sandi
+              </label>
+              <div className="relative">
                 <input
-                  type="password"
+                  id="auth-reg-confirm-password"
+                  type={showRegConfirmPassword ? 'text' : 'password'}
                   value={regConfirmPassword}
                   onChange={(e) => setRegConfirmPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   required
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                  className="w-full min-h-[44px] pl-3.5 pr-11 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowRegConfirmPassword((prev) => !prev)}
+                  aria-label={showRegConfirmPassword ? 'Sembunyikan konfirmasi kata sandi' : 'Tampilkan konfirmasi kata sandi'}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                >
+                  {showRegConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-3"
+              className="w-full min-h-[44px] py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-3"
             >
               {loading ? 'Mendaftarkan...' : 'Buat Akun Baru'}
             </button>
@@ -263,7 +387,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   setTab('login');
                   setErrorMsg('');
                 }}
-                className="font-bold text-[#003d29] hover:underline cursor-pointer"
+                className="font-bold text-[#003d29] hover:underline cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded"
               >
                 Masuk di Sini
               </button>
