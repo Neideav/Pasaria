@@ -149,7 +149,7 @@ class AuthApiController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user('sanctum') ?: $request->user();
         if (!$user) {
             // Local dev fallback if user_id query is passed in development mode
             if (app()->environment('local', 'testing') && $request->has('user_id')) {
@@ -181,8 +181,9 @@ class AuthApiController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        if ($request->user()) {
-            $request->user()->currentAccessToken()?->delete();
+        $user = $request->user('sanctum') ?: $request->user();
+        if ($user) {
+            $user->currentAccessToken()?->delete();
         }
 
         return response()->json([
@@ -199,7 +200,7 @@ class AuthApiController extends Controller
      */
     public function updateProfile(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user('sanctum') ?: $request->user();
         if (!$user) {
             if (app()->environment('local', 'testing')) {
                 $uid = $request->input('user_id') ?: $request->input('id', 1);
@@ -238,7 +239,7 @@ class AuthApiController extends Controller
      */
     public function changePassword(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user('sanctum') ?: $request->user();
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
         }

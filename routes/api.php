@@ -156,5 +156,6 @@ Route::get('/admin/reports', [AdminApiController::class, 'reports']);
 // ==========================================
 // 12. CONFIG & LOCAL EDUCATIONAL DEMO
 // ==========================================
+Route::get('/config', [ConfigApiController::class, 'getDemoMode']);
 Route::get('/config/demo-mode', [ConfigApiController::class, 'getDemoMode']);
 Route::post('/config/demo-mode', [ConfigApiController::class, 'toggleDemoMode']);

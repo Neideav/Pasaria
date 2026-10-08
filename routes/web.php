@@ -58,6 +58,9 @@ Route::middleware('auth')->group(function () {
 
 // React SPA Fallback Route (serves React frontend when built)
 Route::fallback(function () {
+    if (request()->is('api/*')) {
+        return response()->json(['message' => 'API endpoint not found.'], 404);
+    }
     $spaPath = public_path('index.html');
     if (file_exists($spaPath)) {
         return response()->file($spaPath);
