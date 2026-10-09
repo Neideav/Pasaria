@@ -21,13 +21,14 @@ import {
   Globe,
   MessageCircle,
   ShieldAlert,
-  Users
+  ArrowRight,
 } from 'lucide-react';
 import { User, Product } from '../types';
 import { ProductVisual } from './ProductVisual';
 import { NotificationDropdown } from './NotificationDropdown';
 import { formatRupiah } from '../utils/formatters';
 import { Language, translations } from '../i18n/translations';
+import categoryCardImg from '../assets/images/hero_card_yellow_knit.jpg';
 
 interface NavbarProps {
   user: User | null;
@@ -46,7 +47,7 @@ interface NavbarProps {
   onNavigateAdmin?: () => void;
   onNavigateSettings?: () => void;
   onOpenChat?: () => void;
-  onOpenAuth: () => void;
+  onOpenAuth: (tab?: 'login' | 'register') => void;
   onLogout: () => void;
   products: Product[];
 }
@@ -72,18 +73,60 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   products,
 }) => {
-  const t = translations[currentLang];
+  const isId = currentLang === 'id';
   const [searchQuery, setSearchQuery] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const placeholderSuggestions = isId
+    ? [
+        'Cari "Jersey & Apparel"...',
+        'Cari "AirPods Max"...',
+        'Cari "Sneakers Urban"...',
+        'Cari "MacBook Pro M3"...',
+        'Cari "Kursi Ergonomis"...',
+        'Cari "Mechanical Keyboard"...',
+        'Cari "Bose QuietComfort"...',
+        'Cari "Buku Atomic Habits"...',
+      ]
+    : [
+        'Search "Jersey & Apparel"...',
+        'Search "AirPods Max"...',
+        'Search "Urban Sneakers"...',
+        'Search "MacBook Pro M3"...',
+        'Search "Ergonomic Chair"...',
+        'Search "Mechanical Keyboard"...',
+        'Search "Bose QuietComfort"...',
+        'Search "Atomic Habits"...',
+      ];
+
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % placeholderSuggestions.length);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, [placeholderSuggestions.length]);
+
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 15);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -130,348 +173,591 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const categoryList = [
-    { name: 'Headphones', count: 'Original Audio Gear', icon: Headphones, slug: 'headphones' },
-    { name: 'Electronics', count: 'Gadget & Aksesoris', icon: Laptop, slug: 'electronics' },
-    { name: 'Furniture', count: 'Peralatan Rumah', icon: Armchair, slug: 'furniture' },
-    { name: 'Shoes', count: 'Sepatu & Fashion', icon: Footprints, slug: 'shoes' },
-    { name: 'Bags', count: 'Tas & Koper', icon: ShoppingBag, slug: 'bags' },
-    { name: 'Books', count: 'Buku & Literasi', icon: Book, slug: 'books' },
+    { name: isId ? 'Audio & Headphone' : 'Headphones', slug: 'headphones' },
+    { name: isId ? 'Laptop & Komputer' : 'Laptops & Computers', slug: 'laptops' },
+    { name: isId ? 'Furniture & Rumah' : 'Furniture & Living', slug: 'furniture' },
+    { name: isId ? 'Sepatu & Fashion' : 'Shoes & Fashion', slug: 'shoes' },
+    { name: isId ? 'Tas & Aksesoris' : 'Bags & Accessories', slug: 'bags' },
+    { name: isId ? 'Buku & Edukasi' : 'Books & Learning', slug: 'books' },
   ];
 
+  const popularLinks = isId
+    ? [
+        { title: 'Promo & Diskon Kilat', target: 'Deals' },
+        { title: 'Produk Terlaris Minggu Ini', target: 'popular' },
+        { title: 'Official Store Terverifikasi', target: 'official' },
+        { title: 'Produk Baru Rilis', target: "What's New" },
+        { title: 'Lacak Kiriman Pesanan', target: 'Delivery' },
+        { title: 'Garansi Original PASARIA', target: 'all' },
+      ]
+    : [
+        { title: 'Flash Deals & Discounts', target: 'Deals' },
+        { title: 'Weekly Best Sellers', target: 'popular' },
+        { title: 'Verified Official Stores', target: 'official' },
+        { title: 'New Arrivals', target: "What's New" },
+        { title: 'Track Order Delivery', target: 'Delivery' },
+        { title: 'PASARIA Authenticity', target: 'all' },
+      ];
+
   return (
-    <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
-        {/* Left: Brand Logo & Categories */}
-        <div className="flex items-center gap-7">
+    <nav
+      className={`sticky top-0 z-40 transition-all duration-300 ${
+        isScrolled
+          ? 'bg-white/85 backdrop-blur-xl border-b border-slate-200/80 shadow-none'
+          : 'bg-[#fcfcfc] border-b border-slate-100 shadow-none'
+      }`}
+    >
+      <div
+        className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${
+          isScrolled ? 'h-16 sm:h-17' : 'h-18 sm:h-20'
+        }`}
+      >
+        {/* Left Section: Brand Logo & Categories */}
+        <div className="flex items-center gap-4 lg:gap-6 justify-start shrink-0">
+          {/* Brand Logo (Left) */}
           <button
             onClick={onNavigateHome}
-            className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
+            className="flex items-center gap-2 group cursor-pointer focus:outline-none shrink-0"
+            aria-label="PASARIA Home"
           >
-            <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#003d29] text-white shadow-xs transition-transform group-hover:scale-105">
-              <ShoppingCart className="w-5 h-5 text-white" strokeWidth={2.2} />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white" />
+            <div className="relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#003d29] text-white shadow-none transition-transform group-hover:scale-105">
+              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-white" strokeWidth={2.2} />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full border border-white" />
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-xl sm:text-2xl font-black tracking-tight text-[#003d29]">
+              <span className="text-base sm:text-lg lg:text-xl font-black tracking-tight text-[#003d29]">
                 PASARIA
-              </span>
-              <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-700 -mt-1 hidden sm:inline">
-                Marketplace Indonesia
               </span>
             </div>
           </button>
 
-          {/* Desktop Categories Dropdown */}
-          <div className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-700">
-            <div className="relative" ref={categoriesRef}>
-              <button
-                onClick={() => setShowCategoriesMenu(!showCategoriesMenu)}
-                className="flex items-center gap-1.5 hover:text-[#003d29] transition-colors cursor-pointer py-1"
-              >
-                <span>Kategori</span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                    showCategoriesMenu ? 'rotate-180 text-[#003d29]' : 'text-slate-400'
-                  }`}
-                />
-              </button>
+          {/* Categories Mega Dropdown (Left next to logo) */}
+          <div className="relative hidden md:flex items-center" ref={categoriesRef}>
+            <button
+              type="button"
+              onClick={() => setShowCategoriesMenu(!showCategoriesMenu)}
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:text-[#003d29] transition-colors cursor-pointer py-1.5 px-3 rounded-full hover:bg-slate-100"
+            >
+              <span>{isId ? 'Kategori' : 'Categories'}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                  showCategoriesMenu ? 'rotate-180 text-[#003d29]' : 'text-slate-400'
+                }`}
+              />
+            </button>
 
-              {showCategoriesMenu && (
-                <div className="absolute left-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 mb-1">
-                    Kategori Pilihan PASARIA
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {categoryList.map((cat) => {
-                      const Icon = cat.icon;
-                      return (
-                        <button
-                          key={cat.name}
-                          onClick={() => {
-                            setShowCategoriesMenu(false);
-                            onNavigateCategory(cat.name);
-                          }}
-                          className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition-colors text-left group cursor-pointer"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-[#003d29] shrink-0">
-                            <Icon className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="truncate">
-                            <div className="text-xs font-bold text-slate-800 group-hover:text-[#003d29] truncate">
-                              {cat.name}
-                            </div>
-                            <div className="text-[9px] text-slate-400 truncate">
-                              {cat.count}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+            {showCategoriesMenu && (
+              <div className="absolute left-0 top-full mt-6 sm:mt-7 w-[720px] lg:w-[820px] xl:w-[860px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 z-50 animate-in fade-in slide-in-from-top-2 duration-150 shadow-none text-left flex gap-7 lg:gap-9">
+                {/* Left: Featured Image Card */}
+                <div
+                  onClick={() => {
+                    setShowCategoriesMenu(false);
+                    onNavigateCategory('all');
+                  }}
+                  className="w-48 sm:w-56 h-60 sm:h-68 rounded-xl overflow-hidden relative shrink-0 group/card cursor-pointer bg-slate-900"
+                >
+                  <img
+                    src={categoryCardImg}
+                    alt="Featured Collections"
+                    className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500 opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent flex items-end justify-between p-4">
+                    <span className="text-white font-extrabold text-sm sm:text-base tracking-tight leading-snug">
+                      {isId ? 'Koleksi Pilihan' : 'Featured Catalog'}
+                    </span>
+                    <div className="w-7 h-7 rounded-full bg-white text-slate-900 flex items-center justify-center shrink-0 shadow-xs group-hover/card:translate-x-1 transition-transform">
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            <button
-              onClick={() => onNavigateCategory('Deals')}
-              className="hover:text-[#003d29] transition-colors cursor-pointer"
-            >
-              Promo & Diskon
-            </button>
-            <button
-              onClick={() => onNavigateCategory("What's New")}
-              className="hover:text-[#003d29] transition-colors cursor-pointer"
-            >
-              Produk Baru
-            </button>
-            <button
-              onClick={() => onNavigateCategory('Delivery')}
-              className="hover:text-[#003d29] transition-colors cursor-pointer"
-            >
-              Lacak Kiriman
-            </button>
+                {/* Right: 2 Columns of Links */}
+                <div className="flex-1 grid grid-cols-2 gap-x-8 sm:gap-x-12 gap-y-3 py-1">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                      {isId ? 'Kategori Utama' : 'Main Categories'}
+                    </div>
+                    <div className="space-y-2.5">
+                      {categoryList.map((cat) => (
+                        <button
+                          key={cat.slug}
+                          type="button"
+                          onClick={() => {
+                            setShowCategoriesMenu(false);
+                            onNavigateCategory(cat.slug);
+                          }}
+                          className="text-sm font-medium text-slate-700 hover:text-slate-950 hover:underline transition-all block text-left cursor-pointer whitespace-nowrap w-full"
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                      {isId ? 'Paling Populer' : 'Popular Highlights'}
+                    </div>
+                    <div className="space-y-2.5">
+                      {popularLinks.map((link) => (
+                        <button
+                          key={link.title}
+                          type="button"
+                          onClick={() => {
+                            setShowCategoriesMenu(false);
+                            onNavigateCategory(link.target);
+                          }}
+                          className="text-sm font-medium text-slate-700 hover:text-slate-950 hover:underline transition-all block text-left cursor-pointer whitespace-nowrap w-full"
+                        >
+                          {link.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Center: Search Bar with Autocomplete */}
-        <div className="flex-1 max-w-md relative" ref={searchContainerRef}>
-          <form onSubmit={handleSearchSubmit} className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setShowSearchSuggestions(true);
-              }}
-              onFocus={() => setShowSearchSuggestions(true)}
-              placeholder="Cari produk original, headphone, gadget, toko..."
-              className="w-full pl-4 pr-10 py-2.5 text-xs sm:text-sm bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-2 focus:ring-[#003d29]/10 transition-all placeholder:text-slate-400"
-            />
-            <button
-              type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#003d29] transition-colors cursor-pointer p-1"
-            >
-              <Search className="w-4 h-4" />
-            </button>
+        {/* Center Section: Centered Search Bar */}
+        <div className="flex-1 max-w-md md:max-w-xl mx-2 sm:mx-4 relative" ref={searchContainerRef}>
+          <form onSubmit={handleSearchSubmit} className="relative w-full">
+            <div className="relative flex items-center w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none stroke-[2]" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchSuggestions(true);
+                }}
+                onFocus={() => setShowSearchSuggestions(true)}
+                placeholder={placeholderSuggestions[placeholderIndex]}
+                className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm bg-[#f4f4f5] hover:bg-[#ececee] focus:bg-white text-slate-900 rounded-full border border-transparent focus:border-slate-300 focus:outline-none transition-all placeholder:text-slate-400 placeholder:transition-opacity placeholder:duration-300"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowSearchSuggestions(false);
+                  }}
+                  className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </form>
 
+          {/* Search Suggestions Dropdown */}
           {showSearchSuggestions && searchQuery.trim().length > 0 && (
-            <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden animate-in fade-in duration-150 text-left">
+            <div className="absolute left-0 right-0 top-full mt-4 sm:mt-5 bg-white rounded-2xl border border-slate-200 py-2 z-50 overflow-hidden shadow-none text-left">
               {searchSuggestions.length > 0 ? (
                 <div>
-                  <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Saran Produk PASARIA
+                  <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {isId ? 'Saran Produk PASARIA' : 'Suggested Products'}
                   </div>
                   {searchSuggestions.map((item) => (
                     <button
                       key={item.id}
+                      type="button"
                       onClick={() => handleSelectSuggestion(item.name)}
-                      className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer"
+                      className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
                           <ProductVisual imageKey={item.image} name={item.name} size="sm" />
                         </div>
-                        <div>
-                          <div className="text-xs font-semibold text-slate-800 group-hover:text-[#003d29] transition-colors line-clamp-1">
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-slate-800 group-hover:text-slate-950 truncate">
                             {item.name}
                           </div>
-                          <div className="text-[10px] text-emerald-700 font-semibold">
-                            ★ {Number(item.rating || 5).toFixed(1)}{' '}
-                            <span className="text-slate-400 font-normal">({item.review_count || 0})</span>
+                          <div className="text-[10px] text-slate-400 truncate">
+                            {formatRupiah(item.price)}
                           </div>
                         </div>
-                      </div>
-                      <div className="text-xs font-bold text-[#003d29] tabular-nums">
-                        {formatRupiah(item.price)}
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="px-4 py-3 text-center text-xs text-slate-500">
-                  Tekan Enter untuk mencari "{searchQuery}"
+                  {isId
+                    ? `Tekan Enter untuk mencari "${searchQuery}"`
+                    : `Press Enter to search "${searchQuery}"`}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Right: Actions (Wishlist, Chat, Notification, Cart, Account) */}
-        <div className="flex items-center gap-2 sm:gap-3.5">
-          {/* Wishlist Button */}
-          {user && onNavigateWishlist && (
-            <button
-              onClick={onNavigateWishlist}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors cursor-pointer"
-              title="Wishlist Saya"
-            >
-              <Heart className="w-4 h-4" />
-            </button>
-          )}
+        {/* Right Section: Log in / Masuk & Daftar (Pill) or User Account Menu, Cart, Language */}
+        <div className="flex items-center gap-2.5 sm:gap-3.5 justify-end shrink-0">
+          {!user ? (
+            /* Unauthenticated state: "Log in" / "Masuk" (text link) + "Daftar" (black pill button) */
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => onOpenAuth('login')}
+                className="text-xs sm:text-sm font-semibold text-slate-800 hover:text-slate-950 transition-colors cursor-pointer py-1 px-1.5 whitespace-nowrap"
+              >
+                {isId ? 'Log in' : 'Log in'}
+              </button>
 
-          {/* Chat Button */}
-          {user && onOpenChat && (
-            <button
-              onClick={onOpenChat}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-[#003d29] transition-colors cursor-pointer"
-              title="Pesan / Chat"
-            >
-              <MessageCircle className="w-4 h-4" />
-            </button>
-          )}
+              <button
+                type="button"
+                onClick={() => onOpenAuth('register')}
+                className="px-4 sm:px-5 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95 whitespace-nowrap shadow-none"
+              >
+                {isId ? 'Daftar' : 'Sign up'}
+              </button>
 
-          {/* Real Notification Dropdown */}
-          {user && <NotificationDropdown />}
-
-          {/* Cart Icon */}
-          <button
-            onClick={onNavigateCart}
-            className="relative w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer"
-            title="Keranjang Belanja"
-          >
-            <ShoppingCart className="w-4 h-4" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#003d29] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
-                {cartCount}
-              </span>
-            )}
-          </button>
-
-          {/* Account Dropdown */}
-          <div className="relative" ref={accountRef}>
-            <button
-              onClick={() => {
-                if (!user) {
-                  onOpenAuth();
-                } else {
-                  setShowAccountMenu(!showAccountMenu);
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer"
-            >
-              <UserIcon className="w-3.5 h-3.5 text-slate-700" />
-              <span className="hidden sm:inline">
-                {user ? user.name.split(' ')[0] : 'Masuk'}
-              </span>
-            </button>
-
-            {user && showAccountMenu && (
-              <div className="absolute right-0 mt-2.5 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in duration-150 text-left">
-                <div className="px-4 py-2 border-b border-slate-100">
-                  <div className="text-xs font-bold text-slate-900 truncate">{user.name}</div>
-                  <div className="text-[11px] text-slate-400 truncate">{user.email}</div>
-                  <span className="mt-1 inline-block text-[10px] font-bold uppercase tracking-wider text-[#003d29] bg-emerald-50 px-2 py-0.5 rounded-full">
-                    {user.role}
+              {/* Cart Button */}
+              <button
+                type="button"
+                onClick={onNavigateCart}
+                className="group flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 hover:border-slate-300 bg-transparent text-slate-800 transition-all cursor-pointer whitespace-nowrap relative"
+                title={isId ? 'Keranjang Belanja' : 'Cart'}
+              >
+                <ShoppingCart className="w-4 h-4" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full bg-[#003d29] text-white text-[10px] font-bold flex items-center justify-center">
+                    {cartCount}
                   </span>
-                </div>
-                <div className="py-1 text-xs">
-                  <button
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      onNavigateProfile();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
-                  >
-                    <UserIcon className="w-3.5 h-3.5" />
-                    <span>Profil Saya</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      onNavigateOrders();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
-                  >
-                    <Package className="w-3.5 h-3.5" />
-                    <span>Pesanan Saya</span>
-                  </button>
+                )}
+              </button>
+            </div>
+          ) : (
+            /* Authenticated state: Wishlist, Chat, Notifications, Account Menu, Cart Pill */
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Wishlist Button */}
+              {onNavigateWishlist && (
+                <button
+                  type="button"
+                  onClick={onNavigateWishlist}
+                  className="w-8 h-8 rounded-full border border-slate-200 hover:border-slate-300 bg-transparent flex items-center justify-center text-slate-600 hover:text-rose-500 transition-colors cursor-pointer"
+                  title={isId ? 'Wishlist Saya' : 'My Wishlist'}
+                >
+                  <Heart className="w-3.5 h-3.5" />
+                </button>
+              )}
 
-                  {onNavigateWishlist && (
-                    <button
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onNavigateWishlist();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition-colors cursor-pointer"
-                    >
-                      <Heart className="w-3.5 h-3.5" />
-                      <span>Wishlist</span>
-                    </button>
-                  )}
+              {/* Chat Button */}
+              {onOpenChat && (
+                <button
+                  type="button"
+                  onClick={onOpenChat}
+                  className="w-8 h-8 rounded-full border border-slate-200 hover:border-slate-300 bg-transparent flex items-center justify-center text-slate-600 hover:text-[#003d29] transition-colors cursor-pointer"
+                  title={isId ? 'Pesan / Chat' : 'Messages'}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                </button>
+              )}
 
-                  {onNavigateFollowing && (
-                    <button
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onNavigateFollowing();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
-                    >
-                      <Store className="w-3.5 h-3.5" />
-                      <span>Toko yang Diikuti</span>
-                    </button>
-                  )}
+              {/* Notification Bell Dropdown */}
+              <NotificationDropdown />
 
-                  {/* Seller Center Navigation */}
-                  {onNavigateShop && (
-                    <button
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onNavigateShop();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 font-bold text-[#003d29] bg-emerald-50/50 hover:bg-emerald-50 transition-colors cursor-pointer"
-                    >
-                      <Store className="w-3.5 h-3.5 text-[#003d29]" />
-                      <span>{user?.shop ? 'Seller Center (Toko Saya)' : 'Buka Toko Gratis'}</span>
-                    </button>
-                  )}
+              {/* Account Dropdown */}
+              <div className="relative" ref={accountRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowAccountMenu(!showAccountMenu)}
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap py-1 px-2.5 rounded-full border border-slate-200 hover:border-slate-300"
+                >
+                  <UserIcon className="w-3.5 h-3.5 text-slate-600" />
+                  <span>{user.name.split(' ')[0]}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
 
-                  {/* Admin Panel Navigation (Role: admin or support) */}
-                  {(user?.role === 'admin' || user?.role === 'support') && onNavigateAdmin && (
-                    <button
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onNavigateAdmin();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 font-bold text-amber-800 bg-amber-50/50 hover:bg-amber-50 transition-colors cursor-pointer"
-                    >
-                      <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Admin Panel PASARIA</span>
-                    </button>
-                  )}
+                {showAccountMenu && (
+                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none text-left">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <div className="text-xs font-bold text-slate-900 truncate">{user.name}</div>
+                      <div className="text-[11px] text-slate-400 truncate">{user.email}</div>
+                      <span className="mt-1 inline-block text-[9px] font-bold uppercase tracking-wider text-[#003d29] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        {user.role}
+                      </span>
+                    </div>
+                    <div className="py-1 text-xs font-medium">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          onNavigateProfile();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
+                      >
+                        <UserIcon className="w-3.5 h-3.5" />
+                        <span>{isId ? 'Profil Saya' : 'My Profile'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          onNavigateOrders();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
+                      >
+                        <Package className="w-3.5 h-3.5" />
+                        <span>{isId ? 'Pesanan Saya' : 'My Orders'}</span>
+                      </button>
 
-                  {onNavigateSettings && (
-                    <button
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onNavigateSettings();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
-                    >
-                      <SettingsIcon className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Pengaturan & Keamanan</span>
-                    </button>
-                  )}
-                </div>
+                      {onNavigateWishlist && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateWishlist();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <Heart className="w-3.5 h-3.5" />
+                          <span>Wishlist</span>
+                        </button>
+                      )}
 
-                <div className="border-t border-slate-100 pt-1">
-                  <button
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      onLogout();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Keluar Akun</span>
-                  </button>
-                </div>
+                      {onNavigateFollowing && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateFollowing();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
+                        >
+                          <Store className="w-3.5 h-3.5" />
+                          <span>{isId ? 'Toko yang Diikuti' : 'Following Shops'}</span>
+                        </button>
+                      )}
+
+                      {/* Seller Center Navigation */}
+                      {onNavigateShop && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateShop();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 font-bold text-[#003d29] hover:bg-emerald-50/50 transition-colors cursor-pointer"
+                        >
+                          <Store className="w-3.5 h-3.5 text-[#003d29]" />
+                          <span>{user?.shop ? 'Seller Center' : (isId ? 'Buka Toko Gratis' : 'Open Store')}</span>
+                        </button>
+                      )}
+
+                      {/* Admin Panel Navigation */}
+                      {(user?.role === 'admin' || user?.role === 'support') && onNavigateAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateAdmin();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 font-bold text-amber-800 hover:bg-amber-50/50 transition-colors cursor-pointer"
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Admin Panel PASARIA</span>
+                        </button>
+                      )}
+
+                      {onNavigateSettings && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateSettings();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
+                        >
+                          <SettingsIcon className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{isId ? 'Pengaturan' : 'Settings'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          onLogout();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>{isId ? 'Keluar Akun' : 'Log out'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Cart Pill Button */}
+              <button
+                type="button"
+                onClick={onNavigateCart}
+                className="group flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-all cursor-pointer active:scale-95 whitespace-nowrap shadow-none"
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{isId ? 'Keranjang' : 'Cart'}</span>
+                {cartCount > 0 && (
+                  <span className="w-4.5 h-4.5 rounded-full bg-white text-slate-900 text-[10px] font-extrabold flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Language Selector (EN / ID) */}
+          <div className="relative hidden sm:block" ref={langRef}>
+            <button
+              type="button"
+              onClick={() => setShowLangMenu(!showLangMenu)}
+              className="text-xs font-semibold text-slate-700 hover:text-slate-950 transition-colors cursor-pointer uppercase py-1 px-1.5"
+            >
+              {currentLang === 'id' ? 'ID' : 'EN'}
+            </button>
+
+            {showLangMenu && (
+              <div className="absolute right-0 mt-2 w-28 bg-white rounded-xl border border-slate-200 py-1 z-50 text-left shadow-none">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLanguageChange('id');
+                    setShowLangMenu(false);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                    currentLang === 'id' ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  🇮🇩 ID (Bahasa)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLanguageChange('en');
+                    setShowLangMenu(false);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                    currentLang === 'en' ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  🇺🇸 EN-US
+                </button>
               </div>
             )}
           </div>
+
+          {/* Mobile Menu Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-1.5 text-slate-700 hover:text-slate-950 cursor-pointer"
+            aria-label="Toggle mobile menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Menu Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-2.5 text-left animate-in fade-in duration-150">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            {isId ? 'Menu Navigasi' : 'Navigation'}
+          </div>
+
+          {/* Mobile Categories list */}
+          <div className="space-y-1 pl-1">
+            <div className="text-xs font-bold text-slate-800 py-1">
+              {isId ? 'Kategori Produk' : 'Product Categories'}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 pb-2">
+              {categoryList.map((cat) => (
+                <button
+                  key={cat.slug}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onNavigateCategory(cat.slug);
+                  }}
+                  className="text-left text-xs text-slate-600 hover:text-[#003d29] py-1 truncate"
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onNavigateCategory('Deals');
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Promo & Diskon' : 'Deals'}
+          </button>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onNavigateCategory("What's New");
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Produk Baru' : "What's New"}
+          </button>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onNavigateCategory('Delivery');
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Lacak Kiriman' : 'Delivery Tracking'}
+          </button>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              if (onNavigateShop) onNavigateShop();
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Buka Toko / Seller Center' : 'Open Store / Seller Center'}
+          </button>
+
+          <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+            <span className="text-xs text-slate-500 font-medium">Bahasa / Language</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  onLanguageChange('id');
+                  setMobileMenuOpen(false);
+                }}
+                className={`text-xs px-2.5 py-1 rounded-md font-bold ${
+                  currentLang === 'id' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                ID
+              </button>
+              <button
+                onClick={() => {
+                  onLanguageChange('en');
+                  setMobileMenuOpen(false);
+                }}
+                className={`text-xs px-2.5 py-1 rounded-md font-bold ${
+                  currentLang === 'en' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
