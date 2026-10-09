@@ -86,11 +86,18 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   const [payoutAccountNo, setPayoutAccountNo] = useState('');
   const [payoutHolder, setPayoutHolder] = useState(user?.name || '');
   const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutErrors, setPayoutErrors] = useState<{
+    amount?: string;
+    bank?: string;
+    accountNo?: string;
+    accountHolder?: string;
+  }>({});
 
   // Review reply state
   const [replyTextMap, setReplyTextMap] = useState<Record<number, string>>({});
 
   const currentShop: Shop | null = user?.shop || null;
+  const availableBalance = financesData?.available_balance ?? 14500000;
 
   useEffect(() => {
     if (!currentShop) {
@@ -181,25 +188,24 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
         category: prodCategory,
         price: priceNum,
         stock: stockNum,
-        description: prodDesc.trim() || `${prodName} original dari ${currentShop?.name}.`,
-        image: 'airpods-max',
+        description: prodDesc.trim() || 'Produk resmi dengan garansi kualitas terjamin.',
+        variant_name: prodVariantName.trim() || 'Standard',
         sku: prodSku.trim() || `SKU-${Date.now().toString().slice(-6)}`,
-        variant_name: prodVariantName.trim() || 'Standard Edition',
       });
 
-      onAddProduct(created.product || created);
+      onAddProduct((created as any).product || created);
       const msg = 'Produk baru berhasil ditambahkan ke etalase toko Anda!';
       setActionSuccess(msg);
       showToast(msg, 'success');
-      setActiveTab('products');
       setProdName('');
       setProdPrice('');
       setProdDesc('');
       setProdSku('');
+      setActiveTab('products');
       loadSellerData();
-      setTimeout(() => setActionSuccess(''), 3000);
+      setTimeout(() => setActionSuccess(''), 4000);
     } catch (err: any) {
-      showToast(err.message || 'Gagal menambahkan produk', 'error');
+      showToast(err.message || 'Gagal menambahkan produk baru.', 'error');
     } finally {
       setProdCreating(false);
     }
@@ -226,7 +232,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       setActionSuccess(msg);
       showToast(msg, 'success');
       loadSellerData();
-      setTimeout(() => setActionSuccess(''), 3000);
+      setTimeout(() => setActionSuccess(''), 4000);
     } catch (err: any) {
       showToast(err.message || 'Gagal memperbarui status pesanan', 'error');
     }
@@ -249,24 +255,67 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
     }
   };
 
+  const validatePayout = (): boolean => {
+    const errors: {
+      amount?: string;
+      bank?: string;
+      accountNo?: string;
+      accountHolder?: string;
+    } = {};
+
+    const amt = parseFloat(payoutAmount);
+
+    if (!payoutAmount || isNaN(amt) || amt <= 0) {
+      errors.amount = 'Nominal penarikan harus lebih dari Rp 0.';
+    } else if (amt < 10000) {
+      errors.amount = 'Nominal penarikan minimal Rp 10.000.';
+    } else if (amt > availableBalance) {
+      errors.amount = `Nominal melebihi saldo tersedia (${formatRupiah(availableBalance)}).`;
+    }
+
+    if (!payoutBank.trim()) {
+      errors.bank = 'Silakan pilih bank tujuan penarikan.';
+    }
+
+    const cleanAccountNo = payoutAccountNo.trim().replace(/\s+/g, '');
+    if (!cleanAccountNo) {
+      errors.accountNo = 'Nomor rekening tujuan wajib diisi.';
+    } else if (!/^\d{5,25}$/.test(cleanAccountNo)) {
+      errors.accountNo = 'Nomor rekening harus berupa 5-25 digit angka.';
+    }
+
+    if (!payoutHolder.trim()) {
+      errors.accountHolder = 'Nama pemilik rekening wajib diisi.';
+    } else if (payoutHolder.trim().length < 3) {
+      errors.accountHolder = 'Nama pemilik rekening minimal 3 karakter.';
+    }
+
+    setPayoutErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleRequestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amt = parseFloat(payoutAmount);
-    if (!amt || amt <= 0) return;
+    if (!validatePayout()) {
+      showToast('Periksa kembali data formulir penarikan dana.', 'error');
+      return;
+    }
 
+    const amt = parseFloat(payoutAmount);
     setPayoutLoading(true);
     try {
       await api.requestSellerPayout({
         amount: amt,
         bank_name: payoutBank,
-        account_number: payoutAccountNo,
-        account_holder: payoutHolder,
+        account_number: payoutAccountNo.trim(),
+        account_holder: payoutHolder.trim(),
       });
 
       const msg = `Permintaan penarikan dana ${formatRupiah(amt)} berhasil diajukan.`;
       setActionSuccess(msg);
       showToast(msg, 'success');
       setPayoutAmount('');
+      setPayoutErrors({});
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
@@ -306,7 +355,8 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           {currentShop && (
             <button
               onClick={() => onViewShopPublic(currentShop)}
-              className="px-4 py-2 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              aria-label="Lihat profil publik toko di katalog marketplace"
+              className="min-h-[44px] px-4 py-2 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#003d29]"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>Lihat Toko Publik</span>
@@ -314,7 +364,8 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           )}
           <button
             onClick={onNavigateHome}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
+            aria-label="Kembali ke Beranda PASARIA"
+            className="min-h-[44px] inline-flex items-center gap-1 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003d29]"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Kembali ke Beranda</span>
@@ -331,7 +382,11 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tabs for Seller Center */}
       {currentShop && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-3 border-b border-slate-100 text-xs">
+        <div
+          role="tablist"
+          aria-label="Navigasi Menu Seller Center"
+          className="flex items-center gap-2 overflow-x-auto pb-3 border-b border-slate-100 text-xs"
+        >
           {[
             { id: 'overview', label: 'Ringkasan & Metrik', icon: TrendingUp },
             { id: 'products', label: 'Katalog Produk', icon: Package },
@@ -346,8 +401,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
             return (
               <button
                 key={tab.id}
+                id={`shop-tab-${tab.id}`}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`shop-panel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[#003d29] ${
                   isActive
                     ? 'bg-[#003d29] text-white shadow-xs'
                     : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200/80'
@@ -363,7 +423,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Registration View for New Sellers */}
       {activeTab === 'register' && (
-        <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
+        <div
+          id="shop-panel-register"
+          role="tabpanel"
+          aria-labelledby="shop-tab-register"
+          tabIndex={0}
+          className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 focus:outline-none"
+        >
           <div className="text-center space-y-2">
             <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-[#003d29] flex items-center justify-center mx-auto font-black text-xl">
               <Store className="w-7 h-7" />
@@ -374,59 +440,64 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
           <form onSubmit={handleRegisterShop} className="space-y-4 text-xs">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Toko Online</label>
+              <label htmlFor="reg-shop-name" className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Toko Online</label>
               <input
+                id="reg-shop-name"
                 type="text"
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
                 placeholder="Contoh: Maju Audio Store"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Slogan / Tagline Toko</label>
+              <label htmlFor="reg-shop-tagline" className="block text-[11px] font-semibold text-slate-700 mb-1">Slogan / Tagline Toko</label>
               <input
+                id="reg-shop-tagline"
                 type="text"
                 value={shopTagline}
                 onChange={(e) => setShopTagline(e.target.value)}
                 placeholder="Contoh: Pusat Gadget & Audio Original Bergaransi"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kota Domisili Toko</label>
+              <label htmlFor="reg-shop-city" className="block text-[11px] font-semibold text-slate-700 mb-1">Kota Domisili Toko</label>
               <input
+                id="reg-shop-city"
                 type="text"
                 value={shopCity}
                 onChange={(e) => setShopCity(e.target.value)}
                 placeholder="Contoh: Jakarta Pusat"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nomor Kontak Toko</label>
+              <label htmlFor="reg-shop-phone" className="block text-[11px] font-semibold text-slate-700 mb-1">Nomor Kontak Toko</label>
               <input
+                id="reg-shop-phone"
                 type="text"
                 value={shopPhone}
                 onChange={(e) => setShopPhone(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Toko</label>
+              <label htmlFor="reg-shop-desc" className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Toko</label>
               <textarea
+                id="reg-shop-desc"
                 rows={3}
                 value={shopDesc}
                 onChange={(e) => setShopDesc(e.target.value)}
                 placeholder="Jelaskan jenis produk yang Anda jual dan komitmen layanan toko Anda..."
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] leading-relaxed"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29] leading-relaxed"
               />
             </div>
 
@@ -434,7 +505,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
               <button
                 type="submit"
                 disabled={isRegistering}
-                className="w-full py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40"
+                className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
               >
                 {isRegistering ? 'Mendaftarkan Toko...' : 'Buka Toko Sekarang'}
               </button>
@@ -445,7 +516,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tab 1: Overview */}
       {activeTab === 'overview' && currentShop && (
-        <div className="space-y-8">
+        <div
+          id="shop-panel-overview"
+          role="tabpanel"
+          aria-labelledby="shop-tab-overview"
+          tabIndex={0}
+          className="space-y-8 focus:outline-none"
+        >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
               <div className="text-slate-400 text-xs font-semibold mb-1">Pendapatan Kotor</div>
@@ -474,7 +551,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
             <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
               <div className="text-slate-400 text-xs font-semibold mb-1">Rating Kepuasan Toko</div>
               <div className="text-xl font-extrabold text-slate-900 tabular-nums flex items-center gap-1">
-                <span>{Number(currentShop.rating || 5).toFixed(1)}</span>
+                <span className="tabular-nums">{Number(currentShop.rating || 5).toFixed(1)}</span>
                 <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               </div>
               <div className="text-[11px] text-emerald-700 font-medium mt-1">Sangat Baik</div>
@@ -485,15 +562,24 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tab 2: Products Catalog */}
       {activeTab === 'products' && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+        <div
+          id="shop-panel-products"
+          role="tabpanel"
+          aria-labelledby="shop-tab-products"
+          tabIndex={0}
+          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
-              <h3 className="font-extrabold text-slate-900 text-sm">Daftar Produk Toko ({myProducts.length})</h3>
+              <h3 className="font-extrabold text-slate-900 text-sm">
+                Daftar Produk Toko (<span className="tabular-nums">{myProducts.length}</span>)
+              </h3>
               <p className="text-xs text-slate-400">Produk yang sedang aktif ditampilkan di etalase pembeli PASARIA.</p>
             </div>
             <button
               onClick={() => setActiveTab('add_product')}
-              className="px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+              aria-label="Tambah produk baru ke etalase"
+              className="min-h-[44px] px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#003d29]"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Tambah Produk</span>
@@ -512,14 +598,17 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 line-clamp-1">{p.name}</h4>
-                    <div className="text-slate-400 text-[11px]">{p.category} · Stok: {p.stock}</div>
-                    <div className="font-extrabold text-[#003d29] mt-0.5">{formatRupiah(p.price)}</div>
+                    <div className="text-slate-400 text-[11px]">
+                      {p.category} · Stok: <span className="tabular-nums font-semibold text-slate-700">{p.stock}</span>
+                    </div>
+                    <div className="font-extrabold text-[#003d29] mt-0.5 tabular-nums">{formatRupiah(p.price)}</div>
                   </div>
                 </div>
                 {onDeleteProduct && (
                   <button
                     onClick={() => onDeleteProduct(p.id)}
-                    className="p-2 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                    aria-label={`Hapus produk ${p.name}`}
+                    className="min-w-[40px] min-h-[40px] rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-500"
                     title="Hapus Produk"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -533,7 +622,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tab 3: Inventory & SKU Management */}
       {activeTab === 'inventory' && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+        <div
+          id="shop-panel-inventory"
+          role="tabpanel"
+          aria-labelledby="shop-tab-inventory"
+          tabIndex={0}
+          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
               <h3 className="font-extrabold text-slate-900 text-sm">Manajemen Inventaris Stok & SKU</h3>
@@ -556,32 +651,35 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                 {inventoryList.map((inv) => (
                   <tr key={inv.id} className="hover:bg-slate-50/50">
                     <td className="py-3 px-4 font-bold text-slate-900">{inv.name || 'Produk Standar'}</td>
-                    <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">{inv.sku || 'SKU-001'}</td>
-                    <td className="py-3 px-4 font-bold text-[#003d29]">{formatRupiah(inv.price)}</td>
+                    <td className="py-3 px-4 font-mono text-slate-500 text-[11px] tabular-nums">{inv.sku || 'SKU-001'}</td>
+                    <td className="py-3 px-4 font-bold text-[#003d29] tabular-nums">{formatRupiah(inv.price)}</td>
                     <td className="py-3 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
                         inv.stock < 5 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-800'
                       }`}>
                         {inv.stock} Unit
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="inline-flex items-center gap-1">
+                      <div className="inline-flex items-center gap-1.5">
                         <button
                           onClick={() => handleUpdateStock(inv.id, inv.stock, -1)}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                          aria-label={`Kurangi 1 unit stok ${inv.name || 'produk'}`}
+                          className="min-w-[40px] min-h-[40px] rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400"
                         >
                           -
                         </button>
                         <button
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 5)}
-                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer"
+                          aria-label={`Tambah 5 unit stok ${inv.name || 'produk'}`}
+                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
                         >
                           +5
                         </button>
                         <button
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 20)}
-                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer"
+                          aria-label={`Tambah 20 unit stok ${inv.name || 'produk'}`}
+                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
                         >
                           +20
                         </button>
@@ -597,7 +695,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tab 4: Orders Management */}
       {activeTab === 'orders' && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+        <div
+          id="shop-panel-orders"
+          role="tabpanel"
+          aria-labelledby="shop-tab-orders"
+          tabIndex={0}
+          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
               <h3 className="font-extrabold text-slate-900 text-sm">Pesanan Pembeli untuk Toko Anda</h3>
@@ -618,8 +722,10 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-extrabold text-slate-900">Pesanan #{ord.order_number}</span>
-                      <span className="text-slate-400 ml-2">· {formatDateTime(ord.created_at)}</span>
+                      <span className="font-extrabold text-slate-900">
+                        Pesanan #<span className="tabular-nums">{ord.order_number}</span>
+                      </span>
+                      <span className="text-slate-400 ml-2 tabular-nums">· {formatDateTime(ord.created_at)}</span>
                     </div>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
                       {ord.status || 'Processing'}
@@ -638,7 +744,8 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleFulfillOrder(ord.id, 'shipped')}
-                        className="px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs"
+                        aria-label={`Kirim pesanan nomor ${ord.order_number} dan terbitkan nomor resi`}
+                        className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
                       >
                         Kirim Barang (Generate Resi)
                       </button>
@@ -653,7 +760,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tab 5: Reviews */}
       {activeTab === 'reviews' && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
+        <div
+          id="shop-panel-reviews"
+          role="tabpanel"
+          aria-labelledby="shop-tab-reviews"
+          tabIndex={0}
+          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
               <h3 className="font-extrabold text-slate-900 text-sm">Ulasan Produk & Respon Penjual</h3>
@@ -666,7 +779,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-slate-900">
                   <span>Pembeli Terverifikasi</span>
-                  <span className="text-amber-500">★★★★★</span>
+                  <span className="text-amber-500 tabular-nums">★★★★★ (5.0)</span>
                 </div>
                 <span className="text-slate-400 text-[11px]">Kemarin</span>
               </div>
@@ -678,11 +791,12 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                   placeholder="Tulis balasan terima kasih..."
                   value={replyTextMap[1] || ''}
                   onChange={(e) => setReplyTextMap({ ...replyTextMap, 1: e.target.value })}
-                  className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs"
+                  className="flex-1 min-h-[44px] px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#003d29]"
                 />
                 <button
                   onClick={() => handleReplyReview(1)}
-                  className="px-4 py-2 rounded-xl bg-[#003d29] text-white font-bold cursor-pointer"
+                  aria-label="Kirim balasan untuk ulasan pembeli"
+                  className="min-h-[44px] px-5 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
                 >
                   Balas
                 </button>
@@ -694,12 +808,18 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tab 6: Finances & Saldo */}
       {activeTab === 'finances' && (
-        <div className="space-y-6">
+        <div
+          id="shop-panel-finances"
+          role="tabpanel"
+          aria-labelledby="shop-tab-finances"
+          tabIndex={0}
+          className="space-y-6 focus:outline-none"
+        >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
               <div className="text-slate-400 text-xs font-semibold mb-1">Saldo Tersedia untuk Ditarik</div>
               <div className="text-2xl font-black text-[#003d29] tabular-nums">
-                {formatRupiah(financesData?.available_balance || 14500000)}
+                {formatRupiah(availableBalance)}
               </div>
               <div className="text-[11px] text-emerald-700 font-medium mt-1">Siap Masuk Rekening</div>
             </div>
@@ -728,64 +848,175 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
               Ajukan Penarikan Dana (Payout)
             </h3>
 
-            <form onSubmit={handleRequestPayout} className="space-y-3">
+            {/* Quick Amount Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-600">Pilih Cepat Nominal:</span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Tarik Semua', value: String(availableBalance) },
+                  { label: 'Rp 500.000', value: '500000' },
+                  { label: 'Rp 1.000.000', value: '1000000' },
+                  { label: 'Rp 5.000.000', value: '5000000' },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setPayoutAmount(preset.value);
+                      if (payoutErrors.amount) {
+                        setPayoutErrors((prev) => ({ ...prev, amount: undefined }));
+                      }
+                    }}
+                    className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 hover:border-[#003d29] hover:bg-emerald-50 text-slate-700 transition-colors tabular-nums cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleRequestPayout} className="space-y-4" noValidate>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nominal Penarikan (Rp)</label>
+                <label htmlFor="payout-amount" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Nominal Penarikan (Rp) *
+                </label>
                 <input
+                  id="payout-amount"
                   type="number"
+                  min="10000"
+                  max={availableBalance}
                   value={payoutAmount}
-                  onChange={(e) => setPayoutAmount(e.target.value)}
+                  onChange={(e) => {
+                    setPayoutAmount(e.target.value);
+                    if (payoutErrors.amount) {
+                      setPayoutErrors((prev) => ({ ...prev, amount: undefined }));
+                    }
+                  }}
                   placeholder="Contoh: 1000000"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                  aria-invalid={!!payoutErrors.amount}
+                  aria-describedby={payoutErrors.amount ? 'payout-amount-error' : undefined}
+                  className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border font-bold tabular-nums focus:outline-none focus:ring-2 ${
+                    payoutErrors.amount
+                      ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                      : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                  }`}
                   required
                 />
+                {payoutErrors.amount && (
+                  <p id="payout-amount-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                    {payoutErrors.amount}
+                  </p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Bank Tujuan</label>
+                  <label htmlFor="payout-bank" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Bank Tujuan *
+                  </label>
                   <select
+                    id="payout-bank"
                     value={payoutBank}
-                    onChange={(e) => setPayoutBank(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white"
+                    onChange={(e) => {
+                      setPayoutBank(e.target.value);
+                      if (payoutErrors.bank) {
+                        setPayoutErrors((prev) => ({ ...prev, bank: undefined }));
+                      }
+                    }}
+                    aria-invalid={!!payoutErrors.bank}
+                    aria-describedby={payoutErrors.bank ? 'payout-bank-error' : undefined}
+                    className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border bg-white focus:outline-none focus:ring-2 ${
+                      payoutErrors.bank
+                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                        : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                    }`}
                   >
                     <option value="BCA">Bank BCA</option>
                     <option value="Mandiri">Bank Mandiri</option>
                     <option value="BRI">Bank BRI</option>
                     <option value="BNI">Bank BNI</option>
+                    <option value="BSI">Bank Syariah Indonesia (BSI)</option>
+                    <option value="CIMB">CIMB Niaga</option>
                   </select>
+                  {payoutErrors.bank && (
+                    <p id="payout-bank-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                      {payoutErrors.bank}
+                    </p>
+                  )}
                 </div>
+
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nomor Rekening</label>
+                  <label htmlFor="payout-account-no" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Nomor Rekening *
+                  </label>
                   <input
+                    id="payout-account-no"
                     type="text"
+                    inputMode="numeric"
                     value={payoutAccountNo}
-                    onChange={(e) => setPayoutAccountNo(e.target.value)}
+                    onChange={(e) => {
+                      setPayoutAccountNo(e.target.value);
+                      if (payoutErrors.accountNo) {
+                        setPayoutErrors((prev) => ({ ...prev, accountNo: undefined }));
+                      }
+                    }}
                     placeholder="Contoh: 8830192841"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200"
+                    aria-invalid={!!payoutErrors.accountNo}
+                    aria-describedby={payoutErrors.accountNo ? 'payout-account-no-error' : undefined}
+                    className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border font-mono tabular-nums focus:outline-none focus:ring-2 ${
+                      payoutErrors.accountNo
+                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                        : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                    }`}
                     required
                   />
+                  {payoutErrors.accountNo && (
+                    <p id="payout-account-no-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                      {payoutErrors.accountNo}
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Pemilik Rekening</label>
+                <label htmlFor="payout-holder" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Nama Pemilik Rekening *
+                </label>
                 <input
+                  id="payout-holder"
                   type="text"
                   value={payoutHolder}
-                  onChange={(e) => setPayoutHolder(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200"
+                  onChange={(e) => {
+                    setPayoutHolder(e.target.value);
+                    if (payoutErrors.accountHolder) {
+                      setPayoutErrors((prev) => ({ ...prev, accountHolder: undefined }));
+                    }
+                  }}
+                  placeholder="Nama sesuai buku tabungan"
+                  aria-invalid={!!payoutErrors.accountHolder}
+                  aria-describedby={payoutErrors.accountHolder ? 'payout-holder-error' : undefined}
+                  className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                    payoutErrors.accountHolder
+                      ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                      : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                  }`}
                   required
                 />
+                {payoutErrors.accountHolder && (
+                  <p id="payout-holder-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                    {payoutErrors.accountHolder}
+                  </p>
+                )}
               </div>
 
               <div className="pt-2">
                 <button
                   type="submit"
                   disabled={payoutLoading}
-                  className="w-full py-3 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-40"
+                  aria-label="Kirim pengajuan penarikan dana saldo toko"
+                  className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
                 >
-                  {payoutLoading ? 'Memproses...' : 'Kirim Pengajuan Penarikan'}
+                  {payoutLoading ? 'Memproses Pengajuan...' : 'Kirim Pengajuan Penarikan'}
                 </button>
               </div>
             </form>
@@ -795,7 +1026,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       {/* Tab 7: Add Product */}
       {activeTab === 'add_product' && (
-        <div className="max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 text-xs">
+        <div
+          id="shop-panel-add-product"
+          role="tabpanel"
+          aria-labelledby="shop-tab-add_product"
+          tabIndex={0}
+          className="max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 text-xs focus:outline-none"
+        >
           <div>
             <h3 className="font-extrabold text-slate-900 text-sm">Tambah Produk Baru ke Etalase</h3>
             <p className="text-slate-400 text-xs mt-0.5">Lengkapi spesifikasi produk dan varian stok barang.</p>
@@ -803,24 +1040,26 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
           <form onSubmit={handleCreateProduct} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Produk</label>
+              <label htmlFor="prod-name" className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Produk</label>
               <input
+                id="prod-name"
                 type="text"
                 value={prodName}
                 onChange={(e) => setProdName(e.target.value)}
                 placeholder="Contoh: AirPods Max Wireless Headphone Space Gray"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
                 required
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kategori</label>
+                <label htmlFor="prod-category" className="block text-[11px] font-semibold text-slate-700 mb-1">Kategori</label>
                 <select
+                  id="prod-category"
                   value={prodCategory}
                   onChange={(e) => setProdCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#003d29]"
                 >
                   <option value="Headphones">Headphones</option>
                   <option value="Electronics">Electronics</option>
@@ -831,50 +1070,54 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Harga Jual (Rp)</label>
+                <label htmlFor="prod-price" className="block text-[11px] font-semibold text-slate-700 mb-1">Harga Jual (Rp)</label>
                 <input
+                  id="prod-price"
                   type="number"
                   value={prodPrice}
                   onChange={(e) => setProdPrice(e.target.value)}
                   placeholder="Contoh: 1250000"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
                   required
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Varian Nama</label>
+                <label htmlFor="prod-variant-name" className="block text-[11px] font-semibold text-slate-700 mb-1">Varian Nama</label>
                 <input
+                  id="prod-variant-name"
                   type="text"
                   value={prodVariantName}
                   onChange={(e) => setProdVariantName(e.target.value)}
                   placeholder="Contoh: Standard Edition"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Jumlah Stok Awal</label>
+                <label htmlFor="prod-stock" className="block text-[11px] font-semibold text-slate-700 mb-1">Jumlah Stok Awal</label>
                 <input
+                  id="prod-stock"
                   type="number"
                   value={prodStock}
                   onChange={(e) => setProdStock(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29]"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Lengkap Produk</label>
+              <label htmlFor="prod-desc" className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Lengkap Produk</label>
               <textarea
+                id="prod-desc"
                 rows={3}
                 value={prodDesc}
                 onChange={(e) => setProdDesc(e.target.value)}
                 placeholder="Jelaskan fitur unggulan, kelengkapan boks, dan keaslian produk..."
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] leading-relaxed"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] focus:ring-2 focus:ring-[#003d29] leading-relaxed"
               />
             </div>
 
@@ -882,7 +1125,8 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
               <button
                 type="submit"
                 disabled={prodCreating}
-                className="w-full py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40"
+                aria-label="Publikasikan produk baru ke katalog toko"
+                className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
               >
                 {prodCreating ? 'Menyimpan Produk...' : 'Publikasikan Produk'}
               </button>

@@ -169,6 +169,7 @@ function AppContent() {
         if (me && me.id) {
           setUser(me);
           localStorage.setItem("pasaria_user", JSON.stringify(me));
+          await loadUserData(me.id);
         }
       }
     } catch (e) {
@@ -234,6 +235,51 @@ function AppContent() {
     }
   };
 
+  const loadUserData = async (uid: number) => {
+    const results = await Promise.allSettled([
+      api.getOrders(uid),
+      api.getCart(uid),
+      api.getDeliveries(uid),
+    ]);
+
+    const [ordersResult, cartResult, deliveriesResult] = results;
+
+    if (ordersResult.status === "fulfilled") {
+      setOrders(ordersResult.value || []);
+    } else {
+      console.error("Failed to load orders:", ordersResult.reason);
+    }
+
+    if (cartResult.status === "fulfilled") {
+      const dbCart = cartResult.value;
+      if (dbCart && Array.isArray(dbCart)) {
+        setCartItems(dbCart);
+        localStorage.setItem("pasaria_cart", JSON.stringify(dbCart));
+      } else {
+        setCartItems([]);
+        localStorage.removeItem("pasaria_cart");
+      }
+    } else {
+      console.warn("Load cart note:", cartResult.reason);
+    }
+
+    if (deliveriesResult.status === "fulfilled") {
+      const shipments = deliveriesResult.value;
+      if (shipments && Array.isArray(shipments) && shipments.length > 0) {
+        setActiveShipment(shipments[0]);
+        localStorage.setItem(
+          "pasaria_active_shipment",
+          JSON.stringify(shipments[0]),
+        );
+      } else {
+        setActiveShipment(null);
+        localStorage.removeItem("pasaria_active_shipment");
+      }
+    } else {
+      console.warn("Load deliveries note:", deliveriesResult.reason);
+    }
+  };
+
   // Load products when filters/search change
   useEffect(() => {
     loadProducts();
@@ -241,10 +287,8 @@ function AppContent() {
 
   // Load orders and user-specific data on mount/login
   useEffect(() => {
-    if (user) {
-      loadOrders(user.id);
-      loadCartFromDatabase(user.id);
-      loadDeliveriesFromDatabase(user.id);
+    if (user?.id) {
+      loadUserData(user.id);
     } else {
       setOrders([]);
     }
@@ -463,26 +507,8 @@ function AppContent() {
     setUser(loggedUser);
     localStorage.setItem("pasaria_user", JSON.stringify(loggedUser));
 
-    loadOrders(loggedUser.id);
-
-    try {
-      const dbCart = await api.getCart(loggedUser.id);
-      if (dbCart && Array.isArray(dbCart)) {
-        setCartItems(dbCart);
-        localStorage.setItem("pasaria_cart", JSON.stringify(dbCart));
-      }
-    } catch (_) {}
-
-    try {
-      const dbShipments = await api.getDeliveries(loggedUser.id);
-      if (dbShipments && Array.isArray(dbShipments) && dbShipments.length > 0) {
-        setActiveShipment(dbShipments[0]);
-        localStorage.setItem(
-          "pasaria_active_shipment",
-          JSON.stringify(dbShipments[0]),
-        );
-      }
-    } catch (_) {}
+    // Parallelize independent user data fetching via Promise.allSettled
+    await loadUserData(loggedUser.id);
 
     if (pendingCartAction) {
       const { type, product, quantity, color, variantId } = pendingCartAction;
@@ -856,8 +882,7 @@ function AppContent() {
             onNavigateHome={handleNavigateHome}
             onClearCache={() => {
               if (user) {
-                loadCartFromDatabase(user.id);
-                loadDeliveriesFromDatabase(user.id);
+                loadUserData(user.id);
               }
               loadProducts();
             }}

@@ -82,12 +82,6 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      (window as any).__showToast = showToast;
-    }
-  }, [showToast]);
-
-  useEffect(() => {
     const currentTimers = timersRef.current;
     return () => {
       currentTimers.forEach((timer) => clearTimeout(timer));
