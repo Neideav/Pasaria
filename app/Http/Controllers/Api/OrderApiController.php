@@ -25,17 +25,46 @@ class OrderApiController extends Controller
     }
 
     /**
-     * Server-controlled checkout & order creation.
+     * Server-controlled checkout & atomic order creation.
      */
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.variant_id' => 'nullable|integer',
+            'shipping_address' => 'nullable|string|max:500',
+            'customer_name' => 'nullable|string|max:100',
+            'customer_phone' => 'nullable|string|max:50',
+            'payment_method' => 'nullable|string|max:50',
+            'voucher_code' => 'nullable|string|max:50',
+            'idempotency_key' => 'nullable|string|max:100',
+        ]);
+
         try {
-            $user = $request->user();
-            $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
+            $payload = $request->all();
+            if ($request->hasHeader('Idempotency-Key') && empty($payload['idempotency_key'])) {
+                $payload['idempotency_key'] = $request->header('Idempotency-Key');
+            }
 
-            $result = $this->checkoutService->checkout($request->all(), $userId);
+            // Customer info defaults to authenticated user
+            $payload['customer_name'] = $payload['customer_name'] ?? $user->name;
+            $payload['customer_email'] = $user->email;
+            $payload['customer_phone'] = $payload['customer_phone'] ?? $user->phone;
 
-            return response()->json($result, 201);
+            $result = $this->checkoutService->checkout($payload, $user->id);
+
+            $statusCode = (!empty($result['idempotent'])) ? 200 : 201;
+            return response()->json($result, $statusCode);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
@@ -47,9 +76,10 @@ class OrderApiController extends Controller
                 'message' => $e->getMessage(),
             ], 400);
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('OrderApiController error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memproses pesanan: ' . $e->getMessage(),
+                'message' => (config('app.debug') || app()->environment('testing')) ? $e->getMessage() : 'Gagal memproses pesanan.',
             ], 500);
         }
     }
@@ -59,10 +89,18 @@ class OrderApiController extends Controller
      */
     public function calculate(Request $request): JsonResponse
     {
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.variant_id' => 'nullable|integer',
+            'voucher_code' => 'nullable|string|max:50',
+        ]);
+
         try {
             $items = $request->input('items', []);
             $voucherCode = $request->input('voucher_code');
-            $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+            $userId = $request->user()?->id;
 
             $pricing = $this->pricingService->calculate($items, $voucherCode, $userId);
 
@@ -70,44 +108,53 @@ class OrderApiController extends Controller
                 'success' => true,
                 'data' => $pricing,
             ]);
-        } catch (\Throwable $e) {
+        } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => config('app.debug') ? $e->getMessage() : 'Gagal menghitung kalkulasi pesanan.',
+            ], 500);
         }
     }
 
     /**
-     * List orders with ownership enforcement.
+     * List orders with strict ownership enforcement and pagination.
      */
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
         try {
-            $user = $request->user();
             $query = Order::with(['items', 'shop', 'payment'])->orderBy('id', 'desc');
 
-            if ($user) {
-                if ($user->isAdmin()) {
-                    // Admin can see all orders
-                } elseif ($user->isSeller() && $user->shop) {
-                    // Seller sees orders for their shop
-                    $query->where('shop_id', $user->shop->id);
-                } else {
-                    // Customer sees only their own orders
-                    $query->where('user_id', $user->id);
-                }
+            if ($user->isAdmin()) {
+                // Admin can inspect all orders
+            } elseif ($user->isSeller() && $user->shop) {
+                // Seller sees only their shop's orders
+                $query->where('shop_id', $user->shop->id);
             } else {
-                // Local fallback
-                $userId = (int) ($request->input('user_id') ?: 1);
-                $query->where('user_id', $userId);
+                // Customer strictly sees only their own orders
+                $query->where('user_id', $user->id);
             }
 
             if ($request->has('status') && !empty($request->input('status')) && $request->input('status') !== 'all') {
                 $query->where('status', strtolower($request->input('status')));
             }
 
-            $orders = $query->get()->map(function ($order) {
+            $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+            $paginated = $query->paginate($perPage);
+
+            $orders = collect($paginated->items())->map(function ($order) {
                 $arr = $order->toArray();
                 $arr['subtotal'] = (float) $order->subtotal;
                 $arr['tax'] = (float) $order->tax;
@@ -126,23 +173,39 @@ class OrderApiController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $orders,
+                'pagination' => [
+                    'current_page' => $paginated->currentPage(),
+                    'last_page' => $paginated->lastPage(),
+                    'per_page' => $paginated->perPage(),
+                    'total' => $paginated->total(),
+                ],
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Gagal memuat daftar pesanan.',
             ], 500);
         }
     }
 
     /**
-     * Get single order by order_number with IDOR protection.
+     * Get single order by order_number with strict BOLA/IDOR protection.
      */
     public function show(Request $request, string $orderNumber): JsonResponse
     {
         $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
         $order = Order::with(['items.review', 'shop', 'payment', 'shipment.events'])
-            ->where('order_number', $orderNumber)
+            ->where(function ($q) use ($orderNumber) {
+                $q->where('order_number', $orderNumber)
+                  ->orWhere('master_order_number', $orderNumber);
+            })
             ->first();
 
         if (!$order) {
@@ -150,14 +213,15 @@ class OrderApiController extends Controller
         }
 
         // BOLA / IDOR ownership validation
-        if ($user) {
-            $isBuyer = $order->user_id === $user->id;
-            $isSeller = $user->shop && $order->shop_id === $user->shop->id;
-            $isAdmin = $user->isAdmin();
+        $isBuyer = ($order->user_id === $user->id);
+        $isSeller = ($user->shop && $order->shop_id === $user->shop->id);
+        $isAdmin = $user->isAdmin();
 
-            if (!$isBuyer && !$isSeller && !$isAdmin) {
-                return response()->json(['success' => false, 'message' => 'Anda tidak memiliki hak akses ke pesanan ini.'], 403);
-            }
+        if (!$isBuyer && !$isSeller && !$isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak akses ke pesanan ini.',
+            ], 403);
         }
 
         $arr = $order->toArray();
@@ -171,33 +235,69 @@ class OrderApiController extends Controller
     }
 
     /**
-     * Update order status (Seller or Admin only).
+     * Update order status with state machine transition rules and authorization.
      */
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        $order = Order::find($id);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $order = Order::find($id);
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Pesanan tidak ditemukan.'], 404);
         }
 
-        if ($user && !$user->isAdmin()) {
+        // Only the seller owning this order's shop, or admin can update status
+        if (!$user->isAdmin()) {
             if (!$user->shop || $user->shop->id !== $order->shop_id) {
-                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak. Anda bukan pemilik toko untuk pesanan ini.',
+                ], 403);
             }
         }
 
-        $newStatus = strtolower($request->input('status', 'processing'));
-        $validStatuses = ['pending_payment', 'paid', 'processing', 'packed', 'shipped', 'delivered', 'completed', 'cancelled'];
+        $newStatus = strtolower(trim($request->input('status', '')));
+        $currentStatus = strtolower($order->status);
 
-        if (!in_array($newStatus, $validStatuses)) {
-            return response()->json(['success' => false, 'message' => 'Status pesanan tidak valid.'], 422);
+        // State Machine validation
+        $allowedTransitions = [
+            'pending_payment' => ['paid', 'cancelled'],
+            'paid'            => ['processing', 'cancelled'],
+            'processing'      => ['packed', 'shipped', 'cancelled'],
+            'packed'          => ['shipped', 'cancelled'],
+            'shipped'         => ['delivered'],
+            'delivered'       => ['completed', 'return_requested'],
+            'return_requested'=> ['refunded', 'completed'],
+            'completed'       => [],
+            'cancelled'       => [],
+            'refunded'        => [],
+        ];
+
+        if ($currentStatus === $newStatus) {
+            // No state change
+            return response()->json([
+                'success' => true,
+                'message' => 'Status pesanan tidak berubah.',
+                'data' => $order,
+            ]);
+        }
+
+        if (!isset($allowedTransitions[$currentStatus]) || !in_array($newStatus, $allowedTransitions[$currentStatus], true)) {
+            // Admin can override except terminal completed/cancelled
+            if (!$user->isAdmin() || in_array($currentStatus, ['cancelled', 'completed', 'refunded'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Transisi status dari '{$currentStatus}' ke '{$newStatus}' tidak diizinkan.",
+                ], 422);
+            }
         }
 
         $order->status = $newStatus;
         if ($request->has('tracking_number')) {
-            $order->tracking_number = $request->input('tracking_number');
+            $order->tracking_number = trim($request->input('tracking_number'));
         }
         $order->save();
 
@@ -209,25 +309,31 @@ class OrderApiController extends Controller
     }
 
     /**
-     * Cancel order (Customer within eligible period).
+     * Cancel order (Customer or Admin) with atomic inventory restock.
      */
     public function cancel(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        $order = Order::find($id);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $order = Order::with('items')->find($id);
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Pesanan tidak ditemukan.'], 404);
         }
 
-        if ($user && $order->user_id !== $user->id && !$user->isAdmin()) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-        }
-
-        if (!in_array($order->status, ['pending_payment', 'paid', 'processing'])) {
+        if ($order->user_id !== $user->id && !$user->isAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Pesanan tidak dapat dibatalkan karena sudah dalam proses pengiriman atau selesai.',
+                'message' => 'Akses ditolak.',
+            ], 403);
+        }
+
+        if (!in_array($order->status, ['pending_payment', 'paid', 'processing'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan tidak dapat dibatalkan karena sudah dikemas, dikirim, atau selesai.',
             ], 422);
         }
 
@@ -248,7 +354,7 @@ class OrderApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Pesanan berhasil dibatalkan dan stok dikembalikan.',
+            'message' => 'Pesanan berhasil dibatalkan dan stok produk telah dikembalikan.',
             'data' => $order,
         ]);
     }

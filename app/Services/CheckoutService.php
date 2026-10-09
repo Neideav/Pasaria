@@ -13,6 +13,8 @@ use App\Models\Voucher;
 use App\Models\VoucherRedemption;
 use App\Models\Notification;
 use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\IdempotencyKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -36,33 +38,51 @@ class CheckoutService
     {
         $rawItems = $checkoutData['items'] ?? [];
         if (empty($rawItems)) {
-            throw new \InvalidArgumentException('Your cart or order items cannot be empty.');
+            throw new \InvalidArgumentException('Keranjang belanja Anda kosong.');
         }
 
-        $shippingAddress = $checkoutData['shipping_address'] ?? 'DKI Jakarta, Indonesia';
-        $customerName = $checkoutData['customer_name'] ?? 'PASARIA Customer';
-        $customerEmail = $checkoutData['customer_email'] ?? 'customer@pasaria.id';
-        $customerPhone = $checkoutData['customer_phone'] ?? '+62 812 3456 7890';
-        $paymentMethod = $checkoutData['payment_method'] ?? 'QRIS Instant';
-        $voucherCode = $checkoutData['voucher_code'] ?? null;
-        $idempotencyKey = $checkoutData['idempotency_key'] ?? (string) Str::uuid();
+        $shippingAddress = trim($checkoutData['shipping_address'] ?? 'DKI Jakarta, Indonesia');
+        $customerName = trim($checkoutData['customer_name'] ?? 'PASARIA Customer');
+        $customerEmail = trim($checkoutData['customer_email'] ?? 'customer@pasaria.id');
+        $customerPhone = trim($checkoutData['customer_phone'] ?? '+62 812 3456 7890');
+        $paymentMethod = trim($checkoutData['payment_method'] ?? 'QRIS Instant');
+        $voucherCode = !empty($checkoutData['voucher_code']) ? trim($checkoutData['voucher_code']) : null;
+        $idempotencyKey = !empty($checkoutData['idempotency_key']) ? (string) $checkoutData['idempotency_key'] : null;
 
-        // Idempotency check: if an order with this idempotency key already exists for this user, return it
+        // 1. Persistent Idempotency check via idempotency_keys table
         if (!empty($idempotencyKey)) {
+            $cachedKey = IdempotencyKey::where('key', $idempotencyKey)
+                ->where('user_id', $userId)
+                ->first();
+
+            if ($cachedKey && !empty($cachedKey->response_json)) {
+                $response = is_array($cachedKey->response_json)
+                    ? $cachedKey->response_json
+                    : json_decode($cachedKey->response_json, true);
+                $response['idempotent'] = true;
+                $response['message'] = 'Pesanan sudah pernah dibuat (Idempotent replay).';
+                return $response;
+            }
+
+            // Fallback check on orders table
             $existing = Order::where('user_id', $userId)
                 ->where('idempotency_key', $idempotencyKey)
                 ->first();
+
             if ($existing) {
                 return [
-                    'order_number' => $existing->order_number,
+                    'success' => true,
+                    'order_number' => $existing->master_order_number ?: $existing->order_number,
                     'master_order_number' => $existing->master_order_number ?: $existing->order_number,
                     'total' => (float) $existing->total,
                     'status' => $existing->status,
-                    'message' => 'Existing order retrieved (idempotent)',
+                    'idempotent' => true,
+                    'message' => 'Pesanan sudah pernah dibuat (Idempotent replay).',
                 ];
             }
         }
 
+        // 2. Atomic Database Transaction with pessimistic locking
         return DB::transaction(function () use (
             $rawItems,
             $voucherCode,
@@ -74,35 +94,47 @@ class CheckoutService
             $paymentMethod,
             $idempotencyKey
         ) {
-            // 1. Stock validation & locking
+            // A. Stock validation & pessimistic row-level locking (FOR UPDATE)
             foreach ($rawItems as $item) {
                 $pId = (int) ($item['product_id'] ?? $item['id'] ?? 0);
-                $qty = max(1, (int) ($item['quantity'] ?? 1));
+                $qty = (int) ($item['quantity'] ?? 1);
+                $vId = isset($item['variant_id']) && $item['variant_id'] !== '' && $item['variant_id'] !== null
+                    ? (int) $item['variant_id']
+                    : null;
+
+                if ($qty < 1) {
+                    throw new \InvalidArgumentException("Jumlah item harus minimal 1.");
+                }
 
                 $product = Product::where('id', $pId)->lockForUpdate()->first();
                 if (!$product) {
-                    throw new \RuntimeException("Product #{$pId} does not exist.");
+                    throw new \InvalidArgumentException("Produk #{$pId} tidak ditemukan atau sudah tidak tersedia.");
                 }
 
                 if ($product->stock < $qty) {
-                    throw new \RuntimeException("Insufficient stock for '{$product->name}'. Available: {$product->stock}, requested: {$qty}.");
+                    throw new \RuntimeException("Stok untuk '{$product->name}' tidak mencukupi. Tersedia: {$product->stock}, diminta: {$qty}.");
                 }
 
-                if (!empty($item['variant_id'])) {
-                    $variant = ProductVariant::where('id', $item['variant_id'])
+                if ($vId !== null) {
+                    $variant = ProductVariant::where('id', $vId)
                         ->where('product_id', $pId)
                         ->lockForUpdate()
                         ->first();
-                    if ($variant && $variant->stock < $qty) {
-                        throw new \RuntimeException("Insufficient stock for variant '{$variant->name}'. Available: {$variant->stock}, requested: {$qty}.");
+
+                    if (!$variant) {
+                        throw new \InvalidArgumentException("Varian #{$vId} tidak cocok atau tidak ditemukan pada produk '{$product->name}'.");
+                    }
+
+                    if ($variant->stock < $qty) {
+                        throw new \RuntimeException("Stok untuk varian '{$variant->name}' tidak mencukupi. Tersedia: {$variant->stock}, diminta: {$qty}.");
                     }
                 }
             }
 
-            // 2. Server-side Pricing Recalculation
+            // B. Server-side Pricing Recalculation (discards any client-sent prices/totals)
             $pricing = $this->pricingService->calculate($rawItems, $voucherCode, $userId);
 
-            // 3. Decrement stock atomically
+            // C. Decrement stock atomically
             foreach ($pricing['items'] as $calcItem) {
                 Product::where('id', $calcItem['product_id'])->decrement('stock', $calcItem['quantity']);
                 if (!empty($calcItem['variant_id'])) {
@@ -110,10 +142,10 @@ class CheckoutService
                 }
             }
 
-            // 4. Generate Order Numbers
+            // D. Generate Master Order Number
             $masterOrderNumber = 'PAS-' . date('Ymd') . '-' . strtoupper(Str::random(6));
 
-            // Group items by shop for multi-vendor structure
+            // Group items by shop for multi-vendor atomic sub-orders
             $itemsByShop = [];
             foreach ($pricing['items'] as $item) {
                 $shopId = $item['shop_id'];
@@ -129,7 +161,6 @@ class CheckoutService
             foreach ($itemsByShop as $shopId => $shopItems) {
                 $shopSubtotal = array_sum(array_column($shopItems, 'subtotal'));
                 $shopShipping = 15000.0;
-                // Distribute voucher and tax proportionally
                 $proportion = $pricing['subtotal'] > 0 ? ($shopSubtotal / $pricing['subtotal']) : (1.0 / $totalShops);
                 $shopVoucherDiscount = round($pricing['voucher_discount'] * $proportion, 2);
                 $shopTax = round($pricing['tax'] * $proportion, 2);
@@ -154,7 +185,7 @@ class CheckoutService
                     'discount' => $shopVoucherDiscount,
                     'shipping_cost' => $shopShipping,
                     'total' => $shopTotal,
-                    'status' => 'paid', // Initial payment confirmed
+                    'status' => 'paid',
                     'courier' => 'PASARIA Express',
                     'courier_service' => 'Reguler 2-3 Hari',
                     'tracking_number' => 'PAS-TRK-' . strtoupper(Str::random(8)),
@@ -199,7 +230,7 @@ class CheckoutService
 
                 // Create Shipment record & initial Event
                 $shipmentId = 'SHP-' . strtoupper(Str::random(10));
-                $shipment = Shipment::create([
+                Shipment::create([
                     'shipment_id' => $shipmentId,
                     'order_number' => $shopOrderNumber,
                     'user_id' => $userId,
@@ -249,7 +280,7 @@ class CheckoutService
                 $createdOrders[] = $order;
             }
 
-            // 5. Record Voucher Redemption if voucher was used
+            // E. Record Voucher Redemption if voucher was applied
             if (!empty($pricing['voucher_code'])) {
                 $voucher = Voucher::where('code', $pricing['voucher_code'])->first();
                 if ($voucher) {
@@ -263,7 +294,7 @@ class CheckoutService
                 }
             }
 
-            // 6. Send in-app notification
+            // F. Send in-app notification
             Notification::create([
                 'user_id' => $userId,
                 'title' => 'Pesanan Berhasil Dibuat!',
@@ -272,17 +303,39 @@ class CheckoutService
                 'action_url' => "/orders/{$masterOrderNumber}",
             ]);
 
-            // 7. Clear user's cart in database
-            Cart::where('user_id', $userId)->delete();
+            // G. Clear user's cart in database (both relational cart_items and legacy json)
+            $userCart = Cart::where('user_id', $userId)->first();
+            if ($userCart) {
+                CartItem::where('cart_id', $userCart->id)->delete();
+                $userCart->update(['items_json' => []]);
+            }
 
-            return [
+            $result = [
                 'success' => true,
                 'order_number' => $masterOrderNumber,
+                'master_order_number' => $masterOrderNumber,
                 'transaction_id' => $masterOrderNumber,
                 'orders_count' => count($createdOrders),
                 'pricing' => $pricing,
                 'message' => 'Pesanan berhasil dibuat dan diverifikasi oleh PASARIA.',
             ];
+
+            // H. Persist Idempotency Key record
+            if (!empty($idempotencyKey)) {
+                try {
+                    IdempotencyKey::create([
+                        'key' => $idempotencyKey,
+                        'user_id' => $userId,
+                        'action' => 'checkout',
+                        'resource_id' => $masterOrderNumber,
+                        'response_json' => $result,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Ignore duplicate key race in database
+                }
+            }
+
+            return $result;
         });
     }
 }

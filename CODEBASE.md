@@ -86,7 +86,8 @@ cart_items (id PK, cart_id FK -> carts.id, product_id FK -> products.id, variant
 orders (id PK, order_number unique, user_id FK -> users.id nullable, parent_id FK nullable, shop_id FK nullable, total_amount decimal, status string)
 order_items (id PK, order_id FK -> orders.id, product_id FK -> products.id, quantity int, unit_price decimal, subtotal decimal)
 shipments (id PK, order_id FK -> orders.id, tracking_number unique, courier, shipping_cost decimal, status string)
-reviews (id PK, user_id FK -> users.id, product_id FK -> products.id, order_id FK nullable, rating int, comment text)
+reviews (id PK, user_id FK -> users.id, product_id FK -> products.id, order_id FK nullable, order_item_id unique FK nullable, rating int, comment text)
+idempotency_keys (id PK, key unique string, user_id FK -> users.id nullable, request_hash string, response_body json, status_code int)
 <!-- END AUTO GENERATED: DATABASE_SCHEMA -->
 
 Full catalog for all 30+ tables is recorded in `.agents/references/database-schema.md`.

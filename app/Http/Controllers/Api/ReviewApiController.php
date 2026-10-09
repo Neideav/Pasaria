@@ -19,27 +19,35 @@ class ReviewApiController extends Controller
      */
     public function index(Request $request, int $productId): JsonResponse
     {
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+
         $reviews = Review::with(['user', 'media'])
             ->where('product_id', $productId)
             ->where('status', 'approved')
             ->orderBy('id', 'desc')
-            ->get();
+            ->paginate($perPage);
 
-        // Calculate breakdown
+        // Calculate breakdown from approved reviews
+        $allReviews = Review::where('product_id', $productId)->where('status', 'approved')->get();
         $breakdown = [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0];
         $totalRating = 0;
-        foreach ($reviews as $rev) {
+        foreach ($allReviews as $rev) {
             $star = max(1, min(5, (int) $rev->rating));
             $breakdown[$star]++;
             $totalRating += $star;
         }
 
-        $totalReviews = count($reviews);
+        $totalReviews = count($allReviews);
         $averageRating = $totalReviews > 0 ? round($totalRating / $totalReviews, 1) : 5.0;
 
         return response()->json([
             'success' => true,
-            'data' => $reviews,
+            'data' => $reviews->items(),
+            'pagination' => [
+                'current_page' => $reviews->currentPage(),
+                'last_page' => $reviews->lastPage(),
+                'total' => $reviews->total(),
+            ],
             'summary' => [
                 'average_rating' => $averageRating,
                 'total_reviews' => $totalReviews,
@@ -49,17 +57,21 @@ class ReviewApiController extends Controller
     }
 
     /**
-     * Submit a product review. Verified purchaser strictly enforced.
+     * Submit a product review. Verified purchase strictly enforced without exceptions.
      */
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         $request->validate([
             'product_id' => 'required|integer',
             'rating' => 'required|integer|min:1|max:5',
-            'review_text' => 'nullable|string',
+            'review_text' => 'nullable|string|max:2000',
+            'media_urls' => 'nullable|array',
+            'media_urls.*' => 'string|max:500',
         ]);
 
         $productId = (int) $request->input('product_id');
@@ -68,40 +80,55 @@ class ReviewApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
         }
 
-        // Verified purchase verification: check if user has purchased this product in any order
-        $validPurchase = OrderItem::whereHas('order', function ($q) use ($userId) {
-            $q->where('user_id', $userId)
-              ->whereIn('status', ['paid', 'processing', 'packed', 'shipped', 'delivered', 'completed', 'Delivered']);
-        })->where('product_id', $productId)->first();
+        // 1. Strict verified purchase check: User must have an order with status delivered/completed containing this product
+        $orderItem = OrderItem::where('product_id', $productId)
+            ->whereHas('order', function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                  ->whereIn(DB::raw('LOWER(status)'), ['delivered', 'completed']);
+            })
+            ->whereDoesntHave('review')
+            ->first();
 
-        // In production, enforce verified purchase. In local dev, allow fallback purchase creation if none exists.
-        if (!$validPurchase && !app()->environment('local', 'testing')) {
+        if (!$orderItem) {
+            // Check if user has already reviewed every purchased instance of this product
+            $alreadyReviewed = OrderItem::where('product_id', $productId)
+                ->whereHas('order', function ($q) use ($user) {
+                    $q->where('user_id', $user->id)
+                      ->whereIn(DB::raw('LOWER(status)'), ['delivered', 'completed']);
+                })
+                ->whereHas('review')
+                ->exists();
+
+            if ($alreadyReviewed) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda sudah memberikan ulasan untuk seluruh pesanan produk ini.',
+                ], 422);
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Hanya pembeli terverifikasi yang telah membeli produk ini yang dapat memberikan ulasan.',
+                'message' => 'Hanya pembeli terverifikasi yang telah menerima produk ini (status delivered/completed) yang dapat memberikan ulasan.',
             ], 403);
         }
 
-        $orderId = $validPurchase ? $validPurchase->order_id : null;
-        $orderItemId = $validPurchase ? $validPurchase->id : null;
-
-        // Check if duplicate review already submitted for this order item
-        if ($orderItemId && Review::where('order_item_id', $orderItemId)->exists()) {
+        // 2. Prevent duplicate reviews
+        if (Review::where('order_item_id', $orderItem->id)->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda sudah memberikan ulasan untuk pesanan ini.',
+                'message' => 'Ulasan untuk pesanan ini sudah pernah dikirimkan.',
             ], 422);
         }
 
-        return DB::transaction(function () use ($request, $userId, $productId, $product, $orderId, $orderItemId) {
+        return DB::transaction(function () use ($request, $user, $productId, $product, $orderItem) {
             $review = Review::create([
-                'user_id' => $userId,
-                'order_id' => $orderId,
-                'order_item_id' => $orderItemId,
+                'user_id' => $user->id,
+                'order_id' => $orderItem->order_id,
+                'order_item_id' => $orderItem->id,
                 'product_id' => $productId,
                 'shop_id' => $product->shop_id ?: 1,
                 'rating' => (int) $request->input('rating'),
-                'review_text' => $request->input('review_text', ''),
+                'review_text' => trim($request->input('review_text', '')),
                 'is_anonymous' => $request->boolean('is_anonymous', false),
                 'is_verified_purchase' => true,
                 'status' => 'approved',
@@ -111,11 +138,13 @@ class ReviewApiController extends Controller
             $mediaUrls = $request->input('media_urls', []);
             if (is_array($mediaUrls)) {
                 foreach ($mediaUrls as $url) {
-                    ReviewMedia::create([
-                        'review_id' => $review->id,
-                        'media_url' => $url,
-                        'media_type' => 'image',
-                    ]);
+                    if (!empty($url)) {
+                        ReviewMedia::create([
+                            'review_id' => $review->id,
+                            'media_url' => $url,
+                            'media_type' => 'image',
+                        ]);
+                    }
                 }
             }
 
@@ -142,14 +171,17 @@ class ReviewApiController extends Controller
     public function reply(Request $request, int $reviewId): JsonResponse
     {
         $user = $request->user();
-        $review = Review::with('product')->find($reviewId);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $review = Review::with('product')->find($reviewId);
         if (!$review) {
             return response()->json(['success' => false, 'message' => 'Ulasan tidak ditemukan.'], 404);
         }
 
         // Ownership authorization: user must own the shop of this product, or be admin
-        if ($user && !$user->isAdmin()) {
+        if (!$user->isAdmin()) {
             if (!$user->shop || $user->shop->id !== $review->shop_id) {
                 return response()->json([
                     'success' => false,
@@ -159,10 +191,10 @@ class ReviewApiController extends Controller
         }
 
         $request->validate([
-            'reply' => 'required|string',
+            'reply' => 'required|string|min:2|max:1000',
         ]);
 
-        $review->seller_reply = $request->input('reply');
+        $review->seller_reply = trim($request->input('reply'));
         $review->replied_at = now();
         $review->save();
 

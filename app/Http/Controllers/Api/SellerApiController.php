@@ -12,6 +12,7 @@ use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Models\SellerPayout;
 use App\Models\Review;
+use App\Models\IdempotencyKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,18 +26,21 @@ class SellerApiController extends Controller
     public function dashboard(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (!$user && app()->environment('local', 'testing')) {
-            $user = \App\Models\User::find($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        $shop = $user?->shop ?: Shop::first();
+        $shop = $user->shop;
         if (!$shop) {
-            return response()->json(['success' => false, 'message' => 'Toko belum terdaftar.'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda belum memiliki toko terdaftar di PASARIA.',
+            ], 404);
         }
 
         $shopId = $shop->id;
 
-        // Real database aggregations
+        // Real database aggregations for this seller's shop only
         $totalOrders = Order::where('shop_id', $shopId)->count();
         $pendingOrders = Order::where('shop_id', $shopId)->whereIn('status', ['paid', 'processing'])->count();
         $totalRevenue = (float) Order::where('shop_id', $shopId)->whereIn('status', ['paid', 'processing', 'packed', 'shipped', 'delivered', 'completed'])->sum('total');
@@ -50,10 +54,14 @@ class SellerApiController extends Controller
         $totalProducts = Product::where('shop_id', $shopId)->count();
         $lowStockProducts = Product::where('shop_id', $shopId)->where('stock', '<=', 5)->count();
 
-        $avgRating = (float) (Review::where('shop_id', $shopId)->avg('rating') ?: 5.0);
-        $totalReviews = Review::where('shop_id', $shopId)->count();
+        $avgRating = (float) (Review::where('shop_id', $shopId)->where('status', 'approved')->avg('rating') ?: 5.0);
+        $totalReviews = Review::where('shop_id', $shopId)->where('status', 'approved')->count();
 
-        $wallet = Wallet::firstOrCreate(['shop_id' => $shopId], ['user_id' => $shop->user_id, 'balance' => $totalRevenue * 0.95]);
+        // Wallet ledger: never synthesize balance from gross revenue
+        $wallet = Wallet::firstOrCreate(
+            ['shop_id' => $shopId],
+            ['user_id' => $shop->user_id, 'balance' => 0.00]
+        );
 
         return response()->json([
             'success' => true,
@@ -81,24 +89,35 @@ class SellerApiController extends Controller
     public function products(Request $request): JsonResponse
     {
         $user = $request->user();
-        $shop = $user?->shop ?: Shop::first();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $shop = $user->shop;
         if (!$shop) {
             return response()->json(['success' => true, 'data' => []]);
         }
 
-        $products = Product::with(['variants'])
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $paginated = Product::with(['variants'])
             ->where('shop_id', $shop->id)
             ->orderBy('id', 'desc')
-            ->get()
-            ->map(function ($p) {
-                $arr = $p->toArray();
-                $arr['price'] = (float) $p->price;
-                return $arr;
-            });
+            ->paginate($perPage);
+
+        $products = collect($paginated->items())->map(function ($p) {
+            $arr = $p->toArray();
+            $arr['price'] = (float) $p->price;
+            return $arr;
+        });
 
         return response()->json([
             'success' => true,
             'data' => $products,
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'total' => $paginated->total(),
+            ],
         ]);
     }
 
@@ -108,25 +127,41 @@ class SellerApiController extends Controller
     public function orders(Request $request): JsonResponse
     {
         $user = $request->user();
-        $shop = $user?->shop ?: Shop::first();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $shop = $user->shop;
         if (!$shop) {
             return response()->json(['success' => true, 'data' => []]);
         }
 
-        $orders = Order::with(['items', 'payment', 'shipment'])
+        $query = Order::with(['items', 'payment', 'shipment'])
             ->where('shop_id', $shop->id)
-            ->orderBy('id', 'desc')
-            ->get()
-            ->map(function ($order) {
-                $arr = $order->toArray();
-                $arr['subtotal'] = (float) $order->subtotal;
-                $arr['total'] = (float) $order->total;
-                return $arr;
-            });
+            ->orderBy('id', 'desc');
+
+        if ($request->has('status') && !empty($request->input('status')) && $request->input('status') !== 'all') {
+            $query->where('status', strtolower($request->input('status')));
+        }
+
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $paginated = $query->paginate($perPage);
+
+        $orders = collect($paginated->items())->map(function ($order) {
+            $arr = $order->toArray();
+            $arr['subtotal'] = (float) $order->subtotal;
+            $arr['total'] = (float) $order->total;
+            return $arr;
+        });
 
         return response()->json([
             'success' => true,
             'data' => $orders,
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'total' => $paginated->total(),
+            ],
         ]);
     }
 
@@ -136,25 +171,36 @@ class SellerApiController extends Controller
     public function updateStock(Request $request, int $productId): JsonResponse
     {
         $user = $request->user();
-        $product = Product::find($productId);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $product = Product::find($productId);
         if (!$product) {
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
         }
 
-        if ($user && !$user->isAdmin()) {
+        // Ownership validation
+        if (!$user->isAdmin()) {
             if (!$user->shop || $user->shop->id !== $product->shop_id) {
-                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+                return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
             }
         }
 
-        $stock = max(0, (int) $request->input('stock', 0));
+        $request->validate([
+            'stock' => 'required|integer|min:0|max:1000000',
+            'variant_id' => 'nullable|integer',
+        ]);
+
+        $stock = (int) $request->input('stock');
         $product->stock = $stock;
         $product->save();
 
-        if ($request->has('variant_id')) {
-            $variant = ProductVariant::find($request->input('variant_id'));
-            if ($variant && $variant->product_id === $product->id) {
+        if ($request->has('variant_id') && !empty($request->input('variant_id'))) {
+            $variant = ProductVariant::where('id', $request->input('variant_id'))
+                ->where('product_id', $product->id)
+                ->first();
+            if ($variant) {
                 $variant->stock = $stock;
                 $variant->save();
             }
@@ -173,17 +219,28 @@ class SellerApiController extends Controller
     public function finances(Request $request): JsonResponse
     {
         $user = $request->user();
-        $shop = $user?->shop ?: Shop::first();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $shop = $user->shop;
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
         }
 
-        $grossSales = (float) Order::where('shop_id', $shop->id)->whereIn('status', ['paid', 'processing', 'packed', 'shipped', 'delivered', 'completed'])->sum('subtotal');
+        $grossSales = (float) Order::where('shop_id', $shop->id)
+            ->whereIn('status', ['paid', 'processing', 'packed', 'shipped', 'delivered', 'completed'])
+            ->sum('subtotal');
         $platformFee = round($grossSales * 0.05, 2); // 5% platform fee
         $netRevenue = round($grossSales - $platformFee, 2);
 
-        $wallet = Wallet::firstOrCreate(['shop_id' => $shop->id], ['user_id' => $shop->user_id, 'balance' => $netRevenue]);
+        $wallet = Wallet::firstOrCreate(
+            ['shop_id' => $shop->id],
+            ['user_id' => $shop->user_id, 'balance' => 0.00]
+        );
+
         $payouts = SellerPayout::where('shop_id', $shop->id)->orderBy('id', 'desc')->get();
+        $transactions = WalletTransaction::where('wallet_id', $wallet->id)->orderBy('id', 'desc')->take(30)->get();
 
         return response()->json([
             'success' => true,
@@ -193,40 +250,59 @@ class SellerApiController extends Controller
                 'net_revenue' => $netRevenue,
                 'available_balance' => (float) $wallet->balance,
                 'payouts' => $payouts,
+                'transactions' => $transactions,
             ],
         ]);
     }
 
     /**
-     * Request payout withdrawal.
+     * Request payout withdrawal with transaction & idempotency.
      */
     public function requestPayout(Request $request): JsonResponse
     {
         $user = $request->user();
-        $shop = $user?->shop ?: Shop::first();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $shop = $user->shop;
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
         }
 
         $request->validate([
             'amount' => 'required|numeric|min:10000',
-            'bank_name' => 'required|string',
-            'account_number' => 'required|string',
-            'account_holder' => 'required|string',
+            'bank_name' => 'required|string|max:100',
+            'account_number' => 'required|string|max:50',
+            'account_holder' => 'required|string|max:100',
+            'idempotency_key' => 'nullable|string|max:100',
         ]);
 
-        $amount = (float) $request->input('amount');
-        $wallet = Wallet::firstOrCreate(['shop_id' => $shop->id], ['user_id' => $shop->user_id, 'balance' => 0]);
-
-        if ($wallet->balance < $amount) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Saldo dompet tidak mencukupi untuk penarikan ini.',
-            ], 422);
+        $idempotencyKey = $request->header('Idempotency-Key') ?: $request->input('idempotency_key');
+        if (!empty($idempotencyKey)) {
+            $cached = IdempotencyKey::where('key', $idempotencyKey)->where('user_id', $user->id)->first();
+            if ($cached && !empty($cached->response_json)) {
+                return response()->json($cached->response_json, 200);
+            }
         }
 
-        return DB::transaction(function () use ($shop, $wallet, $amount, $request) {
+        $amount = (float) $request->input('amount');
+
+        return DB::transaction(function () use ($shop, $user, $amount, $request, $idempotencyKey) {
+            $wallet = Wallet::where('shop_id', $shop->id)->lockForUpdate()->first();
+            if (!$wallet) {
+                $wallet = Wallet::create(['shop_id' => $shop->id, 'user_id' => $shop->user_id, 'balance' => 0]);
+            }
+
+            if ($wallet->balance < $amount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Saldo dompet tidak mencukupi untuk penarikan ini.',
+                ], 422);
+            }
+
             $wallet->decrement('balance', $amount);
+            $wallet->refresh();
 
             $payout = SellerPayout::create([
                 'shop_id' => $shop->id,
@@ -249,11 +325,25 @@ class SellerApiController extends Controller
                 'description' => 'Penarikan saldo ke rekening ' . $request->input('bank_name'),
             ]);
 
-            return response()->json([
+            $responsePayload = [
                 'success' => true,
                 'message' => 'Permintaan penarikan dana berhasil diajukan.',
                 'data' => $payout,
-            ], 201);
+            ];
+
+            if (!empty($idempotencyKey)) {
+                try {
+                    IdempotencyKey::create([
+                        'key' => $idempotencyKey,
+                        'user_id' => $user->id,
+                        'action' => 'payout',
+                        'resource_id' => $payout->reference_id,
+                        'response_json' => $responsePayload,
+                    ]);
+                } catch (\Throwable $e) {}
+            }
+
+            return response()->json($responsePayload, 201);
         });
     }
 
@@ -263,7 +353,11 @@ class SellerApiController extends Controller
     public function inventory(Request $request): JsonResponse
     {
         $user = $request->user();
-        $shop = $user?->shop ?: Shop::first();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $shop = $user->shop;
         if (!$shop) {
             return response()->json(['success' => true, 'data' => []]);
         }
@@ -291,4 +385,3 @@ class SellerApiController extends Controller
         ]);
     }
 }
-

@@ -16,13 +16,16 @@ use Illuminate\Validation\ValidationException;
 class AuthApiController extends Controller
 {
     /**
-     * Handle user login.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Handle user login with Sanctum Bearer Token.
      */
     public function login(Request $request): JsonResponse
     {
+        $request->validate([
+            'username' => 'nullable|string',
+            'email'    => 'nullable|string',
+            'password' => 'required|string',
+        ]);
+
         $usernameOrEmail = trim($request->input('username') ?: $request->input('email', ''));
         $password = (string) $request->input('password', '');
 
@@ -40,7 +43,6 @@ class AuthApiController extends Controller
         $user = null;
 
         if ($demoSqliMode) {
-            // Educational demo raw query (strictly isolated from production)
             $rawSql = "SELECT * FROM users WHERE (email = '{$usernameOrEmail}' OR username = '{$usernameOrEmail}') AND password = '{$password}' LIMIT 1";
             try {
                 $results = DB::select($rawSql);
@@ -57,9 +59,9 @@ class AuthApiController extends Controller
                 ], 400);
             }
         } else {
-            // SECURE PRODUCTION IMPLEMENTATION: Parameterized query & Hash::check
-            $candidate = User::where('email', $usernameOrEmail)
-                ->orWhere('username', $usernameOrEmail)
+            // SECURE PRODUCTION IMPLEMENTATION: Parameterized lookup & bcrypt check
+            $candidate = User::where('email', strtolower($usernameOrEmail))
+                ->orWhere('username', strtolower($usernameOrEmail))
                 ->first();
 
             if ($candidate && Hash::check($password, $candidate->password)) {
@@ -81,7 +83,7 @@ class AuthApiController extends Controller
             ], 403);
         }
 
-        // Generate Sanctum plain text token
+        // Generate Sanctum plain text bearer token
         $token = $user->createToken('pasaria_auth_token')->plainTextToken;
 
         $userData = $user->load(['shop', 'addresses'])->toArray();
@@ -97,36 +99,34 @@ class AuthApiController extends Controller
     }
 
     /**
-     * Handle user registration.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Handle user registration with secure hashing and Sanctum Token.
      */
     public function register(Request $request): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name'     => 'required|string|max:255',
             'username' => 'required|string|min:3|max:50|unique:users,username',
-            'email' => 'required|email|max:255|unique:users,email',
+            'email'    => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:6',
         ]);
 
         $user = User::create([
-            'name' => trim($request->input('name')),
-            'username' => strtolower(trim($request->input('username'))),
-            'email' => strtolower(trim($request->input('email'))),
-            'password' => Hash::make($request->input('password')),
-            'role' => 'customer',
-            'status' => 'active',
-            'address' => $request->input('address', ''),
-            'city' => $request->input('city', 'Jakarta'),
-            'zip' => $request->input('zip', ''),
-            'phone' => $request->input('phone', ''),
+            'name'              => trim($request->input('name')),
+            'username'          => strtolower(trim($request->input('username'))),
+            'email'             => strtolower(trim($request->input('email'))),
+            'password'          => Hash::make($request->input('password')),
+            'role'              => 'customer',
+            'status'            => 'active',
+            'address'           => $request->input('address', ''),
+            'city'              => $request->input('city', 'Jakarta'),
+            'zip'               => $request->input('zip', ''),
+            'phone'             => $request->input('phone', ''),
+            'email_verified_at' => now(), // Auto-verified for local/demo infra
         ]);
 
         // Create empty Cart & Wallet for user
-        Cart::firstOrCreate(['user_id' => $user->id], ['items_json' => '[]']);
-        Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0]);
+        Cart::firstOrCreate(['user_id' => $user->id], ['items_json' => []]);
+        Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0.00]);
 
         $token = $user->createToken('pasaria_auth_token')->plainTextToken;
 
@@ -136,31 +136,21 @@ class AuthApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pendaftaran berhasil. Selamat bergabung di PASARIA!',
-            'token' => $token,
-            'user' => $userData,
+            'token'   => $token,
+            'user'    => $userData,
         ], 201);
     }
 
     /**
-     * Get authenticated user.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Get authenticated user profile via Sanctum token.
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
-        if (!$user) {
-            // Local dev fallback if user_id query is passed in development mode
-            if (app()->environment('local', 'testing') && $request->has('user_id')) {
-                $user = User::find($request->input('user_id'));
-            }
-        }
-
+        $user = $request->user();
         if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated',
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -169,19 +159,16 @@ class AuthApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'user' => $userData,
+            'user'    => $userData,
         ]);
     }
 
     /**
-     * Handle user logout.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Handle user logout (revoke current Sanctum token).
      */
     public function logout(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
+        $user = $request->user();
         if ($user) {
             $user->currentAccessToken()?->delete();
         }
@@ -194,28 +181,27 @@ class AuthApiController extends Controller
 
     /**
      * Update authenticated user profile.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function updateProfile(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
+        $user = $request->user();
         if (!$user) {
-            if (app()->environment('local', 'testing')) {
-                $uid = $request->input('user_id') ?: $request->input('id', 1);
-                $user = User::find($uid);
-            }
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
-        }
+        $request->validate([
+            'name'    => 'nullable|string|max:255',
+            'phone'   => 'nullable|string|max:50',
+            'address' => 'nullable|string|max:500',
+            'city'    => 'nullable|string|max:100',
+            'zip'     => 'nullable|string|max:20',
+            'avatar'  => 'nullable|string|max:500',
+        ]);
 
         $fillableFields = ['name', 'phone', 'address', 'city', 'zip', 'avatar'];
         foreach ($fillableFields as $field) {
             if ($request->has($field)) {
-                $user->{$field} = $request->input($field);
+                $user->{$field} = trim($request->input($field));
             }
         }
 
@@ -227,26 +213,23 @@ class AuthApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profil berhasil diperbarui.',
-            'user' => $userData,
+            'user'    => $userData,
         ]);
     }
 
     /**
-     * Change user password.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Change user password with old password validation and token revocation.
      */
     public function changePassword(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
+        $user = $request->user();
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $request->validate([
             'current_password' => 'required|string',
-            'new_password' => 'required|string|min:6',
+            'new_password'     => 'required|string|min:6',
         ]);
 
         if (!Hash::check($request->input('current_password'), $user->password)) {
@@ -259,9 +242,14 @@ class AuthApiController extends Controller
         $user->password = Hash::make($request->input('new_password'));
         $user->save();
 
+        // Security hardening: Revoke existing tokens and issue a fresh one
+        $user->tokens()->delete();
+        $newToken = $user->createToken('pasaria_auth_token')->plainTextToken;
+
         return response()->json([
             'success' => true,
-            'message' => 'Kata sandi berhasil diperbarui.',
+            'message' => 'Kata sandi berhasil diperbarui. Sesi lama telah dicabut.',
+            'token'   => $newToken,
         ]);
     }
 }
