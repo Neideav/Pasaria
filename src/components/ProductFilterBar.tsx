@@ -185,15 +185,15 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
             aria-haspopup="true"
             aria-expanded={activeDropdown === 'category'}
             aria-label={`Filter Kategori: ${categoryBtnLabel}`}
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
+            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
               isCategoryActive
-                ? 'bg-[#003d29] text-white border-[#003d29]'
+                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
                 : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
             }`}
           >
             <span>{categoryBtnLabel}</span>
             <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+              className={`w-3.5 h-3.5 transition-transform duration-200 ease-[var(--ease-out)] ${
                 isCategoryActive ? 'text-white' : 'opacity-60'
               } ${activeDropdown === 'category' ? 'rotate-180' : ''}`}
             />
@@ -206,15 +206,15 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
             aria-haspopup="true"
             aria-expanded={activeDropdown === 'price'}
             aria-label={`Filter Rentang Harga: ${priceBtnLabel}`}
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
+            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
               isPriceActive
-                ? 'bg-[#003d29] text-white border-[#003d29]'
+                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
                 : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
             }`}
           >
             <span>{priceBtnLabel}</span>
             <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+              className={`w-3.5 h-3.5 transition-transform duration-200 ease-[var(--ease-out)] ${
                 isPriceActive ? 'text-white' : 'opacity-60'
               } ${activeDropdown === 'price' ? 'rotate-180' : ''}`}
             />
@@ -227,15 +227,15 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
             aria-haspopup="true"
             aria-expanded={activeDropdown === 'rating'}
             aria-label={`Filter Rating: ${ratingBtnLabel}`}
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
+            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
               isRatingActive
-                ? 'bg-[#003d29] text-white border-[#003d29]'
+                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
                 : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
             }`}
           >
             <span>{ratingBtnLabel}</span>
             <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+              className={`w-3.5 h-3.5 transition-transform duration-200 ease-[var(--ease-out)] ${
                 isRatingActive ? 'text-white' : 'opacity-60'
               } ${activeDropdown === 'rating' ? 'rotate-180' : ''}`}
             />
@@ -253,9 +253,9 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
             }}
             aria-pressed={filters.minPrice === 0 && filters.maxPrice === 1500000}
             aria-label="Filter Promo Spesial"
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
+            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
               filters.minPrice === 0 && filters.maxPrice === 1500000
-                ? 'bg-[#003d29] text-white border-[#003d29]'
+                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
                 : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
             }`}
           >
@@ -269,7 +269,7 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
               type="button"
               onClick={onResetFilters}
               aria-label="Reset semua filter"
-              className="min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 cursor-pointer shrink-0 snap-start"
+              className="min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 cursor-pointer shrink-0 snap-start"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reset Filter</span>
@@ -279,7 +279,7 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
               type="button"
               onClick={(e) => toggleDropdown('category', e)}
               aria-label="Buka pilihan filter"
-              className="min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 bg-slate-100/90 text-slate-700 border border-slate-200/60 hover:bg-slate-200/80 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0 snap-start"
+              className="min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 bg-slate-100/90 text-slate-700 border border-slate-200/60 hover:bg-slate-200/80 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0 snap-start"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 opacity-60" />
               <span>Semua Filter</span>
@@ -296,11 +296,11 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
             aria-haspopup="true"
             aria-expanded={activeDropdown === 'sort'}
             aria-label={`Urutkan produk: ${currentSortLabel}`}
-            className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold bg-white text-slate-800 border border-slate-200 hover:border-slate-300 shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0"
+            className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold bg-white text-slate-800 border border-slate-200 hover:border-slate-300 shadow-2xs motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0"
           >
             <span>{currentSortLabel}</span>
             <ChevronDown
-              className={`w-3.5 h-3.5 opacity-60 transition-transform duration-200 ${
+              className={`w-3.5 h-3.5 opacity-60 transition-transform duration-200 ease-[var(--ease-out)] ${
                 activeDropdown === 'sort' ? 'rotate-180' : ''
               }`}
             />
@@ -310,7 +310,8 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
             <div
               role="menu"
               aria-label="Pilihan Urutan"
-              className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 animate-in fade-in"
+              style={{ transformOrigin: 'top right' }}
+              className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 motion-popover"
             >
               {sortOptions.map((s) => {
                 const isSortActive = filters.sort === s.value;
@@ -323,7 +324,7 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
                       onChangeFilters({ sort: s.value });
                       setActiveDropdown(null);
                     }}
-                    className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
+                    className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
                   >
                     <span
                       className={
@@ -346,8 +347,8 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
         <div
           role="menu"
           aria-label="Pilih Kategori Produk"
-          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left } : undefined}
-          className="absolute mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in"
+          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left, transformOrigin: 'top center' } : { transformOrigin: 'top center' }}
+          className="absolute mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 motion-popover"
         >
           <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Pilih Kategori
@@ -366,7 +367,7 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
                     onChangeFilters({ category: cat.value });
                     setActiveDropdown(null);
                   }}
-                  className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
+                  className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
                 >
                   <span className={isCatActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
                     {cat.label}
@@ -383,8 +384,8 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
         <div
           role="menu"
           aria-label="Pilih Rentang Harga"
-          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left } : undefined}
-          className="absolute mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in"
+          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left, transformOrigin: 'top center' } : { transformOrigin: 'top center' }}
+          className="absolute mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 motion-popover"
         >
           <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Rentang Harga
@@ -401,7 +402,7 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
                   onChangeFilters({ minPrice: tier.min, maxPrice: tier.max });
                   setActiveDropdown(null);
                 }}
-                className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
+                className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
               >
                 <span className={isTierActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
                   {tier.label}
@@ -417,8 +418,8 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
         <div
           role="menu"
           aria-label="Pilih Rating Ulasan"
-          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left } : undefined}
-          className="absolute mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in"
+          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left, transformOrigin: 'top center' } : { transformOrigin: 'top center' }}
+          className="absolute mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 motion-popover"
         >
           <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Minimal Rating
@@ -435,7 +436,7 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
                   onChangeFilters({ minRating: r.rating });
                   setActiveDropdown(null);
                 }}
-                className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
+                className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
               >
                 <span className={isTierActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
                   {r.label}

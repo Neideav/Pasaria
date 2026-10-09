@@ -21,6 +21,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 }) => {
   const [justAdded, setJustAdded] = useState(false);
   const [favorited, setFavorited] = useState(isWishlisted);
+  const [justFavorited, setJustFavorited] = useState(false);
 
   const isCurrentlyFavorited = favorited || Boolean(product.is_wishlisted);
 
@@ -35,7 +36,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   const handleHeartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavorited(!isCurrentlyFavorited);
+    const nextState = !isCurrentlyFavorited;
+    setFavorited(nextState);
+    if (nextState) {
+      setJustFavorited(true);
+      setTimeout(() => setJustFavorited(false), 300);
+    }
     if (onToggleWishlist) {
       onToggleWishlist(product, e);
     }
@@ -55,7 +61,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       tabIndex={0}
       onClick={() => onSelect(product)}
       onKeyDown={handleKeyDown}
-      className="group relative flex flex-col justify-between bg-white rounded-2xl p-4 border border-slate-100 hover:border-slate-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:ring-offset-2 transition-all duration-200 cursor-pointer text-left"
+      className="group relative flex flex-col justify-between bg-white rounded-2xl p-4 border border-slate-100 hover:border-slate-200 hover:shadow-lg hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:ring-offset-2 transition-[transform,box-shadow,border-color] duration-200 ease-[var(--ease-out)] cursor-pointer text-left motion-reduce:hover:translate-y-0"
     >
       {/* Top Section: Badges, Wishlist Heart & Image */}
       <div>
@@ -71,14 +77,14 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           <button
             type="button"
             onClick={handleHeartClick}
-            className="w-12 h-12 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+            className="w-12 h-12 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 motion-press active:scale-[0.85] transition-[transform,background-color,color] duration-160 ease-[var(--ease-out)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
             aria-label={isCurrentlyFavorited ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}
           >
             <Heart
-              className={`w-4 h-4 transition-colors ${
+              className={`w-4 h-4 transition-transform duration-200 ease-[var(--ease-out)] ${
                 isCurrentlyFavorited
-                  ? 'fill-rose-500 text-rose-500'
-                  : 'text-slate-400'
+                  ? `fill-rose-500 text-rose-500 ${justFavorited ? 'scale-125' : 'scale-110'}`
+                  : 'text-slate-400 scale-100'
               }`}
             />
           </button>
@@ -90,7 +96,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             imageKey={product.image}
             name={product.name}
             size="md"
-            className="transform transition-transform duration-300 group-hover:scale-105"
+            className="transform transition-transform duration-250 ease-[var(--ease-out)] group-hover:scale-105 motion-reduce:transform-none"
           />
         </div>
 
@@ -147,9 +153,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           type="button"
           onClick={handleAddClick}
           aria-label="Tambah ke keranjang"
-          className={`w-full py-2.5 px-4 min-h-[44px] rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
+          className={`w-full py-2.5 px-4 min-h-[44px] rounded-full text-xs sm:text-sm font-semibold motion-press active:scale-[0.96] transition-[transform,background-color,color,border-color,box-shadow] duration-120 ease-[var(--ease-out)] cursor-pointer flex items-center justify-center gap-1.5 ${
             justAdded
-              ? 'bg-[#003d29] text-white'
+              ? 'bg-[#003d29] text-white shadow-xs'
               : 'bg-white hover:bg-slate-900 hover:text-white text-slate-800 border border-slate-300 hover:border-slate-900 shadow-2xs'
           }`}
         >

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Truck,
   RotateCcw,
@@ -58,7 +58,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [addedSuccess, setAddedSuccess] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(Boolean(product.is_wishlisted));
+  const [justWishlisted, setJustWishlisted] = useState(false);
   const [isFollowingShop, setIsFollowingShop] = useState(false);
+
+  // Motion #16: Momentary blur & crossfade on gallery switch
+  const [isImageTransitioning, setIsImageTransitioning] = useState(false);
+  const imageTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Motion #20: Reviews & Q&A tab state
+  const [activeTab, setActiveTab] = useState<'reviews' | 'qa'>('reviews');
 
   // Reviews state
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -79,6 +87,27 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
     loadReviewsAndQA();
   }, [product.id]);
+
+  useEffect(() => {
+    return () => {
+      if (imageTransitionTimeoutRef.current) {
+        clearTimeout(imageTransitionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleSelectColor = (colorName: string, hex: string) => {
+    if (colorName === selectedColor) return;
+    setIsImageTransitioning(true);
+    if (imageTransitionTimeoutRef.current) {
+      clearTimeout(imageTransitionTimeoutRef.current);
+    }
+    setSelectedColor(colorName);
+    setSelectedHex(hex);
+    imageTransitionTimeoutRef.current = setTimeout(() => {
+      setIsImageTransitioning(false);
+    }, 180);
+  };
 
   const loadReviewsAndQA = async () => {
     const [reviewsResult, questionsResult] = await Promise.allSettled([
@@ -119,6 +148,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       } else {
         await api.addToWishlist(product.id);
         setIsWishlisted(true);
+        setJustWishlisted(true);
+        setTimeout(() => setJustWishlisted(false), 300);
       }
     } catch (e) {
       console.warn('Wishlist toggle note:', e);
@@ -194,11 +225,17 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <button
                 type="button"
                 onClick={handleToggleWishlist}
-                className="w-11 h-11 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 motion-press active:scale-[0.85] transition-[transform,background-color,color] duration-160 ease-[var(--ease-out)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                 title="Wishlist"
                 aria-label={isWishlisted ? 'Hapus dari wishlist' : 'Tambah ke wishlist'}
               >
-                <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
+                <Heart
+                  className={`w-4 h-4 transition-transform duration-200 ease-[var(--ease-out)] ${
+                    isWishlisted
+                      ? `fill-rose-500 text-rose-500 ${justWishlisted ? 'scale-125' : 'scale-110'}`
+                      : 'text-slate-400 scale-100'
+                  }`}
+                />
               </button>
               <button
                 type="button"
@@ -206,7 +243,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   navigator.clipboard.writeText(window.location.href);
                   showToast('Tautan produk berhasil disalin ke papan klip!', 'success');
                 }}
-                className="w-11 h-11 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-full bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 motion-press active:scale-[0.88] transition-[transform,background-color,color] duration-160 ease-[var(--ease-out)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                 title="Bagikan"
                 aria-label="Bagikan produk"
               >
@@ -214,16 +251,22 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
             </div>
 
-            {/* Main Interactive Graphic */}
-            <ProductVisual
-              imageKey={product.image}
-              name={product.name}
-              colorHex={selectedHex}
-              size="lg"
-            />
+            {/* Main Interactive Graphic - Motion #16: Momentary blur & opacity crossfade */}
+            <div
+              className={`transition-[filter,opacity] duration-180 ease-[var(--ease-out)] ${
+                isImageTransitioning ? 'blur-[2px] opacity-70' : 'blur-0 opacity-100'
+              }`}
+            >
+              <ProductVisual
+                imageKey={product.image}
+                name={product.name}
+                colorHex={selectedHex}
+                size="lg"
+              />
+            </div>
           </div>
 
-          {/* Color Thumbnails */}
+          {/* Color Thumbnails - Motion #18: Ring selection spring */}
           <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 pt-2">
             {colors.map((c) => {
               const isSelected = selectedColor === c.name;
@@ -231,11 +274,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <button
                   key={c.name}
                   type="button"
-                  onClick={() => {
-                    setSelectedColor(c.name);
-                    setSelectedHex(c.hex);
-                  }}
-                  className={`min-h-[44px] rounded-xl bg-[#f8f9fa] p-2 border-2 transition-all flex flex-col items-center justify-center cursor-pointer ${
+                  onClick={() => handleSelectColor(c.name, c.hex)}
+                  className={`min-h-[44px] rounded-xl bg-[#f8f9fa] p-2 border-2 motion-press active:scale-[0.96] transition-[box-shadow,border-color,transform] duration-180 ease-[var(--ease-out)] flex flex-col items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] ${
                     isSelected
                       ? 'border-[#003d29] shadow-xs'
                       : 'border-transparent hover:border-slate-300'
@@ -306,7 +346,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </p>
           </div>
 
-          {/* Product Variants (Storage, Type, etc.) */}
+          {/* Product Variants (Storage, Type, etc.) - Motion #18: Ring selection spring */}
           {product.variants && product.variants.length > 0 && (
             <div className="border-t border-slate-100 pt-5 space-y-3">
               <div className="text-xs font-semibold text-slate-800">
@@ -323,7 +363,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       key={v.id}
                       type="button"
                       onClick={() => setSelectedVariant(v)}
-                      className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer inline-flex items-center justify-center gap-1.5 ${
+                      className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-semibold motion-press active:scale-[0.96] transition-[box-shadow,border-color,background-color,color,transform] duration-180 ease-[var(--ease-out)] border cursor-pointer inline-flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] ${
                         isSelected
                           ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
@@ -339,7 +379,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
           )}
 
-          {/* Color Selector */}
+          {/* Color Selector - Motion #18: Swatch ring selection spring */}
           <div className="border-t border-slate-100 pt-5 space-y-3">
             <div className="text-xs font-semibold text-slate-800">
               Pilihan Warna: <span className="text-slate-500 font-normal">{selectedColor}</span>
@@ -351,13 +391,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   <button
                     key={c.name}
                     type="button"
-                    onClick={() => {
-                      setSelectedColor(c.name);
-                      setSelectedHex(c.hex);
-                    }}
-                    className={`w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                    onClick={() => handleSelectColor(c.name, c.hex)}
+                    className={`w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center motion-press active:scale-[0.92] transition-[box-shadow,border-color,transform] duration-180 ease-[var(--ease-out)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] ${
                       isSelected
-                        ? 'ring-2 ring-offset-2 ring-[#003d29] shadow-sm'
+                        ? 'ring-2 ring-offset-2 ring-[#003d29] shadow-sm scale-105'
                         : 'hover:scale-105 border border-slate-200/60'
                     }`}
                     style={{ backgroundColor: c.hex }}
@@ -373,13 +410,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
           </div>
 
-          {/* Quantity & Stock */}
+          {/* Quantity & Stock - Motion #17: Tactile click pulse */}
           <div className="border-t border-slate-100 pt-5 flex flex-wrap items-center gap-6">
             <div className="flex items-center bg-slate-100/90 rounded-full p-1 border border-slate-200/60">
               <button
                 type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-11 h-11 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 active:bg-slate-200 transition-colors cursor-pointer disabled:opacity-30 disabled:hover:bg-transparent"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 active:bg-slate-200 motion-press active:scale-[0.92] transition-[transform,background-color,color] duration-120 ease-[var(--ease-out)] cursor-pointer disabled:opacity-30 disabled:hover:bg-transparent disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
                 disabled={quantity <= 1}
                 aria-label="Kurangi kuantitas"
               >
@@ -392,7 +429,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 type="button"
                 onClick={() => setQuantity(Math.min(currentStock || 99, quantity + 1))}
                 disabled={quantity >= currentStock}
-                className="w-11 h-11 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 active:bg-slate-200 transition-colors cursor-pointer disabled:opacity-30 disabled:hover:bg-transparent"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 active:bg-slate-200 motion-press active:scale-[0.92] transition-[transform,background-color,color] duration-120 ease-[var(--ease-out)] cursor-pointer disabled:opacity-30 disabled:hover:bg-transparent disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
                 aria-label="Tambah kuantitas"
               >
                 <Plus className="w-4 h-4" />
@@ -411,7 +448,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <button
               type="button"
               onClick={handleBuy}
-              className="w-full sm:w-1/2 py-3.5 px-6 min-h-[48px] rounded-full font-bold text-white bg-[#003d29] hover:bg-[#064e3b] active:scale-[0.99] shadow-md shadow-emerald-950/10 text-sm transition-all cursor-pointer"
+              className="w-full sm:w-1/2 py-3.5 px-6 min-h-[48px] rounded-full font-bold text-white bg-[#003d29] hover:bg-[#064e3b] motion-press active:scale-[0.97] transition-[transform,background-color] duration-120 ease-[var(--ease-out)] shadow-md shadow-emerald-950/10 text-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
             >
               Beli Sekarang
             </button>
@@ -419,7 +456,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               type="button"
               onClick={handleAdd}
               aria-label="Tambah ke keranjang belanja"
-              className={`w-full sm:w-1/2 py-3.5 px-6 min-h-[48px] rounded-full font-semibold text-sm transition-all border cursor-pointer flex items-center justify-center gap-2 ${
+              className={`w-full sm:w-1/2 py-3.5 px-6 min-h-[48px] rounded-full font-semibold text-sm motion-press active:scale-[0.97] transition-[transform,background-color,border-color,color] duration-120 ease-[var(--ease-out)] border cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
                 addedSuccess
                   ? 'bg-slate-900 text-white border-slate-900'
                   : 'bg-white text-slate-800 border-slate-300 hover:border-slate-800 hover:bg-slate-50 shadow-2xs'
@@ -466,7 +503,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <button
                   type="button"
                   onClick={handleToggleFollowShop}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  className={`py-2 px-3 rounded-xl text-xs font-bold motion-press active:scale-[0.96] transition-[transform,background-color,border-color,color] duration-160 ease-[var(--ease-out)] border cursor-pointer ${
                     isFollowingShop
                       ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                       : 'bg-white hover:bg-emerald-50 text-[#003d29] border-emerald-200 shadow-2xs'
@@ -479,7 +516,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <button
                   type="button"
                   onClick={() => onOpenChatWithShop(product.shop_id!)}
-                  className="p-2 rounded-xl bg-white hover:bg-emerald-50 text-[#003d29] border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
+                  className="p-2 rounded-xl bg-white hover:bg-emerald-50 text-[#003d29] border border-emerald-200 motion-press active:scale-[0.92] transition-[transform,background-color] duration-160 ease-[var(--ease-out)] shadow-2xs cursor-pointer"
                   title="Chat Penjual"
                 >
                   <MessageCircle className="w-4 h-4" />
@@ -489,7 +526,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <button
                   type="button"
                   onClick={() => onViewShop(product.shop_name || 'PASARIA Official Store', product.shop_id)}
-                  className="py-2 px-3.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
+                  className="py-2 px-3.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs motion-press active:scale-[0.96] transition-[transform,background-color] duration-160 ease-[var(--ease-out)] shadow-2xs cursor-pointer"
                 >
                   Kunjungi Toko
                 </button>
@@ -583,211 +620,275 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         </div>
       </div>
 
-      {/* Ratings & Reviews Section (Verified Purchase) */}
+      {/* Motion #20: Reviews and Q&A Section with Tab Crossfade Transition */}
       <div className="mt-16 border-t border-slate-100 pt-10">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-              Ulasan & Penilaian Pembeli
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Ulasan asli dari pembeli yang telah menyelesaikan transaksi di PASARIA.
-            </p>
-          </div>
-          {onOpenReviewModal && (
-            <button
-              type="button"
-              onClick={() => onOpenReviewModal(product)}
-              className="px-5 py-2.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            >
-              + Beri Ulasan
-            </button>
-          )}
+        {/* Tab Controls */}
+        <div className="flex items-center gap-3 border-b border-slate-200 pb-px mb-8">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'reviews'}
+            onClick={() => setActiveTab('reviews')}
+            className={`min-h-[44px] pb-3 px-3 text-base sm:text-lg font-bold inline-flex items-center gap-2 border-b-2 motion-press active:scale-[0.98] transition-[color,border-color,transform] duration-160 ease-[var(--ease-out)] cursor-pointer ${
+              activeTab === 'reviews'
+                ? 'border-[#003d29] text-[#003d29]'
+                : 'border-transparent text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            <Star className={`w-4 h-4 ${activeTab === 'reviews' ? 'fill-emerald-600 text-emerald-600' : 'text-slate-400'}`} />
+            <span>Ulasan Pembeli</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full tabular-nums font-semibold transition-colors ${
+              activeTab === 'reviews'
+                ? 'bg-emerald-50 text-[#003d29]'
+                : 'bg-slate-100 text-slate-500'
+            }`}>
+              {reviews.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'qa'}
+            onClick={() => setActiveTab('qa')}
+            className={`min-h-[44px] pb-3 px-3 text-base sm:text-lg font-bold inline-flex items-center gap-2 border-b-2 motion-press active:scale-[0.98] transition-[color,border-color,transform] duration-160 ease-[var(--ease-out)] cursor-pointer ${
+              activeTab === 'qa'
+                ? 'border-[#003d29] text-[#003d29]'
+                : 'border-transparent text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            <HelpCircle className={`w-4 h-4 ${activeTab === 'qa' ? 'text-[#003d29]' : 'text-slate-400'}`} />
+            <span>Tanya Jawab</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full tabular-nums font-semibold transition-colors ${
+              activeTab === 'qa'
+                ? 'bg-emerald-50 text-[#003d29]'
+                : 'bg-slate-100 text-slate-500'
+            }`}>
+              {questions.length}
+            </span>
+          </button>
         </div>
 
-        {/* Rating Breakdown Bars */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-2xs mb-8">
-          <div className="md:col-span-4 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-100 pb-6 md:pb-0 md:pr-6">
-            <span className="text-5xl font-black text-slate-900 tabular-nums">
-              {Number(product.rating || 5).toFixed(1)}
-            </span>
-            <div className="flex text-amber-400 my-2 text-base">★★★★★</div>
-            <span className="text-xs text-slate-400">
-              Berdasarkan <span className="tabular-nums">{reviews.length}</span> ulasan terverifikasi
-            </span>
-          </div>
-
-          <div className="md:col-span-8 space-y-2 text-xs">
-            {[5, 4, 3, 2, 1].map((stars) => {
-              const count = reviewBreakdown ? reviewBreakdown[stars] || 0 : stars === 5 ? reviews.length : 0;
-              const total = reviews.length || 1;
-              const percent = Math.round((count / total) * 100);
-              return (
-                <div key={stars} className="flex items-center gap-3">
-                  <span className="w-10 font-bold text-slate-700 flex items-center gap-1">
-                    <span className="tabular-nums">{stars}</span> <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  </span>
-                  <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                  <span className="w-12 text-right text-slate-400 font-semibold tabular-nums">
-                    {count} ({percent}%)
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Reviews List */}
-        <div className="space-y-4">
-          {reviews.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs bg-slate-50/50 rounded-2xl">
-              Belum ada ulasan untuk produk ini. Jadilah pembeli pertama yang memberikan ulasan!
-            </div>
-          ) : (
-            reviews.map((r) => (
-              <div
-                key={r.id}
-                className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs space-y-3 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-[#003d29] font-bold flex items-center justify-center text-xs">
-                      {r.is_anonymous ? 'U' : (r.user?.name ? r.user.name.charAt(0) : 'U')}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">
-                        {r.is_anonymous ? 'Pengguna PASARIA' : (r.user?.name || 'Pembeli Terverifikasi')}
-                      </span>
-                      {r.is_verified_purchase && (
-                        <span className="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                          ✓ Pembelian Terverifikasi
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 text-amber-400">
-                    {'★'.repeat(r.rating)}
-                    <span className="text-slate-400 text-[11px] ml-1">
-                      {formatDateTime(r.created_at)}
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-slate-700 leading-relaxed font-normal">
-                  {r.review_text}
+        {/* Tab 1: Ratings & Reviews */}
+        {activeTab === 'reviews' && (
+          <div
+            role="tabpanel"
+            aria-label="Ulasan Pembeli"
+            key="reviews-tab"
+            className="motion-tab-pane"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                  Ulasan & Penilaian Pembeli
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Ulasan asli dari pembeli yang telah menyelesaikan transaksi di PASARIA.
                 </p>
-
-                {/* Seller Reply Display */}
-                {r.seller_reply && (
-                  <div className="p-3.5 rounded-xl bg-slate-50 border-l-4 border-[#003d29] space-y-1">
-                    <div className="font-bold text-[#003d29] text-[11px] flex items-center gap-1.5">
-                      <Store className="w-3.5 h-3.5" />
-                      <span>Respon dari Penjual:</span>
-                    </div>
-                    <p className="text-slate-600 text-xs leading-relaxed">
-                      {r.seller_reply}
-                    </p>
-                  </div>
-                )}
               </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Product Questions & Answers (Q&A) */}
-      <div className="mt-16 border-t border-slate-100 pt-10">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <HelpCircle className="w-5 h-5 text-[#003d29]" />
-              Tanya Jawab Produk (<span className="tabular-nums">{questions.length}</span>)
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Ada pertanyaan seputar produk ini? Tanyakan langsung kepada penjual.
-            </p>
-          </div>
-        </div>
-
-        {/* Ask Question Form */}
-        <form onSubmit={handleAskQuestion} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-2xs mb-6 text-xs">
-          {questionSuccess && (
-            <div className="p-3 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold flex items-center gap-2">
-              <Check className="w-4 h-4" />
-              <span>Pertanyaan Anda berhasil dikirim! Penjual akan segera menjawab.</span>
+              {onOpenReviewModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenReviewModal(product)}
+                  className="px-5 py-2.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold motion-press active:scale-[0.96] transition-[transform,background-color] duration-160 ease-[var(--ease-out)] cursor-pointer shadow-2xs"
+                >
+                  + Beri Ulasan
+                </button>
+              )}
             </div>
-          )}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newQuestionText}
-              onChange={(e) => setNewQuestionText(e.target.value)}
-              placeholder="Contoh: Apakah barang ini bergaransi resmi Indonesia? Warna hitam ready?"
-              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#003d29] focus:outline-none text-xs"
-            />
-            <button
-              type="submit"
-              disabled={!newQuestionText.trim() || submittingQuestion}
-              className="px-5 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold transition-all disabled:opacity-40 cursor-pointer flex items-center gap-1.5 shrink-0"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Tanya</span>
-            </button>
-          </div>
-        </form>
 
-        {/* Questions List */}
-        <div className="space-y-4">
-          {questions.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-xs bg-slate-50/50 rounded-2xl">
-              Belum ada pertanyaan untuk produk ini.
+            {/* Rating Breakdown Bars */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-2xs mb-8">
+              <div className="md:col-span-4 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-100 pb-6 md:pb-0 md:pr-6">
+                <span className="text-5xl font-black text-slate-900 tabular-nums">
+                  {Number(product.rating || 5).toFixed(1)}
+                </span>
+                <div className="flex text-amber-400 my-2 text-base">★★★★★</div>
+                <span className="text-xs text-slate-400">
+                  Berdasarkan <span className="tabular-nums">{reviews.length}</span> ulasan terverifikasi
+                </span>
+              </div>
+
+              <div className="md:col-span-8 space-y-2 text-xs">
+                {[5, 4, 3, 2, 1].map((stars) => {
+                  const count = reviewBreakdown ? reviewBreakdown[stars] || 0 : stars === 5 ? reviews.length : 0;
+                  const total = reviews.length || 1;
+                  const percent = Math.round((count / total) * 100);
+                  return (
+                    <div key={stars} className="flex items-center gap-3">
+                      <span className="w-10 font-bold text-slate-700 flex items-center gap-1">
+                        <span className="tabular-nums">{stars}</span> <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      </span>
+                      <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <span className="w-12 text-right text-slate-400 font-semibold tabular-nums">
+                        {count} ({percent}%)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ) : (
-            questions.map((q) => (
-              <div key={q.id} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-2xs space-y-3 text-xs">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
-                    Q
-                  </div>
-                  <div>
-                    <span className="font-bold text-slate-900">{q.question}</span>
-                    <span className="text-[10px] text-slate-400 ml-2">{formatDateTime(q.created_at)}</span>
-                  </div>
+
+            {/* Reviews List */}
+            <div className="space-y-4">
+              {reviews.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs bg-slate-50/50 rounded-2xl">
+                  Belum ada ulasan untuk produk ini. Jadilah pembeli pertama yang memberikan ulasan!
                 </div>
+              ) : (
+                reviews.map((r) => (
+                  <div
+                    key={r.id}
+                    className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs space-y-3 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-[#003d29] font-bold flex items-center justify-center text-xs">
+                          {r.is_anonymous ? 'U' : (r.user?.name ? r.user.name.charAt(0) : 'U')}
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-900">
+                            {r.is_anonymous ? 'Pengguna PASARIA' : (r.user?.name || 'Pembeli Terverifikasi')}
+                          </span>
+                          {r.is_verified_purchase && (
+                            <span className="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                              ✓ Pembelian Terverifikasi
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-amber-400">
+                        {'★'.repeat(r.rating)}
+                        <span className="text-slate-400 text-[11px] ml-1">
+                          {formatDateTime(r.created_at)}
+                        </span>
+                      </div>
+                    </div>
 
-                {q.answers && q.answers.length > 0 ? (
-                  q.answers.map((ans) => (
-                    <div key={ans.id} className="ml-8 p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-start gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-emerald-100 text-[#003d29] font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
-                        A
+                    <p className="text-slate-700 leading-relaxed font-normal">
+                      {r.review_text}
+                    </p>
+
+                    {/* Seller Reply Display */}
+                    {r.seller_reply && (
+                      <div className="p-3.5 rounded-xl bg-slate-50 border-l-4 border-[#003d29] space-y-1">
+                        <div className="font-bold text-[#003d29] text-[11px] flex items-center gap-1.5">
+                          <Store className="w-3.5 h-3.5" />
+                          <span>Respon dari Penjual:</span>
+                        </div>
+                        <p className="text-slate-600 text-xs leading-relaxed">
+                          {r.seller_reply}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Product Questions & Answers (Q&A) */}
+        {activeTab === 'qa' && (
+          <div
+            role="tabpanel"
+            aria-label="Tanya Jawab Produk"
+            key="qa-tab"
+            className="motion-tab-pane"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5 text-[#003d29]" />
+                  Tanya Jawab Produk (<span className="tabular-nums">{questions.length}</span>)
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Ada pertanyaan seputar produk ini? Tanyakan langsung kepada penjual.
+                </p>
+              </div>
+            </div>
+
+            {/* Ask Question Form */}
+            <form onSubmit={handleAskQuestion} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-2xs mb-6 text-xs">
+              {questionSuccess && (
+                <div className="p-3 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  <span>Pertanyaan Anda berhasil dikirim! Penjual akan segera menjawab.</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newQuestionText}
+                  onChange={(e) => setNewQuestionText(e.target.value)}
+                  placeholder="Contoh: Apakah barang ini bergaransi resmi Indonesia? Warna hitam ready?"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#003d29] focus:outline-none text-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={!newQuestionText.trim() || submittingQuestion}
+                  className="px-5 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold motion-press active:scale-[0.96] transition-[transform,background-color] duration-120 ease-[var(--ease-out)] disabled:opacity-40 cursor-pointer flex items-center gap-1.5 shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Tanya</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Questions List */}
+            <div className="space-y-4">
+              {questions.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs bg-slate-50/50 rounded-2xl">
+                  Belum ada pertanyaan untuk produk ini.
+                </div>
+              ) : (
+                questions.map((q) => (
+                  <div key={q.id} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-2xs space-y-3 text-xs">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
+                        Q
                       </div>
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-[#003d29] text-[11px]">
-                            {ans.shop?.name || product.shop_name || 'Penjual Resmi'}
-                          </span>
-                          <span className="text-[9px] font-bold bg-emerald-200/70 text-[#003d29] px-1.5 py-0.2 rounded-full">
-                            Penjual
-                          </span>
-                        </div>
-                        <p className="text-slate-700 mt-1 leading-relaxed">{ans.answer}</p>
+                        <span className="font-bold text-slate-900">{q.question}</span>
+                        <span className="text-[10px] text-slate-400 ml-2">{formatDateTime(q.created_at)}</span>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="ml-8 text-[11px] text-slate-400 italic">
-                    Menunggu jawaban dari penjual...
+
+                    {q.answers && q.answers.length > 0 ? (
+                      q.answers.map((ans) => (
+                        <div key={ans.id} className="ml-8 p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-start gap-2.5">
+                          <div className="w-6 h-6 rounded-full bg-emerald-100 text-[#003d29] font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
+                            A
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-[#003d29] text-[11px]">
+                                {ans.shop?.name || product.shop_name || 'Penjual Resmi'}
+                              </span>
+                              <span className="text-[9px] font-bold bg-emerald-200/70 text-[#003d29] px-1.5 py-0.2 rounded-full">
+                                Penjual
+                              </span>
+                            </div>
+                            <p className="text-slate-700 mt-1 leading-relaxed">{ans.answer}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="ml-8 text-[11px] text-slate-400 italic">
+                        Menunggu jawaban dari penjual...
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Similar Items */}
@@ -811,8 +912,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         </div>
       )}
 
-      {/* Sticky Mobile Purchase Action Bar */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white border-t border-slate-200 z-30 flex items-center gap-3 shadow-lg">
+      {/* Motion #19: Sticky Mobile Purchase Action Bar Slide-Up Reveal */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white border-t border-slate-200 z-30 flex items-center gap-3 shadow-lg motion-sticky-bottom">
         <div className="flex flex-col min-w-0 flex-1">
           <span className="text-[10px] text-slate-400 font-medium">Total Harga</span>
           <span className="text-base font-extrabold text-[#003d29] tabular-nums truncate">
@@ -823,7 +924,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           type="button"
           onClick={handleAdd}
           aria-label="Tambah ke keranjang"
-          className={`px-4 py-2.5 min-h-[44px] rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+          className={`px-4 py-2.5 min-h-[44px] rounded-full text-xs font-semibold border motion-press active:scale-[0.96] transition-[transform,background-color,border-color,color] duration-120 ease-[var(--ease-out)] cursor-pointer flex items-center justify-center shrink-0 ${
             addedSuccess
               ? 'bg-slate-900 text-white border-slate-900'
               : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
@@ -838,7 +939,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         <button
           type="button"
           onClick={handleBuy}
-          className="px-5 py-2.5 min-h-[44px] rounded-full text-xs font-bold text-white bg-[#003d29] hover:bg-[#064e3b] active:scale-[0.99] transition-all cursor-pointer shrink-0"
+          className="px-5 py-2.5 min-h-[44px] rounded-full text-xs font-bold text-white bg-[#003d29] hover:bg-[#064e3b] motion-press active:scale-[0.96] transition-[transform,background-color] duration-120 ease-[var(--ease-out)] cursor-pointer shrink-0"
         >
           Beli Sekarang
         </button>
