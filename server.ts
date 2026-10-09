@@ -1,10 +1,26 @@
+/**
+ * ============================================================================
+ * PASARIA — Standalone Educational Sandbox (Legacy Express Implementation)
+ * ============================================================================
+ * ARCHITECTURAL NOTICE:
+ * The single source of truth and authoritative backend for PASARIA is Laravel 11 (PHP 8.2+).
+ * This Express server was part of an earlier standalone demonstration prototype.
+ * It is completely detached from the production runtime and Docker image build.
+ * It must NEVER be executed in production environments.
+ * ============================================================================
+ */
+if (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production') {
+  console.error('CRITICAL SECURITY ERROR: server.ts (Express Demo Server) cannot be executed in production environment.');
+  process.exit(1);
+}
+
 import express, { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import initSqlJs, { Database } from 'sql.js';
 
 let db: Database;
-let demoSqliMode = process.env.DEMO_SQLI_MODE !== 'false'; // Defaults to true for local demo
+let demoSqliMode = process.env.DEMO_SQLI_MODE === 'true'; // Strictly default to false unless explicitly set to true
 
 // Initial Seed Data
 const initialCategories = [

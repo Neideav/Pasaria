@@ -15,8 +15,8 @@ services:
       - .env
 
     volumes:
+      # Persistent volume for application storage, cache, session data, and media uploads
       - pasaria-storage:/var/www/html/storage
-      - ./.env:/var/www/html/.env
 
     networks:
       - pasaria-network
@@ -30,6 +30,9 @@ services:
 
 networks:
   pasaria-network:
+    driver: bridge
 
 volumes:
+  # Named volume preserves data across container updates and restarts
   pasaria-storage:
+    name: pasaria_storage_volume
