@@ -13,24 +13,31 @@ use Illuminate\Http\Request;
 class QuestionApiController extends Controller
 {
     /**
-     * Get list of questions and answers for a product.
+     * Get list of questions and answers for a product with pagination.
      */
-    public function index(int $productId): JsonResponse
+    public function index(Request $request, int $productId): JsonResponse
     {
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+
         $questions = ProductQuestion::with(['user', 'answers.shop'])
             ->where('product_id', $productId)
             ->where('status', 'approved')
             ->orderBy('id', 'desc')
-            ->get();
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => PublicQuestionResource::collection($questions)->resolve(),
+            'data' => PublicQuestionResource::collection($questions->items())->resolve(),
+            'pagination' => [
+                'current_page' => $questions->currentPage(),
+                'last_page'    => $questions->lastPage(),
+                'total'        => $questions->total(),
+            ],
         ]);
     }
 
     /**
-     * Buyer asks a question about a product.
+     * Buyer asks a question about a product with spam prevention.
      */
     public function store(Request $request): JsonResponse
     {
@@ -50,10 +57,26 @@ class QuestionApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
         }
 
+        $cleanedQuestion = trim($request->input('question'));
+
+        // Spam prevention: prevent identical question within last 10 minutes
+        $duplicate = ProductQuestion::where('product_id', $productId)
+            ->where('user_id', $user->id)
+            ->where('question', $cleanedQuestion)
+            ->where('created_at', '>=', now()->subMinutes(10))
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda sudah mengajukan pertanyaan yang sama baru-baru ini. Mohon tunggu tanggapan penjual.',
+            ], 429);
+        }
+
         $question = ProductQuestion::create([
             'product_id' => $productId,
             'user_id' => $user->id,
-            'question' => trim($request->input('question')),
+            'question' => $cleanedQuestion,
             'is_public' => true,
             'status' => 'approved',
         ]);

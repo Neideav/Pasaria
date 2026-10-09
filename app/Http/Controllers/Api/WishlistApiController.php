@@ -26,7 +26,7 @@ class WishlistApiController extends Controller
             ->get();
 
         $products = $wishlists->map(function ($w) {
-            if (!$w->product) return null;
+            if (!$w->product || (isset($w->product->is_active) && !$w->product->is_active)) return null;
             $arr = $w->product->toArray();
             $arr['price'] = (float) $w->product->price;
             $arr['is_wishlisted'] = true;
@@ -56,8 +56,8 @@ class WishlistApiController extends Controller
 
         $productId = (int) $request->input('product_id');
         $product = Product::find($productId);
-        if (!$product) {
-            return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
+        if (!$product || (isset($product->is_active) && !$product->is_active)) {
+            return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan atau sedang tidak aktif.'], 404);
         }
 
         $wishlist = Wishlist::firstOrCreate([

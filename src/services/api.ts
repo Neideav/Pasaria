@@ -79,10 +79,13 @@ const unauthorizedListeners: Set<UnauthorizedListener> = new Set();
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     'Accept': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
+
+  if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -242,6 +245,36 @@ export const api = {
   async deleteProduct(productId: number): Promise<{ success: boolean }> {
     return request<{ success: boolean }>(`/api/products/${productId}`, {
       method: 'DELETE',
+    });
+  },
+
+  async updateProduct(productId: number, productData: Partial<Product> | Record<string, any>): Promise<{ success: boolean; product: Product; message: string }> {
+    return request<{ success: boolean; product: Product; message: string }>(`/api/products/${productId}`, {
+      method: 'PUT',
+      body: JSON.stringify(productData),
+    });
+  },
+
+  async toggleProductStatus(productId: number, isActive?: boolean): Promise<{ success: boolean; is_active: boolean; message: string }> {
+    return request<{ success: boolean; is_active: boolean; message: string }>(`/api/products/${productId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(isActive !== undefined ? { is_active: isActive } : {}),
+    });
+  },
+
+  async uploadImage(file: File): Promise<{ success: boolean; url: string; path: string; filename: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<{ success: boolean; url: string; path: string; filename: string }>('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  async deleteUploadedImage(path: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/upload', {
+      method: 'DELETE',
+      body: JSON.stringify({ path }),
     });
   },
 

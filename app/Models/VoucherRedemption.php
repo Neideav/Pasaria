@@ -14,6 +14,7 @@ class VoucherRedemption extends Model
         'user_id',
         'order_id',
         'discount_amount',
+        'status',
     ];
 
     protected $casts = [

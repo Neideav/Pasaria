@@ -145,9 +145,27 @@ class PricingService
                 ->where('is_active', true)
                 ->first();
 
-            if ($voucher && $voucher->isValidForAmount($subtotal)) {
-                $voucherDiscount = $voucher->calculateDiscount($subtotal, $shippingCost);
-                $appliedVoucher = $voucher;
+            if ($voucher) {
+                $applicableSubtotal = $subtotal;
+                $isShopMatch = true;
+                if ($voucher->shop_id !== null) {
+                    $shopItemsSubtotal = 0.0;
+                    foreach ($calculatedItems as $cItem) {
+                        if ((int) $cItem['shop_id'] === (int) $voucher->shop_id) {
+                            $shopItemsSubtotal += $cItem['subtotal'];
+                        }
+                    }
+                    if ($shopItemsSubtotal <= 0) {
+                        $isShopMatch = false;
+                    } else {
+                        $applicableSubtotal = $shopItemsSubtotal;
+                    }
+                }
+
+                if ($isShopMatch && $voucher->isValidForAmount($applicableSubtotal, $userId, $voucher->shop_id)) {
+                    $voucherDiscount = $voucher->calculateDiscount($applicableSubtotal, $shippingCost, $userId, $voucher->shop_id);
+                    $appliedVoucher = $voucher;
+                }
             }
         }
 

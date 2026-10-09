@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\ReturnApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\ConfigApiController;
 use App\Http\Controllers\Api\PaymentWebhookController;
+use App\Http\Controllers\Api\UploadApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -135,6 +136,10 @@ Route::middleware(['auth:sanctum', 'account.active'])->group(function () {
     Route::get('/notifications', [NotificationApiController::class, 'index']);
     Route::post('/notifications/{id}/read', [NotificationApiController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationApiController::class, 'markAllAsRead']);
+
+    // Media & File Upload
+    Route::post('/upload', [UploadApiController::class, 'upload']);
+    Route::delete('/upload', [UploadApiController::class, 'delete']);
 });
 
 // =========================================================================
@@ -152,6 +157,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'role:seller,admin'])->grou
 
     // Seller Catalog Management
     Route::post('/products', [ProductApiController::class, 'store']);
+    Route::put('/products/{id}', [ProductApiController::class, 'update']);
+    Route::patch('/products/{id}/status', [ProductApiController::class, 'toggleStatus']);
     Route::delete('/products/{id}', [ProductApiController::class, 'destroy']);
     Route::put('/shops/{id}', [ShopApiController::class, 'update']);
 

@@ -110,7 +110,10 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
 | GET | /api/products | Api\ProductApiController@index | Public |
+| POST,PUT,DELETE | /api/products | Api\ProductApiController | Seller / Admin |
+| PATCH | /api/products/{id}/status | Api\ProductApiController@toggleStatus | Seller / Admin |
 | GET | /api/products/{slug} | Api\ProductApiController@show | Public |
+| POST,DELETE | /api/upload | Api\UploadApiController | Authenticated |
 | GET,POST | /api/cart | Api\CartApiController | Public or Authenticated |
 | POST | /api/orders/calculate | Api\OrderApiController@calculate | Authenticated |
 | GET,POST | /api/orders | Api\OrderApiController | Authenticated |

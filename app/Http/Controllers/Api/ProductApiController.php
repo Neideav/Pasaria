@@ -332,7 +332,199 @@ class ProductApiController extends Controller
     }
 
     /**
-     * Delete a product by ID with strict ownership authorization.
+     * Update an existing product. Strictly authorized to the owning Seller or Admin.
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        if (!$user->isSeller() && !$user->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya penjual atau administrator yang dapat mengubah produk.',
+            ], 403);
+        }
+
+        $product = Product::with(['variants', 'shop'])->find($id);
+        if (!$product) {
+            return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
+        }
+
+        // Ownership check: seller must own product's shop, or user must be admin
+        if (!$user->isAdmin()) {
+            if (!$user->shop || $user->shop->id !== $product->shop_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki hak untuk mengubah produk toko lain.',
+                ], 403);
+            }
+            if ($user->shop->status !== 'approved') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Toko Anda belum disetujui atau sedang ditangguhkan.',
+                ], 403);
+            }
+        }
+
+        // Protection against internal fields manipulation
+        if ($request->has('rating') || $request->has('review_count')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Field rating atau review_count tidak boleh dimanipulasi secara manual.',
+            ], 422);
+        }
+
+        if ($request->has('shop_id') && !$user->isAdmin()) {
+            if ((int) $request->input('shop_id') !== (int) $product->shop_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kepemilikan toko produk tidak dapat diubah.',
+                ], 403);
+            }
+        }
+
+        $request->validate([
+            'name'           => 'sometimes|required|string|max:255',
+            'category'       => 'sometimes|required|string|max:100',
+            'price'          => 'sometimes|required|numeric|min:0',
+            'original_price' => 'nullable|numeric|min:0',
+            'stock'          => 'sometimes|required|integer|min:0|max:1000000',
+            'short_desc'     => 'nullable|string|max:500',
+            'description'    => 'nullable|string',
+            'image'          => 'nullable|string|max:500',
+            'is_active'      => 'nullable|boolean',
+            'variants'       => 'nullable|array',
+            'variants.*.name'=> 'required_with:variants|string|max:100',
+            'variants.*.price'=> 'required_with:variants|numeric|min:0',
+            'variants.*.stock'=> 'required_with:variants|integer|min:0',
+        ]);
+
+        if ($request->has('name') && trim($request->input('name')) !== $product->name) {
+            $product->name = trim($request->input('name'));
+            $baseSlug = Str::slug($product->name);
+            $slug = $baseSlug;
+            $counter = 1;
+            while (Product::where('slug', $slug)->where('id', '!=', $product->id)->exists()) {
+                $slug = $baseSlug . '-' . $counter++;
+            }
+            $product->slug = $slug;
+        }
+
+        if ($request->has('category')) {
+            $product->category = trim($request->input('category'));
+        }
+        if ($request->has('price')) {
+            $product->price = (float) $request->input('price');
+        }
+        if ($request->has('original_price')) {
+            $product->original_price = $request->input('original_price') !== null ? (float) $request->input('original_price') : null;
+        }
+        if ($request->has('monthly_price')) {
+            $product->monthly_price = $request->input('monthly_price') !== null ? (float) $request->input('monthly_price') : null;
+        }
+        if ($request->has('stock')) {
+            $product->stock = (int) $request->input('stock');
+        }
+        if ($request->has('short_desc')) {
+            $product->short_desc = $request->input('short_desc');
+        }
+        if ($request->has('description')) {
+            $product->description = $request->input('description', '');
+        }
+        if ($request->has('image')) {
+            $product->image = $request->input('image');
+        }
+        if ($request->has('is_active')) {
+            $product->is_active = $request->boolean('is_active');
+        }
+        if ($request->has('colors')) {
+            $product->colors = $request->input('colors');
+        }
+        if ($request->has('specs')) {
+            $product->specs = $request->input('specs');
+        }
+
+        $product->save();
+
+        // Update or recreate variants if provided
+        if ($request->has('variants') && is_array($request->input('variants'))) {
+            $variants = $request->input('variants');
+            foreach ($variants as $v) {
+                if (isset($v['id']) && $v['id']) {
+                    ProductVariant::where('id', $v['id'])->where('product_id', $product->id)->update([
+                        'name'         => $v['name'],
+                        'price'        => (float) $v['price'],
+                        'stock'        => (int) $v['stock'],
+                        'weight_grams' => (int) ($v['weight_grams'] ?? 200),
+                    ]);
+                } else {
+                    ProductVariant::create([
+                        'product_id'   => $product->id,
+                        'sku'          => $v['sku'] ?? ('SKU-' . strtoupper(Str::random(6))),
+                        'name'         => $v['name'],
+                        'price'        => (float) ($v['price'] ?? $product->price),
+                        'stock'        => (int) ($v['stock'] ?? 10),
+                        'weight_grams' => (int) ($v['weight_grams'] ?? 200),
+                    ]);
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $product->fresh()->load(['variants', 'shop'])->toArray(),
+            'product' => $product->fresh()->load(['variants', 'shop'])->toArray(),
+            'message' => 'Produk berhasil diperbarui.',
+        ]);
+    }
+
+    /**
+     * Toggle active/inactive status of a product.
+     */
+    public function toggleStatus(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $product = Product::find($id);
+        if (!$product) {
+            return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
+        }
+
+        // Ownership check
+        if (!$user->isAdmin()) {
+            if (!$user->shop || $user->shop->id !== $product->shop_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki hak untuk mengubah status produk toko lain.',
+                ], 403);
+            }
+        }
+
+        if ($request->has('is_active')) {
+            $product->is_active = $request->boolean('is_active');
+        } else {
+            $product->is_active = !$product->is_active;
+        }
+        $product->save();
+
+        $statusLabel = $product->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
+        return response()->json([
+            'success'   => true,
+            'is_active' => (bool) $product->is_active,
+            'product'   => $product,
+            'message'   => "Produk berhasil {$statusLabel}.",
+        ]);
+    }
+
+    /**
+     * Delete a product by ID with strict ownership authorization and safe soft-delete.
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
@@ -362,7 +554,11 @@ class ProductApiController extends Controller
             }
         }
 
+        // Soft delete safe preservation: de-activate first, then soft delete
+        $product->is_active = false;
+        $product->save();
         $product->delete();
+
         return response()->json(['success' => true, 'message' => 'Produk berhasil dihapus.']);
     }
 }

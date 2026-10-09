@@ -102,6 +102,9 @@ class OrderStateMachine
         $current = strtolower(trim($currentStatus));
         $next = strtolower(trim($newStatus));
 
+        if ($current === 'pending') $current = self::STATUS_PENDING_PAYMENT;
+        if ($next === 'pending') $next = self::STATUS_PENDING_PAYMENT;
+
         if ($current === $next) {
             return true;
         }
@@ -129,6 +132,9 @@ class OrderStateMachine
     {
         $current = strtolower(trim($currentStatus));
         $next = strtolower(trim($newStatus));
+
+        if ($current === 'pending') $current = self::STATUS_PENDING_PAYMENT;
+        if ($next === 'pending') $next = self::STATUS_PENDING_PAYMENT;
 
         if (in_array($current, self::TERMINAL_STATES, true)) {
             throw new InvalidArgumentException("Pesanan yang sudah berada pada status final '{$current}' tidak dapat diubah lagi.");
@@ -205,6 +211,7 @@ class OrderStateMachine
     public function isCancellable(Order $order, ?User $user = null): bool
     {
         $status = strtolower((string) $order->status);
+        if ($status === 'pending') $status = self::STATUS_PENDING_PAYMENT;
 
         if (in_array($status, self::TERMINAL_STATES, true)) {
             return false;

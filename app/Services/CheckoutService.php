@@ -206,6 +206,36 @@ class CheckoutService
                 $idempotencyKey,
                 $claim
             ) {
+                // Lock and validate voucher if provided
+                $lockedVoucher = null;
+                if (!empty($voucherCode)) {
+                    $lockedVoucher = Voucher::where('code', strtoupper(trim($voucherCode)))
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$lockedVoucher || !$lockedVoucher->is_active) {
+                        throw new \InvalidArgumentException("Kode voucher tidak valid atau sudah dinonaktifkan.");
+                    }
+                    if ($lockedVoucher->usage_count >= $lockedVoucher->usage_limit) {
+                        throw new \InvalidArgumentException("Kuota pemakaian voucher '{$lockedVoucher->name}' telah habis.");
+                    }
+                    if ($lockedVoucher->start_at && now()->lt($lockedVoucher->start_at)) {
+                        throw new \InvalidArgumentException("Voucher belum dapat digunakan.");
+                    }
+                    if ($lockedVoucher->end_at && now()->gt($lockedVoucher->end_at)) {
+                        throw new \InvalidArgumentException("Voucher telah kadaluarsa.");
+                    }
+                    if ($userId && !empty($lockedVoucher->usage_per_user) && $lockedVoucher->usage_per_user > 0) {
+                        $userUsage = VoucherRedemption::where('voucher_id', $lockedVoucher->id)
+                            ->where('user_id', $userId)
+                            ->where('status', '!=', 'rolled_back')
+                            ->count();
+                        if ($userUsage >= $lockedVoucher->usage_per_user) {
+                            throw new \InvalidArgumentException("Anda telah mencapai batas penggunaan maksimal ({$lockedVoucher->usage_per_user}x) untuk voucher ini.");
+                        }
+                    }
+                }
+
                 // A. Lock products in strict ascending ID order to prevent deadlocks
                 $sortedProductIds = array_keys($demandedProductStock);
                 sort($sortedProductIds, SORT_NUMERIC);
@@ -431,14 +461,15 @@ class CheckoutService
 
                 // F. Record Voucher Redemption if voucher was applied
                 if (!empty($pricing['voucher_code'])) {
-                    $voucher = Voucher::where('code', $pricing['voucher_code'])->first();
-                    if ($voucher) {
-                        $voucher->increment('usage_count');
+                    $voucherToRedeem = $lockedVoucher ?: Voucher::where('code', $pricing['voucher_code'])->lockForUpdate()->first();
+                    if ($voucherToRedeem) {
+                        $voucherToRedeem->increment('usage_count');
                         VoucherRedemption::create([
-                            'voucher_id'      => $voucher->id,
+                            'voucher_id'      => $voucherToRedeem->id,
                             'user_id'         => $userId,
                             'order_id'        => $createdOrders[0]->id,
                             'discount_amount' => $pricing['voucher_discount'],
+                            'status'          => 'applied',
                         ]);
                     }
                 }

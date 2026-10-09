@@ -440,6 +440,10 @@ export default function App() {
     setProducts((prev) => [newProduct, ...prev]);
   };
 
+  const handleUpdateProduct = async (updatedProduct: Product) => {
+    setProducts((prev) => prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
+  };
+
   const handleDeleteProduct = async (productId: number) => {
     try {
       await api.deleteProduct(productId);
@@ -923,6 +927,7 @@ export default function App() {
               localStorage.setItem('pasaria_user', JSON.stringify(updated));
             }}
             onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
             onNavigateHome={handleNavigateHome}
             onSelectProduct={handleSelectProduct}

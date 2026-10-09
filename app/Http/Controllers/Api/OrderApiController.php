@@ -470,11 +470,11 @@ class OrderApiController extends Controller
 
             // Restore voucher usage quota
             if (!empty($lockedOrder->voucher_code)) {
-                $voucher = \App\Models\Voucher::where('code', $lockedOrder->voucher_code)->first();
-                if ($voucher) {
+                $voucher = \App\Models\Voucher::where('code', $lockedOrder->voucher_code)->lockForUpdate()->first();
+                if ($voucher && $voucher->usage_count > 0) {
                     $voucher->decrement('usage_count');
                 }
-                \App\Models\VoucherRedemption::where('order_id', $lockedOrder->id)->delete();
+                \App\Models\VoucherRedemption::where('order_id', $lockedOrder->id)->update(['status' => 'rolled_back']);
             }
 
             // Safe notification

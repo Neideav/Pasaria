@@ -81,6 +81,7 @@ export interface Product {
   badge?: string;
   discount_percent?: number;
   is_wishlisted?: boolean;
+  is_active?: boolean;
   created_at?: string;
 }
 

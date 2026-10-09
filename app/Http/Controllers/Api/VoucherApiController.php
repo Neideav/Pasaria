@@ -65,7 +65,30 @@ class VoucherApiController extends Controller
             ], 422);
         }
 
-        $discount = $voucher->calculateDiscount($subtotal, $shipping);
+        $user = $request->user('sanctum') ?: $request->user();
+        if ($user && !empty($voucher->usage_per_user) && $voucher->usage_per_user > 0) {
+            $userUsage = \App\Models\VoucherRedemption::where('voucher_id', $voucher->id)
+                ->where('user_id', $user->id)
+                ->where('status', '!=', 'rolled_back')
+                ->count();
+            if ($userUsage >= $voucher->usage_per_user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Anda telah mencapai batas penggunaan maksimal ({$voucher->usage_per_user}x) untuk voucher ini.",
+                ], 422);
+            }
+        }
+
+        if ($voucher->shop_id !== null && $request->has('shop_id')) {
+            if ((int) $request->input('shop_id') !== (int) $voucher->shop_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Voucher ini hanya berlaku untuk toko tertentu.',
+                ], 422);
+            }
+        }
+
+        $discount = $voucher->calculateDiscount($subtotal, $shipping, $user?->id, $voucher->shop_id);
 
         return response()->json([
             'success' => true,
