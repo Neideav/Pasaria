@@ -14,18 +14,21 @@ class NotificationApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        $notifications = Notification::where('user_id', $userId)
+        $notifications = Notification::where('user_id', $user->id)
             ->orderBy('id', 'desc')
             ->take(30)
             ->get();
 
-        $unreadCount = Notification::where('user_id', $userId)->where('is_read', false)->count();
+        $unreadCount = Notification::where('user_id', $user->id)->where('is_read', false)->count();
 
         return response()->json([
-            'success' => true,
-            'data' => $notifications,
+            'success'      => true,
+            'data'         => $notifications,
             'unread_count' => $unreadCount,
         ]);
     }
@@ -35,9 +38,12 @@ class NotificationApiController extends Controller
      */
     public function markAsRead(Request $request, int $id): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        Notification::where('id', $id)->where('user_id', $userId)->update(['is_read' => true]);
+        Notification::where('id', $id)->where('user_id', $user->id)->update(['is_read' => true]);
 
         return response()->json([
             'success' => true,
@@ -50,9 +56,12 @@ class NotificationApiController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        Notification::where('user_id', $userId)->update(['is_read' => true]);
+        Notification::where('user_id', $user->id)->update(['is_read' => true]);
 
         return response()->json([
             'success' => true,

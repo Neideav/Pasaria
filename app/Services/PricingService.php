@@ -18,31 +18,43 @@ class PricingService
      */
     public function calculate(array $rawItems, ?string $voucherCode = null, ?int $userId = null): array
     {
+        if (empty($rawItems)) {
+            throw new \InvalidArgumentException('Daftar item belanja tidak boleh kosong.');
+        }
+
         $calculatedItems = [];
         $subtotal = 0.0;
         $shopIds = [];
 
         foreach ($rawItems as $item) {
             $productId = (int) ($item['product_id'] ?? $item['id'] ?? 0);
-            $variantId = isset($item['variant_id']) ? (int) $item['variant_id'] : null;
-            $quantity = max(1, (int) ($item['quantity'] ?? 1));
+            $variantId = isset($item['variant_id']) && $item['variant_id'] !== '' && $item['variant_id'] !== null
+                ? (int) $item['variant_id']
+                : null;
+            $quantity = (int) ($item['quantity'] ?? 1);
+
+            if ($quantity < 1) {
+                throw new \InvalidArgumentException("Jumlah produk harus minimal 1.");
+            }
 
             $product = Product::find($productId);
             if (!$product) {
-                throw new \InvalidArgumentException("Product with ID {$productId} not found or unavailable.");
+                throw new \InvalidArgumentException("Produk dengan ID {$productId} tidak ditemukan atau sudah tidak tersedia.");
             }
 
             $price = (float) $product->price;
             $sku = null;
             $variantName = null;
 
-            if ($variantId) {
+            // Reject invalid or mismatched variant
+            if ($variantId !== null) {
                 $variant = ProductVariant::where('product_id', $productId)->find($variantId);
-                if ($variant) {
-                    $price = (float) $variant->price;
-                    $sku = $variant->sku;
-                    $variantName = $variant->name;
+                if (!$variant) {
+                    throw new \InvalidArgumentException("Varian #{$variantId} tidak ditemukan atau tidak sesuai untuk produk '{$product->name}'.");
                 }
+                $price = (float) $variant->price;
+                $sku = $variant->sku;
+                $variantName = $variant->name;
             }
 
             $itemSubtotal = round($price * $quantity, 2);
@@ -73,7 +85,7 @@ class PricingService
         $numberOfShops = max(1, count($shopIds));
         $shippingCost = $numberOfShops * 15000.0;
 
-        // Voucher discount calculation
+        // Voucher discount calculation strictly server-side
         $voucherDiscount = 0.0;
         $appliedVoucher = null;
 
@@ -88,7 +100,7 @@ class PricingService
             }
         }
 
-        // Tax: 11% PPN on subtotal after discount
+        // Tax: 11% PPN on subtotal after voucher discount
         $taxableAmount = max(0, $subtotal - $voucherDiscount);
         $tax = round($taxableAmount * 0.11, 2);
 

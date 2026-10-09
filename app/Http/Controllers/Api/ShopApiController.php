@@ -42,8 +42,8 @@ class ShopApiController extends Controller
         $shopData['products_count'] = $shop->products_count;
 
         return response()->json([
-            'success' => true,
-            'data' => $shopData,
+            'success'  => true,
+            'data'     => $shopData,
             'products' => $products,
         ]);
     }
@@ -54,12 +54,8 @@ class ShopApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (!$user && app()->environment('local', 'testing')) {
-            $user = User::find($request->input('user_id') ?: 1);
-        }
-
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $request->validate([
@@ -77,28 +73,30 @@ class ShopApiController extends Controller
         $shop = Shop::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'name' => $name,
-                'slug' => $slug,
-                'slogan' => $request->input('slogan', 'Toko Resmi PASARIA'),
+                'name'        => $name,
+                'slug'        => $slug,
+                'slogan'      => $request->input('slogan', 'Toko Resmi PASARIA'),
                 'description' => $request->input('description', ''),
-                'city' => $request->input('city', 'Jakarta'),
-                'phone' => $request->input('phone', $user->phone),
-                'logo' => $request->input('logo'),
-                'banner' => $request->input('banner'),
-                'status' => 'approved',
-                'verified' => true,
+                'city'        => $request->input('city', 'Jakarta'),
+                'phone'       => $request->input('phone', $user->phone),
+                'logo'        => $request->input('logo'),
+                'banner'      => $request->input('banner'),
+                'status'      => 'approved',
+                'verified'    => true,
             ]
         );
 
         // Update user role to seller
-        $user->role = 'seller';
-        $user->save();
+        if ($user->role === 'customer') {
+            $user->role = 'seller';
+            $user->save();
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Selamat! Toko Anda di PASARIA berhasil didaftarkan.',
-            'shop' => $shop,
-            'data' => $shop,
+            'shop'    => $shop,
+            'data'    => $shop,
         ], 201);
     }
 
@@ -108,14 +106,17 @@ class ShopApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        $shop = Shop::find($id);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $shop = Shop::find($id);
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
         }
 
-        if ($user && !$user->isAdmin() && $shop->user_id !== $user->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        if (!$user->isAdmin() && $shop->user_id !== $user->id) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
         }
 
         $shop->update($request->only([
@@ -125,7 +126,7 @@ class ShopApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profil toko berhasil diperbarui.',
-            'data' => $shop,
+            'data'    => $shop,
         ]);
     }
 
@@ -134,15 +135,18 @@ class ShopApiController extends Controller
      */
     public function follow(Request $request, int $shopId): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
-        $shop = Shop::find($shopId);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $shop = Shop::find($shopId);
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
         }
 
         DB::table('shop_followers')->updateOrInsert(
-            ['user_id' => $userId, 'shop_id' => $shopId],
+            ['user_id' => $user->id, 'shop_id' => $shopId],
             ['created_at' => now(), 'updated_at' => now()]
         );
 
@@ -157,10 +161,13 @@ class ShopApiController extends Controller
      */
     public function unfollow(Request $request, int $shopId): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         DB::table('shop_followers')
-            ->where('user_id', $userId)
+            ->where('user_id', $user->id)
             ->where('shop_id', $shopId)
             ->delete();
 
@@ -171,19 +178,23 @@ class ShopApiController extends Controller
     }
 
     /**
-     * Get shops followed by user.
+     * Get shops followed by authenticated user.
      */
     public function following(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $userId = $user->id;
         $shops = Shop::whereIn('id', function ($query) use ($userId) {
             $query->select('shop_id')->from('shop_followers')->where('user_id', $userId);
         })->withCount('products')->get();
 
         return response()->json([
             'success' => true,
-            'data' => $shops,
+            'data'    => $shops,
         ]);
     }
 }

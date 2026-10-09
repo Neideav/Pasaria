@@ -95,8 +95,12 @@ fi
 echo "🗄️  Menjalankan database migrations..."
 php "$APP_DIR/artisan" migrate --force
 
-echo "🌱 Menjalankan database seeders..."
-php "$APP_DIR/artisan" db:seed --force
+if [ "${RUN_SEEDERS:-false}" = "true" ]; then
+    echo "🌱 Menjalankan database seeders (RUN_SEEDERS=true)..."
+    php "$APP_DIR/artisan" db:seed --force
+else
+    echo "ℹ️  Melewati database seeders untuk menjaga data produksi (Set RUN_SEEDERS=true untuk menjalankan)."
+fi
 
 # ---------------------------------------------------------------------------
 # 7. Set permission untuk Apache2 (www-data)

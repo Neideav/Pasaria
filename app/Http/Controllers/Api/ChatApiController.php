@@ -17,7 +17,11 @@ class ChatApiController extends Controller
     public function getConversations(Request $request): JsonResponse
     {
         $user = $request->user();
-        $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $userId = $user->id;
 
         $query = Conversation::with(['shop', 'customer'])
             ->withCount(['messages as unread_count' => function ($q) use ($userId) {
@@ -25,7 +29,7 @@ class ChatApiController extends Controller
             }])
             ->orderBy('last_message_at', 'desc');
 
-        if ($user && $user->isSeller() && $user->shop) {
+        if ($user->isSeller() && $user->shop) {
             $query->where('shop_id', $user->shop->id);
         } else {
             $query->where('customer_id', $userId);
@@ -40,27 +44,29 @@ class ChatApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $conversations,
+            'data'    => $conversations,
         ]);
     }
 
     /**
-     * Get messages in a conversation.
+     * Get messages in a conversation with strict participant check.
      */
     public function getMessages(Request $request, int $conversationId): JsonResponse
     {
         $user = $request->user();
-        $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         $conversation = Conversation::with(['shop', 'customer'])->find($conversationId);
         if (!$conversation) {
             return response()->json(['success' => false, 'message' => 'Percakapan tidak ditemukan.'], 404);
         }
 
-        // Ownership check
-        if ($user && !$user->isAdmin()) {
-            $isCustomer = $conversation->customer_id === $user->id;
-            $isSeller = $user->shop && $conversation->shop_id === $user->shop->id;
+        // Ownership authorization check
+        if (!$user->isAdmin()) {
+            $isCustomer = ($conversation->customer_id === $user->id);
+            $isSeller = ($user->shop && $conversation->shop_id === $user->shop->id);
             if (!$isCustomer && !$isSeller) {
                 return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
             }
@@ -68,7 +74,7 @@ class ChatApiController extends Controller
 
         // Mark incoming messages as read
         Message::where('conversation_id', $conversationId)
-            ->where('sender_id', '!=', $userId)
+            ->where('sender_id', '!=', $user->id)
             ->update(['is_read' => true]);
 
         $messages = Message::where('conversation_id', $conversationId)
@@ -76,23 +82,26 @@ class ChatApiController extends Controller
             ->get();
 
         return response()->json([
-            'success' => true,
+            'success'      => true,
             'conversation' => $conversation,
-            'data' => $messages,
+            'data'         => $messages,
         ]);
     }
 
     /**
-     * Send a message in a conversation.
+     * Send a message in a conversation with participant validation.
      */
     public function sendMessage(Request $request): JsonResponse
     {
         $user = $request->user();
-        $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         $request->validate([
             'conversation_id' => 'required|integer',
-            'message' => 'required|string|min:1|max:2000',
+            'message'         => 'required|string|min:1|max:2000',
+            'attachment_url'  => 'nullable|string|max:500',
         ]);
 
         $conversationId = (int) $request->input('conversation_id');
@@ -101,17 +110,22 @@ class ChatApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Percakapan tidak ditemukan.'], 404);
         }
 
-        $senderType = ($user && $user->shop && $user->shop->id === $conversation->shop_id)
-            ? 'seller'
-            : 'customer';
+        $isCustomer = ($conversation->customer_id === $user->id);
+        $isSeller = ($user->shop && $conversation->shop_id === $user->shop->id);
+
+        if (!$isCustomer && !$isSeller && !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $senderType = $isSeller ? 'seller' : 'customer';
 
         $msg = Message::create([
             'conversation_id' => $conversationId,
-            'sender_id' => $userId,
-            'sender_type' => $senderType,
-            'message' => trim($request->input('message')),
-            'attachment_url' => $request->input('attachment_url'),
-            'is_read' => false,
+            'sender_id'       => $user->id,
+            'sender_type'     => $senderType,
+            'message'         => trim($request->input('message')),
+            'attachment_url'  => $request->input('attachment_url'),
+            'is_read'         => false,
         ]);
 
         $conversation->last_message_at = now();
@@ -119,7 +133,7 @@ class ChatApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $msg,
+            'data'    => $msg,
         ], 201);
     }
 
@@ -129,17 +143,28 @@ class ChatApiController extends Controller
     public function startConversation(Request $request): JsonResponse
     {
         $user = $request->user();
-        $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
-        $shopId = (int) $request->input('shop_id', 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $request->validate([
+            'shop_id' => 'required|integer',
+        ]);
+
+        $shopId = (int) $request->input('shop_id');
+        $shop = Shop::find($shopId);
+        if (!$shop) {
+            return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
+        }
 
         $conversation = Conversation::firstOrCreate(
-            ['shop_id' => $shopId, 'customer_id' => $userId],
+            ['shop_id' => $shopId, 'customer_id' => $user->id],
             ['last_message_at' => now()]
         );
 
         return response()->json([
             'success' => true,
-            'data' => $conversation->load(['shop', 'customer']),
+            'data'    => $conversation->load(['shop', 'customer']),
         ]);
     }
 }

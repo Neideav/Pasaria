@@ -22,6 +22,11 @@ class AdminApiController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user || (!$user->isAdmin() && !$user->isSupport())) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
         $totalUsers = User::count();
         $totalSellers = Shop::count();
         $totalProducts = Product::count();
@@ -55,37 +60,59 @@ class AdminApiController extends Controller
     }
 
     /**
-     * List users for admin inspection.
+     * List users for admin inspection with pagination.
      */
     public function users(Request $request): JsonResponse
     {
-        $users = User::with('shop')->orderBy('id', 'desc')->paginate(20);
+        $user = $request->user();
+        if (!$user || (!$user->isAdmin() && !$user->isSupport())) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $users = User::with('shop')->orderBy('id', 'desc')->paginate($perPage);
+
         return response()->json([
             'success' => true,
             'data' => $users->items(),
             'total' => $users->total(),
+            'pagination' => [
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+                'per_page' => $users->perPage(),
+                'total' => $users->total(),
+            ],
         ]);
     }
 
     /**
-     * Suspend or activate user.
+     * Suspend or activate user. Admin only.
      */
     public function updateUserStatus(Request $request, int $id): JsonResponse
     {
-        $user = User::find($id);
-        if (!$user) {
+        $user = $request->user();
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $targetUser = User::find($id);
+        if (!$targetUser) {
             return response()->json(['success' => false, 'message' => 'User tidak ditemukan.'], 404);
         }
 
-        $newStatus = $request->input('status', 'active');
-        $user->status = $newStatus;
-        $user->save();
+        $request->validate([
+            'status' => 'required|string|in:active,suspended',
+        ]);
+
+        $newStatus = $request->input('status');
+        $targetUser->status = $newStatus;
+        $targetUser->save();
 
         AdminAction::create([
-            'user_id' => $request->user()?->id ?: 1,
+            'user_id' => $user->id,
             'action' => 'update_user_status',
             'target_type' => 'user',
-            'target_id' => $user->id,
+            'target_id' => $targetUser->id,
             'details_json' => ['new_status' => $newStatus],
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
@@ -94,36 +121,60 @@ class AdminApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Status user berhasil diperbarui.',
-            'user' => $user,
+            'user' => $targetUser,
         ]);
     }
 
     /**
-     * List sellers.
+     * List sellers with pagination.
      */
     public function sellers(Request $request): JsonResponse
     {
-        $sellers = Shop::with('user')->withCount('products')->orderBy('id', 'desc')->get();
-        return response()->json(['success' => true, 'data' => $sellers]);
+        $user = $request->user();
+        if (!$user || (!$user->isAdmin() && !$user->isSupport())) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $sellers = Shop::with('user')->withCount('products')->orderBy('id', 'desc')->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $sellers->items(),
+            'pagination' => [
+                'current_page' => $sellers->currentPage(),
+                'last_page' => $sellers->lastPage(),
+                'total' => $sellers->total(),
+            ],
+        ]);
     }
 
     /**
-     * Approve, reject, or suspend a seller.
+     * Approve, reject, or suspend a seller. Admin only.
      */
     public function updateSellerStatus(Request $request, int $id): JsonResponse
     {
+        $user = $request->user();
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
         $shop = Shop::find($id);
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
         }
 
-        $status = $request->input('status', 'approved');
+        $request->validate([
+            'status' => 'required|string|in:approved,rejected,suspended,pending',
+        ]);
+
+        $status = $request->input('status');
         $shop->status = $status;
         $shop->verified = ($status === 'approved');
         $shop->save();
 
         AdminAction::create([
-            'user_id' => $request->user()?->id ?: 1,
+            'user_id' => $user->id,
             'action' => 'update_seller_status',
             'target_type' => 'shop',
             'target_id' => $shop->id,
@@ -140,21 +191,40 @@ class AdminApiController extends Controller
     }
 
     /**
-     * Review moderation (hide/approve).
+     * Review moderation (hide/approve). Admin or Support.
      */
     public function moderateReview(Request $request, int $id): JsonResponse
     {
+        $user = $request->user();
+        if (!$user || (!$user->isAdmin() && !$user->isSupport())) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
         $review = Review::find($id);
         if (!$review) {
             return response()->json(['success' => false, 'message' => 'Ulasan tidak ditemukan.'], 404);
         }
 
-        $status = $request->input('status', 'hidden'); // approved, hidden
+        $request->validate([
+            'status' => 'required|string|in:approved,hidden,flagged',
+        ]);
+
+        $status = $request->input('status');
         $review->status = $status;
         $review->save();
 
+        // Recalculate product rating
+        if ($review->product) {
+            $approvedReviews = Review::where('product_id', $review->product_id)->where('status', 'approved')->get();
+            $reviewCount = count($approvedReviews);
+            $avg = $reviewCount > 0 ? round($approvedReviews->avg('rating'), 1) : 5.0;
+            $review->product->rating = $avg;
+            $review->product->review_count = $reviewCount;
+            $review->product->save();
+        }
+
         AdminAction::create([
-            'user_id' => $request->user()?->id ?: 1,
+            'user_id' => $user->id,
             'action' => 'moderate_review',
             'target_type' => 'review',
             'target_id' => $review->id,
@@ -170,20 +240,48 @@ class AdminApiController extends Controller
     }
 
     /**
-     * List audit logs.
+     * List audit logs with pagination. Admin only.
      */
     public function auditLogs(Request $request): JsonResponse
     {
-        $logs = AdminAction::with('user')->orderBy('id', 'desc')->take(50)->get();
-        return response()->json(['success' => true, 'data' => $logs]);
+        $user = $request->user();
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $logs = AdminAction::with('user')->orderBy('id', 'desc')->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $logs->items(),
+            'pagination' => [
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'total' => $logs->total(),
+            ],
+        ]);
     }
 
     /**
-     * List platform reports.
+     * List platform reports. Admin or Support.
      */
     public function reports(Request $request): JsonResponse
     {
-        $reports = Report::with('reporter')->orderBy('id', 'desc')->get();
-        return response()->json(['success' => true, 'data' => $reports]);
+        $user = $request->user();
+        if (!$user || (!$user->isAdmin() && !$user->isSupport())) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $reports = Report::with('reporter')->orderBy('id', 'desc')->paginate(20);
+        return response()->json([
+            'success' => true,
+            'data' => $reports->items(),
+            'pagination' => [
+                'current_page' => $reports->currentPage(),
+                'last_page' => $reports->lastPage(),
+                'total' => $reports->total(),
+            ],
+        ]);
     }
 }

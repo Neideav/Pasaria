@@ -34,7 +34,9 @@ class QuestionApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         $request->validate([
             'product_id' => 'required|integer',
@@ -49,7 +51,7 @@ class QuestionApiController extends Controller
 
         $question = ProductQuestion::create([
             'product_id' => $productId,
-            'user_id' => $userId,
+            'user_id' => $user->id,
             'question' => trim($request->input('question')),
             'is_public' => true,
             'status' => 'approved',
@@ -68,14 +70,17 @@ class QuestionApiController extends Controller
     public function answer(Request $request, int $questionId): JsonResponse
     {
         $user = $request->user();
-        $question = ProductQuestion::with('product')->find($questionId);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $question = ProductQuestion::with('product')->find($questionId);
         if (!$question) {
             return response()->json(['success' => false, 'message' => 'Pertanyaan tidak ditemukan.'], 404);
         }
 
         // Ownership check: seller must own product's shop, or be admin
-        if ($user && !$user->isAdmin()) {
+        if (!$user->isAdmin()) {
             if (!$user->shop || $user->shop->id !== $question->product->shop_id) {
                 return response()->json([
                     'success' => false,
@@ -88,11 +93,11 @@ class QuestionApiController extends Controller
             'answer' => 'required|string|min:2|max:1000',
         ]);
 
-        $shopId = $user?->shop?->id ?: ($question->product->shop_id ?: 1);
+        $shopId = $user->shop ? $user->shop->id : $question->product->shop_id;
 
         $answer = ProductAnswer::create([
             'question_id' => $questionId,
-            'user_id' => $user?->id ?: 1,
+            'user_id' => $user->id,
             'shop_id' => $shopId,
             'answer' => trim($request->input('answer')),
             'status' => 'approved',

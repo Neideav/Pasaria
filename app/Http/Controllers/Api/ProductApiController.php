@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 class ProductApiController extends Controller
 {
     /**
-     * Get products list with search, filter, and SQLi demo mode support.
+     * Get products list with search, filter, and pagination support.
      *
      * @param Request $request
      * @return JsonResponse
@@ -31,24 +31,24 @@ class ProductApiController extends Controller
             $maxPrice = (float) $request->input('maxPrice', 999999999);
             $minRating = (float) $request->input('minRating', 0);
             $shopId = $request->input('shop_id');
+            $perPage = min(100, max(6, (int) $request->input('per_page', 24)));
 
             $isLocal = app()->environment('local', 'testing');
             $demoSqliMode = $isLocal && (bool) Cache::get('demo_sqli_mode', config('pasaria.demo_sqli_mode', env('DEMO_SQLI_MODE', false)));
 
             $orderByClause = match ($sort) {
-                'price-asc' => 'price ASC',
+                'price-asc'  => 'price ASC',
                 'price-desc' => 'price DESC',
-                'rating' => 'rating DESC',
-                'newest' => 'id DESC',
-                default => 'id ASC',
+                'rating'     => 'rating DESC',
+                'newest'     => 'id DESC',
+                default      => 'id ASC',
             };
 
-            $products = [];
+            $formattedProducts = [];
+            $totalCount = 0;
 
             if (!empty($q) && $demoSqliMode) {
-                // ===================================================================
-                // EDUCATIONAL DEMO MODE (Isolated to local development)
-                // ===================================================================
+                // Isolated Educational Demo Mode (Local dev only)
                 $rawSql = "SELECT * FROM products WHERE (name LIKE '%{$q}%' OR description LIKE '%{$q}%' OR short_desc LIKE '%{$q}%' OR category LIKE '%{$q}%') AND price >= {$minPrice} AND price <= {$maxPrice} AND rating >= {$minRating} ORDER BY {$orderByClause}";
 
                 try {
@@ -56,19 +56,18 @@ class ProductApiController extends Controller
                     $products = array_map(function ($item) {
                         return (array) $item;
                     }, $results);
+                    $totalCount = count($products);
                 } catch (\Throwable $sqlErr) {
                     return response()->json([
-                        'success' => true,
-                        'data' => [],
-                        'count' => 0,
+                        'success'   => true,
+                        'data'      => [],
+                        'count'     => 0,
                         'sqli_mode' => true,
                         'sql_error' => $sqlErr->getMessage(),
                     ]);
                 }
             } else {
-                // ===================================================================
-                // SECURE PRODUCTION IMPLEMENTATION: Parameterized query via Eloquent
-                // ===================================================================
+                // SECURE PRODUCTION IMPLEMENTATION: Parameterized Eloquent Query
                 $query = Product::with(['variants', 'shop']);
 
                 if (!empty($q)) {
@@ -101,19 +100,21 @@ class ProductApiController extends Controller
                 }
 
                 match ($sort) {
-                    'price-asc' => $query->orderBy('price', 'asc'),
+                    'price-asc'  => $query->orderBy('price', 'asc'),
                     'price-desc' => $query->orderBy('price', 'desc'),
-                    'rating' => $query->orderBy('rating', 'desc'),
-                    'newest' => $query->orderBy('id', 'desc'),
-                    default => $query->orderBy('id', 'asc'),
+                    'rating'     => $query->orderBy('rating', 'desc'),
+                    'newest'     => $query->orderBy('id', 'desc'),
+                    default      => $query->orderBy('id', 'asc'),
                 };
 
-                $products = $query->get()->toArray();
+                $paginated = $query->paginate($perPage);
+                $products = $paginated->items();
+                $totalCount = $paginated->total();
             }
 
             // Normalization
-            $formattedProducts = array_map(function ($p) {
-                $item = (array) $p;
+            foreach ($products as $p) {
+                $item = is_array($p) ? $p : $p->toArray();
                 $item['id'] = (int) ($item['id'] ?? 0);
                 $item['price'] = (float) ($item['price'] ?? 0);
                 $item['original_price'] = isset($item['original_price']) && $item['original_price'] !== null ? (float) $item['original_price'] : null;
@@ -133,28 +134,25 @@ class ProductApiController extends Controller
                     $decoded = json_decode($item['specs'], true);
                     $item['specs'] = json_last_error() === JSON_ERROR_NONE ? $decoded : (object)[];
                 }
-                return $item;
-            }, $products);
+                $formattedProducts[] = $item;
+            }
 
             return response()->json([
-                'success' => true,
-                'count' => count($formattedProducts),
-                'data' => $formattedProducts,
+                'success'   => true,
+                'count'     => $totalCount,
+                'data'      => $formattedProducts,
                 'sqli_mode' => (bool) $demoSqliMode,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Gagal memuat katalog produk.',
             ], 500);
         }
     }
 
     /**
      * Get single product by slug or ID with full details.
-     *
-     * @param string $slug
-     * @return JsonResponse
      */
     public function show(string $slug): JsonResponse
     {
@@ -198,45 +196,62 @@ class ProductApiController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $productData,
+                'data'    => $productData,
                 'related' => $related,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'message' => config('app.debug') ? $e->getMessage() : 'Gagal memuat detail produk.',
             ], 500);
         }
     }
 
     /**
-     * Store a new product with authorization & shop assignment.
+     * Store a new product. Strictly authorized to Seller or Admin.
      */
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (!$user && app()->environment('local', 'testing')) {
-            $user = \App\Models\User::find($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        if (!$user || (!$user->isSeller() && !$user->isAdmin())) {
-            // Allow auto-seller promotion if demo/local or create default shop
-            if ($user && !$user->shop) {
-                $user->role = 'seller';
-                $user->save();
-                Shop::firstOrCreate(
-                    ['user_id' => $user->id],
-                    ['name' => $user->name . ' Store', 'slug' => Str::slug($user->name . '-' . $user->id), 'city' => 'Jakarta']
-                );
-            }
+        if (!$user->isSeller() && !$user->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya penjual atau administrator yang dapat menambahkan produk.',
+            ], 403);
         }
 
-        $shop = $user?->shop ?: Shop::first();
+        $shop = $user->shop;
+        if (!$shop && !$user->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda belum memiliki toko terdaftar untuk menambahkan produk.',
+            ], 403);
+        }
+
+        $request->validate([
+            'name'           => 'required|string|max:255',
+            'category'       => 'required|string|max:100',
+            'price'          => 'required|numeric|min:0',
+            'original_price' => 'nullable|numeric|min:0',
+            'stock'          => 'required|integer|min:0|max:1000000',
+            'short_desc'     => 'nullable|string|max:500',
+            'description'    => 'nullable|string',
+            'image'          => 'nullable|string|max:500',
+            'variants'       => 'nullable|array',
+            'variants.*.name'=> 'required_with:variants|string|max:100',
+            'variants.*.price'=> 'required_with:variants|numeric|min:0',
+            'variants.*.stock'=> 'required_with:variants|integer|min:0',
+        ]);
+
         $shopId = $shop ? $shop->id : 1;
-        $shopName = $shop ? $shop->name : 'PASARIA Official Merchant';
+        $shopName = $shop ? $shop->name : 'PASARIA Official Store';
         $shopCity = $shop ? $shop->city : 'Jakarta';
 
-        $name = trim($request->input('name', 'Produk Baru PASARIA'));
+        $name = trim($request->input('name'));
         $baseSlug = Str::slug($name);
         $slug = $baseSlug;
         $counter = 1;
@@ -247,10 +262,10 @@ class ProductApiController extends Controller
         $product = Product::create([
             'name'           => $name,
             'slug'           => $slug,
-            'category'       => $request->input('category', 'Headphone'),
-            'price'          => (float) $request->input('price', 0),
-            'original_price' => $request->input('original_price') ? (float) $request->input('original_price') : null,
-            'monthly_price'  => $request->input('monthly_price') ? (float) $request->input('monthly_price') : null,
+            'category'       => trim($request->input('category')),
+            'price'          => (float) $request->input('price'),
+            'original_price' => $request->has('original_price') ? (float) $request->input('original_price') : null,
+            'monthly_price'  => $request->has('monthly_price') ? (float) $request->input('monthly_price') : null,
             'short_desc'     => $request->input('short_desc'),
             'description'    => $request->input('description', ''),
             'image'          => $request->input('image', 'airpods-max'),
@@ -270,11 +285,11 @@ class ProductApiController extends Controller
         if (is_array($variants) && count($variants) > 0) {
             foreach ($variants as $v) {
                 ProductVariant::create([
-                    'product_id' => $product->id,
-                    'sku' => $v['sku'] ?? ('SKU-' . strtoupper(Str::random(6))),
-                    'name' => $v['name'] ?? 'Default Variant',
-                    'price' => (float) ($v['price'] ?? $product->price),
-                    'stock' => (int) ($v['stock'] ?? 10),
+                    'product_id'   => $product->id,
+                    'sku'          => $v['sku'] ?? ('SKU-' . strtoupper(Str::random(6))),
+                    'name'         => $v['name'] ?? 'Default Variant',
+                    'price'        => (float) ($v['price'] ?? $product->price),
+                    'stock'        => (int) ($v['stock'] ?? 10),
                     'weight_grams' => (int) ($v['weight_grams'] ?? 200),
                 ]);
             }
@@ -288,24 +303,27 @@ class ProductApiController extends Controller
     }
 
     /**
-     * Delete a product by ID with ownership authorization.
+     * Delete a product by ID with strict ownership authorization.
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        if (!$user && app()->environment('local', 'testing')) {
-            $user = \App\Models\User::find($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $product = Product::find($id);
         if (!$product) {
-            return response()->json(['success' => false, 'error' => 'Produk tidak ditemukan.'], 404);
+            return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
         }
 
         // Ownership check: seller must own product's shop, or user must be admin
-        if ($user && !$user->isAdmin()) {
+        if (!$user->isAdmin()) {
             if (!$user->shop || $user->shop->id !== $product->shop_id) {
-                return response()->json(['success' => false, 'error' => 'Anda tidak memiliki hak untuk menghapus produk ini.'], 403);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki hak untuk menghapus produk toko lain.',
+                ], 403);
             }
         }
 
