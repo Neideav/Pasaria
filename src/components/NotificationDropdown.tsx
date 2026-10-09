@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Check, Clock, Package, AlertCircle, Sparkles } from 'lucide-react';
+import { Bell, Package } from 'lucide-react';
 import { NotificationItem } from '../types';
 import { api } from '../services/api';
 import { formatDateTime } from '../utils/formatters';
@@ -20,8 +20,17 @@ export const NotificationDropdown: React.FC = () => {
         setOpen(false);
       }
     }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const loadNotifications = async () => {
@@ -60,24 +69,38 @@ export const NotificationDropdown: React.FC = () => {
 
   return (
     <div className="relative" ref={dropdownRef}>
+      {/* Motion Point #7 & #8: Trigger Button with .motion-press and Badge Pop */}
       <button
+        type="button"
         onClick={() => {
           setOpen(!open);
           if (!open) loadNotifications();
         }}
-        className="relative w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label={`Notifikasi, ${unreadCount} pesan belum dibaca`}
+        className="motion-press relative w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
         title="Notifikasi"
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white animate-pulse">
+          <span
+            key={unreadCount}
+            className="motion-badge-pop absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white pointer-events-none"
+          >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
+      {/* Motion Point #8: Notification dropdown popover origin anchor (top right, 180ms var(--ease-out)) */}
       {open && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-100 py-3 z-50 animate-in fade-in duration-150 text-left">
+        <div
+          role="dialog"
+          aria-label="Panel Notifikasi"
+          className="motion-popover absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-100 py-3 z-50 text-left"
+          style={{ transformOrigin: 'top right' }}
+        >
           <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold text-slate-900">Notifikasi</span>
@@ -89,15 +112,16 @@ export const NotificationDropdown: React.FC = () => {
             </div>
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={handleMarkAllAsRead}
-                className="text-[11px] font-semibold text-[#003d29] hover:underline cursor-pointer"
+                className="motion-press text-[11px] font-semibold text-[#003d29] hover:underline cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-[#003d29] rounded"
               >
                 Tandai Semua Dibaca
               </button>
             )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+          <div className="max-h-80 overflow-y-auto divide-y border-t border-slate-100 divide-slate-100">
             {loading ? (
               <div className="py-8 text-center text-xs text-slate-400">Memuat notifikasi...</div>
             ) : notifications.length === 0 ? (
@@ -107,7 +131,7 @@ export const NotificationDropdown: React.FC = () => {
                 <div
                   key={n.id}
                   onClick={() => !n.is_read && handleMarkAsRead(n.id)}
-                  className={`p-3.5 hover:bg-slate-50 transition-colors cursor-pointer flex items-start gap-3 ${
+                  className={`motion-press p-3.5 hover:bg-slate-50 transition-colors cursor-pointer flex items-start gap-3 ${
                     !n.is_read ? 'bg-emerald-50/40' : ''
                   }`}
                 >

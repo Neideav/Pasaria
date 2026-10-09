@@ -21,6 +21,7 @@ import {
   Globe,
   MessageCircle,
   ShieldAlert,
+  Check,
 } from 'lucide-react';
 import { User, Product } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -80,6 +81,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const mobileSearchContainerRef = useRef<HTMLDivElement>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
@@ -89,6 +91,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSearchSuggestions(false);
+      }
+      if (mobileSearchContainerRef.current && !mobileSearchContainerRef.current.contains(event.target as Node)) {
         setShowSearchSuggestions(false);
       }
       if (categoriesRef.current && !categoriesRef.current.contains(event.target as Node)) {
@@ -125,10 +130,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (isMobileMenuOpen) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         drawerCloseBtnRef.current?.focus();
       }, 50);
       return () => {
+        clearTimeout(timer);
         document.body.style.overflow = originalOverflow || 'unset';
       };
     }
@@ -170,30 +176,44 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 transition-all">
+      <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3 flex items-center justify-between gap-3 sm:gap-4">
           {/* Left: Mobile Menu Toggle, Brand Logo & Desktop Categories */}
           <div className="flex items-center gap-2.5 sm:gap-7">
-            {/* Mobile Hamburger Menu Button */}
+            {/* Motion Point #1: Hamburger to 'X' icon transition (rotasi & crossfade transform 160ms var(--ease-out)) */}
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label={isMobileMenuOpen ? "Tutup navigasi utama" : "Buka navigasi utama"}
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-navigation-drawer"
-              className="lg:hidden w-11 h-11 flex items-center justify-center rounded-xl text-slate-700 hover:text-[#003d29] hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0"
+              className="lg:hidden motion-press relative w-11 h-11 flex items-center justify-center rounded-xl text-slate-700 hover:text-[#003d29] hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0"
             >
-              {isMobileMenuOpen ? (
-                <X className="w-5 h-5 text-slate-800" />
-              ) : (
+              <span
+                className={`absolute inset-0 flex items-center justify-center transition-[transform,opacity] duration-160 ease-[var(--ease-out)] ${
+                  isMobileMenuOpen
+                    ? 'opacity-0 rotate-90 scale-90 pointer-events-none'
+                    : 'opacity-100 rotate-0 scale-100'
+                }`}
+              >
                 <Menu className="w-5 h-5 text-slate-800" />
-              )}
+              </span>
+              <span
+                className={`absolute inset-0 flex items-center justify-center transition-[transform,opacity] duration-160 ease-[var(--ease-out)] ${
+                  isMobileMenuOpen
+                    ? 'opacity-100 rotate-0 scale-100'
+                    : 'opacity-0 -rotate-90 scale-90 pointer-events-none'
+                }`}
+              >
+                <X className="w-5 h-5 text-slate-800" />
+              </span>
             </button>
 
             {/* Brand Logo */}
             <button
+              type="button"
               onClick={onNavigateHome}
-              className="flex items-center gap-2.5 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 rounded-xl p-1"
+              className="motion-press flex items-center gap-2.5 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 rounded-xl p-1"
             >
               <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#003d29] text-white shadow-xs transition-transform group-hover:scale-105">
                 <ShoppingCart className="w-5 h-5 text-white" strokeWidth={2.2} />
@@ -218,21 +238,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                   aria-haspopup="true"
                   aria-expanded={showCategoriesMenu}
                   aria-controls="desktop-categories-popover"
-                  className="flex items-center gap-1.5 hover:text-[#003d29] transition-colors cursor-pointer py-1.5 px-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
+                  className="motion-press flex items-center gap-1.5 hover:text-[#003d29] transition-colors cursor-pointer py-1.5 px-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
                 >
                   <span>Kategori</span>
                   <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                      showCategoriesMenu ? 'rotate-180 text-[#003d29]' : 'text-slate-400'
+                    className={`w-3.5 h-3.5 transition-transform duration-160 ease-[var(--ease-out)] ${
+                      showCategoriesMenu ? 'rotate-180 text-[#003d29]' : 'rotate-0 text-slate-400'
                     }`}
                   />
                 </button>
 
+                {/* Motion Point #3: Category mega popover origin-anchored scale (transform-origin: top left, 180ms var(--ease-out)) */}
                 {showCategoriesMenu && (
                   <div
                     id="desktop-categories-popover"
                     role="menu"
-                    className="absolute left-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                    className="motion-popover absolute left-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3.5 z-50 text-left"
+                    style={{ transformOrigin: 'top left' }}
                   >
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 mb-1">
                       Kategori Pilihan PASARIA
@@ -249,7 +271,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                               setShowCategoriesMenu(false);
                               onNavigateCategory(cat.name);
                             }}
-                            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
+                            className="motion-press flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
                           >
                             <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-[#003d29] shrink-0">
                               <Icon className="w-3.5 h-3.5" />
@@ -273,21 +295,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateCategory('Deals')}
-                className="hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
+                className="motion-press hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
               >
                 Promo & Diskon
               </button>
               <button
                 type="button"
                 onClick={() => onNavigateCategory("What's New")}
-                className="hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
+                className="motion-press hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
               >
                 Produk Baru
               </button>
               <button
                 type="button"
                 onClick={() => onNavigateCategory('Delivery')}
-                className="hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
+                className="motion-press hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
               >
                 Lacak Kiriman
               </button>
@@ -297,6 +319,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Center: Search Bar with Autocomplete */}
           <div className="flex-1 max-w-md relative hidden md:block" ref={searchContainerRef}>
             <form onSubmit={handleSearchSubmit} className="relative">
+              {/* Motion Point #6: Search input focus expand transition */}
               <input
                 type="text"
                 value={searchQuery}
@@ -306,19 +329,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 onFocus={() => setShowSearchSuggestions(true)}
                 placeholder="Cari produk original, headphone, gadget, toko..."
-                className="w-full min-h-[44px] pl-4 pr-11 py-2.5 text-xs sm:text-sm bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-2 focus:ring-[#003d29]/15 transition-all placeholder:text-slate-400"
+                className="w-full min-h-[44px] pl-4 pr-11 py-2.5 text-xs sm:text-sm bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-4 focus:ring-[#003d29]/15 focus:shadow-md transition-[box-shadow,border-color,background-color] duration-160 ease-[var(--ease-out)] placeholder:text-slate-400"
               />
               <button
                 type="submit"
                 aria-label="Cari"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-[#003d29] transition-colors cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
+                className="motion-press absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-[#003d29] transition-colors cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
               >
                 <Search className="w-4 h-4" />
               </button>
             </form>
 
+            {/* Motion Point #5: Search autocomplete suggestion box (smooth vertical appearance & fade 180ms var(--ease-out)) */}
             {showSearchSuggestions && searchQuery.trim().length > 0 && (
-              <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden animate-in fade-in duration-150 text-left">
+              <div
+                className="motion-search-suggestions absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden text-left"
+                style={{ transformOrigin: 'top center' }}
+              >
                 {searchSuggestions.length > 0 ? (
                   <div>
                     <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -329,7 +356,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         key={item.id}
                         type="button"
                         onClick={() => handleSelectSuggestion(item.name)}
-                        className="w-full min-h-[44px] flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                        className="motion-press w-full min-h-[44px] flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:bg-slate-50"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
@@ -360,54 +387,115 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Right: Actions (Wishlist, Chat, Notification, Cart, Account) */}
+          {/* Right: Actions (Wishlist, Chat, Notification, Cart, Language, Account) */}
           <div className="flex items-center gap-1.5 sm:gap-2.5">
-            {/* Wishlist Button */}
+            {/* Wishlist Button - Motion Point #7: .motion-press */}
             {user && onNavigateWishlist && (
               <button
                 type="button"
                 onClick={onNavigateWishlist}
                 aria-label="Wishlist Saya"
                 title="Wishlist Saya"
-                className="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
+                className="motion-press w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
               >
                 <Heart className="w-4 h-4" />
               </button>
             )}
 
-            {/* Chat Button */}
+            {/* Chat Button - .motion-press */}
             {user && onOpenChat && (
               <button
                 type="button"
                 onClick={onOpenChat}
                 aria-label="Pesan dan Chat"
                 title="Pesan / Chat"
-                className="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
+                className="motion-press w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
               >
                 <MessageCircle className="w-4 h-4" />
               </button>
             )}
 
-            {/* Real Notification Dropdown */}
+            {/* Real Notification Dropdown - Motion Point #8 */}
             {user && <NotificationDropdown />}
 
-            {/* Cart Icon */}
+            {/* Cart Icon - Motion Point #7: .motion-press & .motion-badge-pop */}
             <button
               type="button"
               onClick={onNavigateCart}
               aria-label={`Keranjang Belanja, ${cartCount} barang`}
               title="Keranjang Belanja"
-              className="relative w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
+              className="motion-press relative w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
             >
               <ShoppingCart className="w-4 h-4" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#003d29] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                <span
+                  key={cartCount}
+                  className="motion-badge-pop absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#003d29] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white pointer-events-none"
+                >
                   {cartCount}
                 </span>
               )}
             </button>
 
-            {/* Account Dropdown */}
+            {/* Desktop Language Switcher - Motion Point #9 */}
+            <div className="relative hidden md:block" ref={langRef}>
+              <button
+                type="button"
+                onClick={() => setShowLangMenu(!showLangMenu)}
+                aria-haspopup="true"
+                aria-expanded={showLangMenu}
+                aria-label={`Pilih Bahasa: ${currentLang.toUpperCase()}`}
+                className="motion-press min-h-[44px] flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
+              >
+                <Globe className="w-3.5 h-3.5 text-slate-600" />
+                <span className="uppercase text-[11px] font-bold">{currentLang}</span>
+                <ChevronDown
+                  className={`w-3 h-3 text-slate-400 transition-transform duration-160 ease-[var(--ease-out)] ${
+                    showLangMenu ? 'rotate-180 text-[#003d29]' : 'rotate-0'
+                  }`}
+                />
+              </button>
+
+              {showLangMenu && (
+                <div
+                  role="menu"
+                  aria-label="Pilihan Bahasa"
+                  className="motion-popover absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-left"
+                  style={{ transformOrigin: 'top right' }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onLanguageChange('id');
+                      setShowLangMenu(false);
+                    }}
+                    className={`motion-press w-full min-h-[36px] flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-slate-50 cursor-pointer ${
+                      currentLang === 'id' ? 'font-bold text-[#003d29] bg-emerald-50/60' : 'text-slate-700'
+                    }`}
+                  >
+                    <span>Bahasa Indonesia</span>
+                    {currentLang === 'id' && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onLanguageChange('en');
+                      setShowLangMenu(false);
+                    }}
+                    className={`motion-press w-full min-h-[36px] flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-slate-50 cursor-pointer ${
+                      currentLang === 'en' ? 'font-bold text-[#003d29] bg-emerald-50/60' : 'text-slate-700'
+                    }`}
+                  >
+                    <span>English</span>
+                    {currentLang === 'en' && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Account Dropdown - Motion Point #4: Profile dropdown menu origin-anchored scale (top right, 160ms var(--ease-out)) */}
             <div className="relative" ref={accountRef}>
               <button
                 type="button"
@@ -422,7 +510,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 aria-expanded={user ? showAccountMenu : undefined}
                 aria-controls={user ? "desktop-account-menu" : undefined}
                 aria-label={user ? `Menu Akun: ${user.name}` : "Masuk ke Akun"}
-                className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
+                className="motion-press min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
               >
                 <UserIcon className="w-4 h-4 text-slate-700" />
                 <span className="hidden sm:inline">
@@ -434,7 +522,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div
                   id="desktop-account-menu"
                   role="menu"
-                  className="absolute right-0 mt-2.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in duration-150 text-left"
+                  className="motion-popover-160 absolute right-0 mt-2.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-left"
+                  style={{ transformOrigin: 'top right' }}
                 >
                   <div className="px-4 py-2 border-b border-slate-100">
                     <div className="text-xs font-bold text-slate-900 truncate">{user.name}</div>
@@ -451,7 +540,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         setShowAccountMenu(false);
                         onNavigateProfile();
                       }}
-                      className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                      className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
                     >
                       <UserIcon className="w-4 h-4 text-slate-500" />
                       <span>Profil Saya</span>
@@ -463,7 +552,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         setShowAccountMenu(false);
                         onNavigateOrders();
                       }}
-                      className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                      className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
                     >
                       <Package className="w-4 h-4 text-slate-500" />
                       <span>Pesanan Saya</span>
@@ -477,7 +566,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowAccountMenu(false);
                           onNavigateWishlist();
                         }}
-                        className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
                       >
                         <Heart className="w-4 h-4 text-rose-500" />
                         <span>Wishlist</span>
@@ -492,7 +581,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowAccountMenu(false);
                           onNavigateFollowing();
                         }}
-                        className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
                       >
                         <Store className="w-4 h-4 text-slate-500" />
                         <span>Toko yang Diikuti</span>
@@ -508,7 +597,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowAccountMenu(false);
                           onNavigateShop();
                         }}
-                        className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 font-bold text-[#003d29] bg-emerald-50/50 hover:bg-emerald-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-emerald-50"
+                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 font-bold text-[#003d29] bg-emerald-50/50 hover:bg-emerald-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-emerald-50"
                       >
                         <Store className="w-4 h-4 text-[#003d29]" />
                         <span>{user?.shop ? 'Seller Center (Toko Saya)' : 'Buka Toko Gratis'}</span>
@@ -524,7 +613,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowAccountMenu(false);
                           onNavigateAdmin();
                         }}
-                        className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 font-bold text-amber-800 bg-amber-50/50 hover:bg-amber-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-amber-50"
+                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 font-bold text-amber-800 bg-amber-50/50 hover:bg-amber-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-amber-50"
                       >
                         <ShieldAlert className="w-4 h-4 text-amber-700" />
                         <span>Admin Panel PASARIA</span>
@@ -539,7 +628,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setShowAccountMenu(false);
                           onNavigateSettings();
                         }}
-                        className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
                       >
                         <SettingsIcon className="w-4 h-4 text-slate-500" />
                         <span>Pengaturan & Keamanan</span>
@@ -555,7 +644,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         setShowAccountMenu(false);
                         onLogout();
                       }}
-                      className="w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-rose-50"
+                      className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-rose-50"
                     >
                       <LogOut className="w-4 h-4 text-rose-500" />
                       <span>Keluar Akun</span>
@@ -568,8 +657,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Mobile Search Row (visible on small mobile screens below md) */}
-        <div className="px-4 pb-3 md:hidden" ref={searchContainerRef}>
+        <div className="px-4 pb-3 md:hidden" ref={mobileSearchContainerRef}>
           <form onSubmit={handleSearchSubmit} className="relative">
+            {/* Motion Point #6: Mobile Search input focus expand transition */}
             <input
               type="text"
               value={searchQuery}
@@ -579,19 +669,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               onFocus={() => setShowSearchSuggestions(true)}
               placeholder="Cari produk original di PASARIA..."
-              className="w-full min-h-[44px] pl-4 pr-11 py-2.5 text-xs bg-slate-100/90 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-2 focus:ring-[#003d29]/15 transition-all placeholder:text-slate-400"
+              className="w-full min-h-[44px] pl-4 pr-11 py-2.5 text-xs bg-slate-100/90 hover:bg-slate-100 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-4 focus:ring-[#003d29]/15 focus:shadow-md transition-[box-shadow,border-color,background-color] duration-160 ease-[var(--ease-out)] placeholder:text-slate-400"
             />
             <button
               type="submit"
               aria-label="Cari"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-[#003d29] transition-colors cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
+              className="motion-press absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-[#003d29] transition-colors cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
             >
               <Search className="w-4 h-4" />
             </button>
           </form>
 
+          {/* Motion Point #5: Mobile Search autocomplete suggestion box */}
           {showSearchSuggestions && searchQuery.trim().length > 0 && (
-            <div className="absolute left-4 right-4 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden animate-in fade-in duration-150 text-left">
+            <div
+              className="motion-search-suggestions absolute left-4 right-4 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden text-left"
+              style={{ transformOrigin: 'top center' }}
+            >
               {searchSuggestions.length > 0 ? (
                 <div>
                   <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -602,7 +696,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       key={item.id}
                       type="button"
                       onClick={() => handleSelectSuggestion(item.name)}
-                      className="w-full min-h-[44px] flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                      className="motion-press w-full min-h-[44px] flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:bg-slate-50"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
@@ -634,311 +728,323 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </nav>
 
-      {/* Mobile Navigation Drawer Modal & Backdrop */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          {/* Dark transparent backdrop with pointer-events-auto */}
-          <div
-            className="fixed inset-0 bg-black/50 transition-opacity pointer-events-auto"
-            onClick={() => setIsMobileMenuOpen(false)}
-            aria-hidden="true"
-          />
+      {/* Motion Point #2: Mobile Navigation Drawer Modal & Backdrop */}
+      {/* Container maintains hardware-accelerated drawer slide and backdrop fade */}
+      <div
+        className={`fixed inset-0 z-50 lg:hidden flex transition-opacity duration-200 ease-[var(--ease-out)] ${
+          isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
+        }`}
+        aria-hidden={!isMobileMenuOpen}
+      >
+        {/* Dark transparent backdrop with smooth fade (opacity 200ms var(--ease-out)) */}
+        <div
+          className={`fixed inset-0 bg-black/50 transition-opacity duration-200 ease-[var(--ease-out)] ${
+            isMobileMenuOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
 
-          {/* Mobile Drawer Panel */}
-          <div
-            id="mobile-navigation-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigasi Utama Mobile"
-            className="relative w-full max-w-xs sm:max-w-sm bg-white h-full shadow-2xl z-10 flex flex-col justify-between overflow-y-auto pointer-events-auto animate-in slide-in-from-left duration-250"
-          >
-            <div>
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#003d29] text-white shadow-xs">
-                    <ShoppingCart className="w-5 h-5 text-white" strokeWidth={2.2} />
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white" />
+        {/* Mobile Drawer Panel with hardware-accelerated slide-in (300ms var(--ease-drawer)) */}
+        <div
+          id="mobile-navigation-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigasi Utama Mobile"
+          tabIndex={-1}
+          className={`relative w-full max-w-xs sm:max-w-sm bg-white h-full shadow-2xl z-10 flex flex-col justify-between overflow-y-auto pointer-events-auto transition-transform duration-300 ease-[var(--ease-drawer)] will-change-transform ${
+            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+          style={{
+            transform: isMobileMenuOpen ? 'translate3d(0, 0, 0)' : 'translate3d(-100%, 0, 0)',
+          }}
+        >
+          <div>
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#003d29] text-white shadow-xs">
+                  <ShoppingCart className="w-5 h-5 text-white" strokeWidth={2.2} />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-lg font-black tracking-tight text-[#003d29]">PASARIA</span>
+                  <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-700 -mt-0.5">
+                    Marketplace Indonesia
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                ref={drawerCloseBtnRef}
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label="Tutup navigasi utama"
+                className="motion-press w-11 h-11 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* User Profile Card or Auth Prompt */}
+            <div className="p-4 border-b border-slate-100 bg-slate-50/70">
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-100 text-[#003d29] flex items-center justify-center font-bold text-base shrink-0">
+                    {user.name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="flex flex-col text-left">
-                    <span className="text-lg font-black tracking-tight text-[#003d29]">PASARIA</span>
-                    <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-700 -mt-0.5">
-                      Marketplace Indonesia
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="text-sm font-bold text-slate-900 truncate">{user.name}</div>
+                    <div className="text-xs text-slate-500 truncate">{user.email}</div>
+                    <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-[#003d29] bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                      {user.role}
                     </span>
                   </div>
                 </div>
-
+              ) : (
                 <button
                   type="button"
-                  ref={drawerCloseBtnRef}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  aria-label="Tutup navigasi utama"
-                  className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenAuth();
+                  }}
+                  className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl bg-[#003d29] text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#064e3b] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shadow-xs"
                 >
-                  <X className="w-5 h-5" />
+                  <UserIcon className="w-4 h-4" />
+                  <span>Masuk / Daftar Akun</span>
                 </button>
+              )}
+            </div>
+
+            {/* Navigation Items List */}
+            <nav className="p-3 space-y-1 text-left" aria-label="Menu navigasi mobile">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onNavigateHome();
+                }}
+                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-slate-800 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+              >
+                <ShoppingCart className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>Beranda</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onNavigateCategory('Deals');
+                }}
+                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>Promo & Diskon</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onNavigateCategory("What's New");
+                }}
+                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+              >
+                <Package className="w-4 h-4 text-blue-500 shrink-0" />
+                <span>Produk Baru</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onNavigateCategory('Delivery');
+                }}
+                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+              >
+                <Globe className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>Lacak Kiriman</span>
+              </button>
+
+              {/* Categories Grid */}
+              <div className="pt-2 pb-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-1">
+                  Kategori Pilihan
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 px-1 pt-1">
+                  {categoryList.map((cat) => {
+                    const Icon = cat.icon;
+                    return (
+                      <button
+                        key={cat.name}
+                        type="button"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          onNavigateCategory(cat.name);
+                        }}
+                        className="motion-press min-h-[44px] py-2.5 px-3 rounded-xl flex items-center gap-2 text-left bg-slate-50 hover:bg-emerald-50 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                      >
+                        <Icon className="w-4 h-4 text-[#003d29] shrink-0" />
+                        <span className="text-xs font-medium text-slate-800 truncate">{cat.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* User Profile Card or Auth Prompt */}
-              <div className="p-4 border-b border-slate-100 bg-slate-50/70">
-                {user ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-100 text-[#003d29] flex items-center justify-center font-bold text-base shrink-0">
-                      {user.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1 text-left">
-                      <div className="text-sm font-bold text-slate-900 truncate">{user.name}</div>
-                      <div className="text-xs text-slate-500 truncate">{user.email}</div>
-                      <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-[#003d29] bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                        {user.role}
-                      </span>
-                    </div>
+              {/* Authenticated user menu */}
+              {user && (
+                <div className="pt-2 pb-1 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-1">
+                    Akun Saya
                   </div>
-                ) : (
                   <button
                     type="button"
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      onOpenAuth();
+                      onNavigateProfile();
                     }}
-                    className="w-full min-h-[44px] py-3 px-4 rounded-xl bg-[#003d29] text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#064e3b] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shadow-xs"
+                    className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
                   >
-                    <UserIcon className="w-4 h-4" />
-                    <span>Masuk / Daftar Akun</span>
+                    <UserIcon className="w-4 h-4 text-slate-600 shrink-0" />
+                    <span>Profil Saya</span>
                   </button>
-                )}
-              </div>
 
-              {/* Navigation Items List */}
-              <nav className="p-3 space-y-1 text-left" aria-label="Menu navigasi mobile">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onNavigateHome();
-                  }}
-                  className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-slate-800 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                >
-                  <ShoppingCart className="w-4 h-4 text-emerald-700 shrink-0" />
-                  <span>Beranda</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onNavigateOrders();
+                    }}
+                    className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                  >
+                    <Package className="w-4 h-4 text-slate-600 shrink-0" />
+                    <span>Pesanan Saya</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onNavigateCategory('Deals');
-                  }}
-                  className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-                  <span>Promo & Diskon</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onNavigateCategory("What's New");
-                  }}
-                  className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                >
-                  <Package className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Produk Baru</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onNavigateCategory('Delivery');
-                  }}
-                  className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                >
-                  <Globe className="w-4 h-4 text-indigo-500 shrink-0" />
-                  <span>Lacak Kiriman</span>
-                </button>
-
-                {/* Categories Grid */}
-                <div className="pt-2 pb-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-1">
-                    Kategori Pilihan
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5 px-1 pt-1">
-                    {categoryList.map((cat) => {
-                      const Icon = cat.icon;
-                      return (
-                        <button
-                          key={cat.name}
-                          type="button"
-                          onClick={() => {
-                            setIsMobileMenuOpen(false);
-                            onNavigateCategory(cat.name);
-                          }}
-                          className="min-h-[44px] py-2.5 px-3 rounded-xl flex items-center gap-2 text-left bg-slate-50 hover:bg-emerald-50 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                        >
-                          <Icon className="w-4 h-4 text-[#003d29] shrink-0" />
-                          <span className="text-xs font-medium text-slate-800 truncate">{cat.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Authenticated user menu */}
-                {user && (
-                  <div className="pt-2 pb-1 space-y-1">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-1">
-                      Akun Saya
-                    </div>
+                  {onNavigateWishlist && (
                     <button
                       type="button"
                       onClick={() => {
                         setIsMobileMenuOpen(false);
-                        onNavigateProfile();
+                        onNavigateWishlist();
                       }}
-                      className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-rose-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
                     >
-                      <UserIcon className="w-4 h-4 text-slate-600 shrink-0" />
-                      <span>Profil Saya</span>
+                      <Heart className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span>Wishlist</span>
                     </button>
+                  )}
 
+                  {onNavigateFollowing && (
                     <button
                       type="button"
                       onClick={() => {
                         setIsMobileMenuOpen(false);
-                        onNavigateOrders();
+                        onNavigateFollowing();
                       }}
-                      className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
                     >
-                      <Package className="w-4 h-4 text-slate-600 shrink-0" />
-                      <span>Pesanan Saya</span>
+                      <Store className="w-4 h-4 text-slate-600 shrink-0" />
+                      <span>Toko yang Diikuti</span>
                     </button>
+                  )}
 
-                    {onNavigateWishlist && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                          onNavigateWishlist();
-                        }}
-                        className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-rose-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                      >
-                        <Heart className="w-4 h-4 text-rose-500 shrink-0" />
-                        <span>Wishlist</span>
-                      </button>
-                    )}
+                  {onNavigateShop && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onNavigateShop();
+                      }}
+                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-[#003d29] bg-emerald-50/70 hover:bg-emerald-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                    >
+                      <Store className="w-4 h-4 text-[#003d29] shrink-0" />
+                      <span>{user?.shop ? 'Seller Center (Toko Saya)' : 'Buka Toko Gratis'}</span>
+                    </button>
+                  )}
 
-                    {onNavigateFollowing && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                          onNavigateFollowing();
-                        }}
-                        className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                      >
-                        <Store className="w-4 h-4 text-slate-600 shrink-0" />
-                        <span>Toko yang Diikuti</span>
-                      </button>
-                    )}
+                  {(user?.role === 'admin' || user?.role === 'support') && onNavigateAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onNavigateAdmin();
+                      }}
+                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 cursor-pointer"
+                    >
+                      <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>Admin Panel PASARIA</span>
+                    </button>
+                  )}
 
-                    {onNavigateShop && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                          onNavigateShop();
-                        }}
-                        className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-[#003d29] bg-emerald-50/70 hover:bg-emerald-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                      >
-                        <Store className="w-4 h-4 text-[#003d29] shrink-0" />
-                        <span>{user?.shop ? 'Seller Center (Toko Saya)' : 'Buka Toko Gratis'}</span>
-                      </button>
-                    )}
-
-                    {(user?.role === 'admin' || user?.role === 'support') && onNavigateAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                          onNavigateAdmin();
-                        }}
-                        className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 cursor-pointer"
-                      >
-                        <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
-                        <span>Admin Panel PASARIA</span>
-                      </button>
-                    )}
-
-                    {onNavigateSettings && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                          onNavigateSettings();
-                        }}
-                        className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                      >
-                        <SettingsIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                        <span>Pengaturan & Keamanan</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </nav>
-            </div>
-
-            {/* Bottom Actions (Language Switcher & Logout) */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50/60 space-y-2">
-              <div className="flex items-center justify-between px-2 py-1 text-xs">
-                <span className="text-slate-500 font-medium flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 text-slate-400" />
-                  Bahasa
-                </span>
-                <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => onLanguageChange('id')}
-                    className={`min-h-[36px] min-w-[36px] px-3 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center justify-center ${
-                      currentLang === 'id'
-                        ? 'bg-[#003d29] text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    ID
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onLanguageChange('en')}
-                    className={`min-h-[36px] min-w-[36px] px-3 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center justify-center ${
-                      currentLang === 'en'
-                        ? 'bg-[#003d29] text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    EN
-                  </button>
+                  {onNavigateSettings && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onNavigateSettings();
+                      }}
+                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                    >
+                      <SettingsIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span>Pengaturan & Keamanan</span>
+                    </button>
+                  )}
                 </div>
-              </div>
-
-              {user && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onLogout();
-                  }}
-                  className="w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 cursor-pointer"
-                >
-                  <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
-                  <span>Keluar Akun</span>
-                </button>
               )}
+            </nav>
+          </div>
+
+          {/* Bottom Actions (Language Switcher & Logout) */}
+          <div className="p-4 border-t border-slate-100 bg-slate-50/60 space-y-2">
+            <div className="flex items-center justify-between px-2 py-1 text-xs">
+              <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-slate-400" />
+                Bahasa
+              </span>
+              <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => onLanguageChange('id')}
+                  className={`motion-press min-h-[36px] min-w-[36px] px-3 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center justify-center ${
+                    currentLang === 'id'
+                      ? 'bg-[#003d29] text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  ID
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onLanguageChange('en')}
+                  className={`motion-press min-h-[36px] min-w-[36px] px-3 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center justify-center ${
+                    currentLang === 'en'
+                      ? 'bg-[#003d29] text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  EN
+                </button>
+              </div>
             </div>
+
+            {user && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onLogout();
+                }}
+                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>Keluar Akun</span>
+              </button>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 };

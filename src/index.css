@@ -68,6 +68,69 @@
 .motion-popover {
   transform-origin: var(--transform-origin, top);
   transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  animation: motionPopoverIn 180ms var(--ease-out) forwards;
+}
+
+.motion-popover-160 {
+  transform-origin: var(--transform-origin, top);
+  transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+  animation: motionPopoverIn 160ms var(--ease-out) forwards;
+}
+
+@keyframes motionPopoverIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.motion-search-suggestions {
+  transform-origin: top center;
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  animation: searchSuggestionsIn 180ms var(--ease-out) forwards;
+}
+
+@keyframes searchSuggestionsIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.motion-badge-pop {
+  animation: badgePop 200ms var(--ease-out) forwards;
+}
+
+@keyframes badgePop {
+  0% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@starting-style {
+  .motion-popover,
+  .motion-popover-160 {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  .motion-search-suggestions {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
 }
 
 .motion-modal {
@@ -88,5 +151,13 @@
   }
   .motion-press:active {
     transform: none !important;
+  }
+  .motion-popover,
+  .motion-popover-160,
+  .motion-search-suggestions,
+  .motion-badge-pop {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }
