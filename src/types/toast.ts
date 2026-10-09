@@ -9,4 +9,5 @@ export interface ToastItem {
     onClick: () => void;
   };
   duration?: number;
+  isExiting?: boolean;
 }

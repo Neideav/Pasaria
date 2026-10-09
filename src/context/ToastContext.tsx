@@ -39,14 +39,35 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
+  const exitTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   const dismissToast = useCallback((id: string) => {
+    // Clear auto-dismiss timer if pending
     const timer = timersRef.current.get(id);
     if (timer) {
       clearTimeout(timer);
       timersRef.current.delete(id);
     }
-    setToasts((prev) => prev.filter((item) => item.id !== id));
+
+    // Set exit state so animation can play (200ms var(--ease-out))
+    setToasts((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (!target || target.isExiting) return prev;
+      return prev.map((item) =>
+        item.id === id ? { ...item, isExiting: true } : item,
+      );
+    });
+
+    // Remove from DOM after exit animation completes
+    if (!exitTimersRef.current.has(id)) {
+      const exitTimer = setTimeout(() => {
+        setToasts((prev) => prev.filter((item) => item.id !== id));
+        exitTimersRef.current.delete(id);
+      }, 200);
+      exitTimersRef.current.set(id, exitTimer);
+    }
   }, []);
 
   const showToast = useCallback(
@@ -65,6 +86,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
         message,
         action: options?.action,
         duration,
+        isExiting: false,
       };
 
       setToasts((prev) => [...prev, newToast]);
@@ -83,9 +105,12 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
 
   useEffect(() => {
     const currentTimers = timersRef.current;
+    const currentExitTimers = exitTimersRef.current;
     return () => {
       currentTimers.forEach((timer) => clearTimeout(timer));
       currentTimers.clear();
+      currentExitTimers.forEach((timer) => clearTimeout(timer));
+      currentExitTimers.clear();
     };
   }, []);
 

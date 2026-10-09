@@ -34,9 +34,10 @@ import {
 import { api } from "./services/api";
 import { Language, translations } from "./i18n/translations";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { ToastProvider } from "./context/ToastContext";
+import { ToastProvider, useToast } from "./context/ToastContext";
 
 function AppContent() {
+  const { showToast } = useToast();
   const [view, setView] = useState<
     | "home"
     | "product"
@@ -476,6 +477,7 @@ function AppContent() {
     }
     setCartItems(next);
     syncCartToDatabase(next, user.id);
+    showToast(`${quantity}x "${product.name}" berhasil dimasukkan ke keranjang.`, "success");
     return true;
   };
 
@@ -547,9 +549,26 @@ function AppContent() {
   };
 
   const handleRemoveCartItem = (productId: number) => {
+    const removedItem = cartItems.find((item) => item.product.id === productId);
     const next = cartItems.filter((item) => item.product.id !== productId);
     setCartItems(next);
     syncCartToDatabase(next);
+    if (removedItem) {
+      showToast(`"${removedItem.product.name}" dihapus dari keranjang.`, "info", {
+        duration: 5000,
+        action: {
+          label: "Batalkan",
+          onClick: () => {
+            setCartItems((prev) => {
+              const restored = [...prev, removedItem];
+              syncCartToDatabase(restored);
+              return restored;
+            });
+            showToast(`"${removedItem.product.name}" dipulihkan ke keranjang.`, "success");
+          },
+        },
+      });
+    }
   };
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);

@@ -1,26 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Truck,
   Package,
-  MapPin,
   Clock,
   CheckCircle2,
-  AlertCircle,
-  Search,
   Phone,
   MessageCircle,
-  ArrowRight,
   ShieldCheck,
   RefreshCw,
   Navigation,
-  ExternalLink,
   ChevronRight,
   Copy,
   Check,
   Compass,
   Building2,
   Home,
-  CheckCircle
 } from 'lucide-react';
 import { DeliveryShipment, Order } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -142,7 +136,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
           </div>
           <button
             onClick={onNavigateHome}
-            className="px-6 py-2.5 rounded-full bg-[#003d29] text-white text-sm font-bold hover:bg-[#064e3b] transition-colors cursor-pointer"
+            className="px-6 py-2.5 rounded-full bg-[#003d29] text-white text-sm font-bold hover:bg-[#064e3b] transition-colors cursor-pointer motion-press"
           >
             Mulai Belanja
           </button>
@@ -212,7 +206,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-100 gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-400 mb-1.5">
-            <button onClick={onNavigateHome} className="hover:text-slate-700">Home</button>
+            <button onClick={onNavigateHome} className="hover:text-slate-700 cursor-pointer motion-press">Home</button>
             <ChevronRight className="w-3 h-3 text-slate-300" />
             <span className="text-slate-800 font-semibold">Delivery & Courier Tracking</span>
           </div>
@@ -225,7 +219,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
           <button
             onClick={handleSimulateAdvance}
             disabled={isSimulating}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold text-[#003d29] bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold text-[#003d29] bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer shadow-2xs motion-press disabled:opacity-50"
             title="Simulate courier vehicle movement on map"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSimulating ? 'animate-spin' : ''}`} />
@@ -234,7 +228,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
 
           <button
             onClick={onNavigateHome}
-            className="px-4 py-2.5 rounded-full text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition-colors"
+            className="px-4 py-2.5 rounded-full text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer motion-press"
           >
             Back to Store
           </button>
@@ -260,7 +254,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
             />
             <button
               type="submit"
-              className="px-3 py-1.5 bg-[#003d29] text-white text-xs font-semibold rounded-xl hover:bg-[#064e3b] transition-colors"
+              className="px-3 py-1.5 bg-[#003d29] text-white text-xs font-semibold rounded-xl hover:bg-[#064e3b] transition-colors cursor-pointer motion-press"
             >
               Cek
             </button>
@@ -274,7 +268,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
               <div
                 key={shipment.id}
                 onClick={() => setSelectedShipmentId(shipment.id)}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                className={`p-4 rounded-2xl border transition-colors cursor-pointer flex flex-col justify-between gap-3 motion-press ${
                   isSelected
                     ? 'border-[#003d29] bg-[#003d29]/5 shadow-sm ring-2 ring-[#003d29]/20'
                     : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-2xs'
@@ -306,9 +300,12 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                   <span className="text-slate-500">
                     {shipment.items_preview?.[0]?.name || `${shipment.items_count} Barang`}
                   </span>
-                  <span className="font-bold text-emerald-700 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    {shipment.estimated_arrival}
+                  <span className="font-bold text-emerald-700 flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 ring-4 ring-emerald-500/20" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    <span>{shipment.estimated_arrival}</span>
                   </span>
                 </div>
               </div>
@@ -348,7 +345,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                   </span>
                   <button
                     onClick={handleCopyTracking}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#003d29] hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#003d29] hover:bg-slate-100 transition-colors cursor-pointer motion-press"
                     title="Salin no resi"
                   >
                     {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
@@ -360,8 +357,11 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
             {/* Live Status Highlight */}
             <div className="p-4 rounded-2xl bg-[#003d29]/5 border border-[#003d29]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1">
-                <div className="text-[11px] uppercase tracking-wider font-extrabold text-[#003d29] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <div className="text-[11px] uppercase tracking-wider font-extrabold text-[#003d29] flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 ring-4 ring-emerald-500/20" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
                   <span>Status Lokasi Terkini</span>
                 </div>
                 <div className="text-sm sm:text-base font-bold text-slate-900">
@@ -381,12 +381,10 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
               </div>
             </div>
 
-            {/* ========================================================================= */}
-            {/* Centered Stepper Progress Bar (Presisi Lurus dengan Lingkaran) */}
-            {/* ========================================================================= */}
+            {/* Stepper Progress Bar */}
             <div className="py-2">
               <div className="relative">
-                {/* Horizontal Background Line (Center-aligned with the 36px icons) */}
+                {/* Horizontal Background Line */}
                 <div className="absolute top-4.5 left-5 right-5 h-1 bg-slate-100 -translate-y-1/2 z-0"></div>
                 {/* Horizontal Active Line */}
                 <div
@@ -412,11 +410,11 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                     return (
                       <div key={idx} className="flex flex-col items-center group cursor-default">
                         <div
-                          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                          className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
                             isDone
                               ? 'bg-[#003d29] text-white shadow-xs'
                               : isCurrent
-                              ? 'bg-white border-2 border-[#003d29] text-[#003d29] shadow-md ring-4 ring-emerald-50'
+                              ? 'bg-white border-2 border-[#003d29] text-[#003d29] shadow-md ring-4 ring-emerald-500/20'
                               : 'bg-white border-2 border-slate-200 text-slate-300'
                           }`}
                         >
@@ -440,9 +438,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
               </div>
             </div>
 
-            {/* ========================================================================= */}
             {/* PETA INTERAKTIF REAL-TIME (Visual Map Kurir Pengiriman) */}
-            {/* ========================================================================= */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -504,7 +500,10 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                 {/* Top Overlay: Route details banner */}
                 <div className="relative z-10 flex items-center justify-between bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-sm border border-slate-100 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 ring-4 ring-emerald-500/20" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
                     <span className="font-bold text-slate-800">
                       Rute: {currentShipment.origin_address.split(',')[0]} → {currentShipment.delivery_address.split(',')[0]}
                     </span>
@@ -524,7 +523,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                   </span>
                 </div>
 
-                {/* Map Pins: Live Moving Courier Truck */}
+                {/* Motion Point #34: DeliveryView Live Courier Tracking Marker Radar Pulse */}
                 <div
                   className="absolute z-20 flex flex-col items-center transition-all duration-700 -translate-x-1/2 -translate-y-1/2"
                   style={{
@@ -538,12 +537,21 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                     <span>Kurir {currentShipment.driver_name?.split(' ')[0]}: Sedang Menuju Rumah Anda!</span>
                   </div>
 
-                  {/* Vehicle Marker */}
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xl border-3 border-white ring-4 ring-emerald-400/40">
+                  {/* Vehicle Marker with Dual Ring Radar Pulse */}
+                  <div className="relative flex items-center justify-center">
+                    {/* Motion Point #34: Radar Pulse Wave Ping */}
+                    <span className="absolute -inset-2.5 rounded-2xl bg-emerald-500/20 ring-4 ring-emerald-500/20 animate-ping pointer-events-none" />
+                    {/* Static Ambient Ring */}
+                    <span className="absolute -inset-1 rounded-2xl ring-4 ring-emerald-500/20 pointer-events-none" />
+
+                    <div className="relative w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xl border-3 border-white ring-4 ring-emerald-500/20 z-10">
                       <Truck className="w-6 h-6 stroke-[2.2]" />
                     </div>
-                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white animate-ping"></span>
+
+                    {/* Mini GPS indicator pin */}
+                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white z-20">
+                      <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75 ring-2 ring-emerald-500/20" />
+                    </span>
                   </div>
                 </div>
 
@@ -598,11 +606,11 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                 return (
                   <div key={cp.id || idx} className="relative flex items-start gap-4 z-10">
                     <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs transition-all ${
+                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs transition-colors ${
                         isCompleted
                           ? 'bg-[#003d29] text-white shadow-2xs'
                           : isCurrent
-                          ? 'bg-emerald-500 text-white shadow-md ring-4 ring-emerald-100 animate-pulse'
+                          ? 'bg-emerald-500 text-white shadow-md ring-4 ring-emerald-500/20 animate-pulse'
                           : 'bg-white border-2 border-slate-200 text-slate-300'
                       }`}
                     >
@@ -674,7 +682,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
             <div className="pt-2 flex gap-2">
               <a
                 href={`tel:${currentShipment.driver_phone || '+15552345678'}`}
-                className="flex-1 py-2.5 px-3 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-200/80 transition-colors"
+                className="flex-1 py-2.5 px-3 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-200/80 transition-colors cursor-pointer motion-press"
               >
                 <Phone className="w-3.5 h-3.5 text-slate-500" />
                 <span>Telepon</span>
@@ -686,7 +694,7 @@ export const DeliveryView: React.FC<DeliveryViewProps> = ({
                     'success'
                   )
                 }
-                className="flex-1 py-2.5 px-3 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="flex-1 py-2.5 px-3 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer motion-press"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
                 <span>Chat Kurir</span>

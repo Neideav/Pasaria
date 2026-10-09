@@ -229,6 +229,104 @@
   }
 }
 
+/* Motion Point #29: ToastContainer Slide-Up Entrance (translateY(100%) -> translateY(0) in 250ms var(--ease-out)) */
+.motion-toast-enter {
+  animation: toastSlideUp 250ms var(--ease-out) forwards;
+}
+
+@keyframes toastSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Motion Point #30: Toast Dismissal Slide-Right Exit Transition (translateX(100%) in 200ms var(--ease-out)) */
+.motion-toast-exit {
+  animation: toastSlideRight 200ms var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+@keyframes toastSlideRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* Motion Point #31: Toast Timeout Progress Bar (linear width 100% -> 0%) */
+.motion-toast-progress {
+  animation-name: toastProgressBar;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes toastProgressBar {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.group:hover .motion-toast-progress,
+.motion-toast:hover .motion-toast-progress {
+  animation-play-state: paused;
+}
+
+/* Motion Point #32: OrdersView Status Badge Color & Glow Transition */
+.motion-status-badge {
+  transition:
+    background-color 200ms var(--ease-out),
+    border-color 200ms var(--ease-out),
+    color 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
+}
+
+/* Motion Point #33: OrdersView Timeline Accordion via CSS Grid Row Interpolation (Recipe 7) */
+.motion-accordion-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms var(--ease-out);
+}
+
+.motion-accordion-wrapper[data-expanded="true"] {
+  grid-template-rows: 1fr;
+}
+
+.motion-accordion-content {
+  overflow: hidden;
+}
+
+/* Motion Point #34: DeliveryView Courier Location Radar Pulse */
+.motion-radar-pulse {
+  animation: radarPulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes radarPulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
 @starting-style {
   .motion-popover,
   .motion-popover-160 {
@@ -258,6 +356,10 @@
     opacity: 0;
     transform: translateY(8px);
   }
+  .motion-toast-enter {
+    opacity: 0;
+    transform: translateY(100%);
+  }
 }
 
 .motion-toast {
@@ -285,9 +387,18 @@
   .motion-modal-backdrop,
   .motion-auth-form-enter,
   .motion-auth-form-enter-reverse,
-  .motion-message-bubble {
+  .motion-message-bubble,
+  .motion-toast-enter,
+  .motion-toast-exit,
+  .motion-radar-pulse {
     animation: none !important;
     transform: none !important;
     opacity: 1 !important;
+  }
+  .motion-accordion-wrapper {
+    transition: none !important;
+  }
+  .motion-toast-progress {
+    animation: none !important;
   }
 }

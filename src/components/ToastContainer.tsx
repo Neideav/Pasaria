@@ -45,6 +45,20 @@ const getToastBorderClass = (type: ToastType) => {
   }
 };
 
+const getToastProgressColor = (type: ToastType) => {
+  switch (type) {
+    case "success":
+      return "bg-emerald-500";
+    case "error":
+      return "bg-rose-500";
+    case "warning":
+      return "bg-amber-500";
+    case "info":
+    default:
+      return "bg-sky-500";
+  }
+};
+
 export const ToastContainer: React.FC<ToastContainerProps> = ({
   toasts = [],
   onDismiss = () => {},
@@ -59,48 +73,65 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
       role="status"
       className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
     >
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          role="status"
-          aria-live="polite"
-          className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border shadow-lg transition-all duration-200 animate-in fade-in slide-in-from-bottom-2 ${getToastBorderClass(
-            toast.type,
-          )}`}
-        >
-          {getToastIcon(toast.type)}
+      {toasts.map((toast) => {
+        const isExiting = Boolean(toast.isExiting);
+        const duration = toast.duration !== undefined ? toast.duration : 4000;
 
-          <div className="flex-1 min-w-0 pt-0.5">
-            <p className="text-sm font-medium leading-snug break-words text-slate-800">
-              {toast.message}
-            </p>
+        return (
+          <div
+            key={toast.id}
+            role="status"
+            aria-live="polite"
+            className={`pointer-events-auto relative overflow-hidden group flex items-start gap-3 p-3.5 pb-4 rounded-xl border shadow-lg ${
+              isExiting ? "motion-toast-exit" : "motion-toast-enter"
+            } ${getToastBorderClass(toast.type)}`}
+          >
+            {getToastIcon(toast.type)}
 
-            {toast.action && (
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    toast.action?.onClick();
-                    onDismiss(toast.id);
-                  }}
-                  className="inline-flex items-center justify-center text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#003d29] text-white hover:bg-[#00281b] active:scale-95 transition-all shadow-xs cursor-pointer"
-                >
-                  {toast.action.label}
-                </button>
+            <div className="flex-1 min-w-0 pt-0.5">
+              <p className="text-sm font-medium leading-snug break-words text-slate-800">
+                {toast.message}
+              </p>
+
+              {toast.action && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.action?.onClick();
+                      onDismiss(toast.id);
+                    }}
+                    className="inline-flex items-center justify-center text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#003d29] text-white hover:bg-[#00281b] transition-colors shadow-xs cursor-pointer motion-press"
+                  >
+                    {toast.action.label}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onDismiss(toast.id)}
+              aria-label="Tutup notifikasi"
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer motion-press"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Motion Point #31: Toast Timeout Progress Bar (linear width 100% -> 0%) */}
+            {duration > 0 && !isExiting && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-100/80 overflow-hidden">
+                <div
+                  className={`h-full motion-toast-progress ${getToastProgressColor(
+                    toast.type,
+                  )}`}
+                  style={{ animationDuration: `${duration}ms` }}
+                />
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => onDismiss(toast.id)}
-            aria-label="Tutup notifikasi"
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
