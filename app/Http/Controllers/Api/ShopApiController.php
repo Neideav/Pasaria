@@ -53,9 +53,17 @@ class ShopApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user()?->fresh() ?? $request->user();
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        // Email verification requirement for seller registration
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Silakan verifikasi email Anda terlebih dahulu sebelum mendaftar sebagai penjual.',
+            ], 403);
         }
 
         $request->validate([
@@ -70,6 +78,7 @@ class ShopApiController extends Controller
             $slug = $baseSlug . '-' . $counter++;
         }
 
+        // Shop is registered in 'pending' status awaiting administrator approval
         $shop = Shop::updateOrCreate(
             ['user_id' => $user->id],
             [
@@ -81,20 +90,16 @@ class ShopApiController extends Controller
                 'phone'       => $request->input('phone', $user->phone),
                 'logo'        => $request->input('logo'),
                 'banner'      => $request->input('banner'),
-                'status'      => 'approved',
-                'verified'    => true,
+                'status'      => 'pending',
+                'verified'    => false,
             ]
         );
 
-        // Update user role to seller
-        if ($user->role === 'customer') {
-            $user->role = 'seller';
-            $user->save();
-        }
+        // Security rule: Do NOT automatically promote role to seller until admin approves the shop.
 
         return response()->json([
             'success' => true,
-            'message' => 'Selamat! Toko Anda di PASARIA berhasil didaftarkan.',
+            'message' => 'Pendaftaran toko berhasil diajukan dan sedang menunggu persetujuan administrator PASARIA.',
             'shop'    => $shop,
             'data'    => $shop,
         ], 201);

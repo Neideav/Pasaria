@@ -76,10 +76,11 @@ class AuthApiController extends Controller
             ], 401);
         }
 
-        if ($user->status === 'suspended') {
+        if ($user->isSuspended()) {
+            $user->tokens()->delete();
             return response()->json([
                 'success' => false,
-                'message' => 'Akun Anda sedang ditangguhkan. Silakan hubungi dukungan PASARIA.',
+                'message' => 'Akun Anda sedang ditangguhkan atau dinonaktifkan. Silakan hubungi dukungan PASARIA.',
             ], 403);
         }
 
@@ -99,7 +100,7 @@ class AuthApiController extends Controller
     }
 
     /**
-     * Handle user registration with secure hashing and Sanctum Token.
+     * Handle user registration with unverified state and verification code generation.
      */
     public function register(Request $request): JsonResponse
     {
@@ -110,35 +111,166 @@ class AuthApiController extends Controller
             'password' => 'required|string|min:6',
         ]);
 
+        $name = trim(strip_tags((string) $request->input('name')));
+        $username = strtolower(trim((string) $request->input('username')));
+        $email = strtolower(trim((string) $request->input('email')));
+
         $user = User::create([
-            'name'              => trim($request->input('name')),
-            'username'          => strtolower(trim($request->input('username'))),
-            'email'             => strtolower(trim($request->input('email'))),
-            'password'          => Hash::make($request->input('password')),
+            'name'              => $name,
+            'username'          => $username,
+            'email'             => $email,
+            'password'          => Hash::make((string) $request->input('password')),
             'role'              => 'customer',
             'status'            => 'active',
-            'address'           => $request->input('address', ''),
-            'city'              => $request->input('city', 'Jakarta'),
-            'zip'               => $request->input('zip', ''),
-            'phone'             => $request->input('phone', ''),
-            'email_verified_at' => now(), // Auto-verified for local/demo infra
+            'address'           => trim((string) $request->input('address', '')),
+            'city'              => trim((string) $request->input('city', 'Jakarta')),
+            'zip'               => trim((string) $request->input('zip', '')),
+            'phone'             => trim((string) $request->input('phone', '')),
+            'email_verified_at' => null, // Explicitly unverified on registration
         ]);
 
         // Create empty Cart & Wallet for user
         Cart::firstOrCreate(['user_id' => $user->id], ['items_json' => []]);
         Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0.00]);
 
+        // Generate 6-digit numeric verification code with 60-minute expiration
+        $verificationCode = sprintf('%06d', random_int(100000, 999999));
+        Cache::put("email_verify_code_{$user->id}", $verificationCode, now()->addMinutes(60));
+        Cache::put("email_verify_email_{$user->email}", ['code' => $verificationCode, 'user_id' => $user->id], now()->addMinutes(60));
+
+        // Safe notification logging: email service absence will NOT fail registration or auto-verify account
+        try {
+            \Illuminate\Support\Facades\Log::info("PASARIA: Verification code generated for {$user->email}: {$verificationCode}");
+        } catch (\Throwable $logErr) {}
+
         $token = $user->createToken('pasaria_auth_token')->plainTextToken;
 
         $userData = $user->toArray();
         unset($userData['password'], $userData['remember_token']);
 
-        return response()->json([
+        $responsePayload = [
             'success' => true,
-            'message' => 'Pendaftaran berhasil. Selamat bergabung di PASARIA!',
+            'message' => 'Pendaftaran berhasil. Silakan verifikasi alamat email Anda untuk mengakses seluruh fitur.',
             'token'   => $token,
             'user'    => $userData,
-        ], 201);
+        ];
+
+        // In testing or local environment, expose code to enable automated verification without mock mailer
+        if (app()->environment('testing', 'local')) {
+            $responsePayload['verification_code'] = $verificationCode;
+        }
+
+        return response()->json($responsePayload, 201);
+    }
+
+    /**
+     * Verify email using 6-digit verification code.
+     * Enforces one-time usage and TTL validation.
+     */
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $request->validate([
+            'code'  => 'required|string',
+            'email' => 'nullable|email',
+        ]);
+
+        $code = trim((string) $request->input('code'));
+        $user = $request->user() ?: auth('sanctum')->user();
+
+        if (!$user && $request->has('email')) {
+            $lookupEmail = strtolower(trim((string) $request->input('email')));
+            $user = User::where('email', $lookupEmail)->first();
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengguna tidak ditemukan atau belum terautentikasi.',
+            ], 404);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Alamat email sudah diverifikasi sebelumnya.',
+                'user'    => $user,
+            ]);
+        }
+
+        $cachedCode = Cache::get("email_verify_code_{$user->id}");
+
+        if (!$cachedCode || $cachedCode !== $code) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kode verifikasi tidak valid atau telah kedaluwarsa.',
+            ], 422);
+        }
+
+        // Successfully verified
+        $user->email_verified_at = now();
+        $user->save();
+
+        // Invalidate cached code immediately to prevent reuse (one-time use)
+        Cache::forget("email_verify_code_{$user->id}");
+        Cache::forget("email_verify_email_{$user->email}");
+
+        $userData = $user->load(['shop', 'addresses'])->toArray();
+        unset($userData['password'], $userData['remember_token']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Alamat email berhasil diverifikasi.',
+            'user'    => $userData,
+        ]);
+    }
+
+    /**
+     * Resend verification code (rate-limited via route throttle).
+     */
+    public function resendVerification(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'nullable|email',
+        ]);
+
+        $user = $request->user() ?: auth('sanctum')->user();
+        if (!$user && $request->has('email')) {
+            $lookupEmail = strtolower(trim((string) $request->input('email')));
+            $user = User::where('email', $lookupEmail)->first();
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengguna dengan email tersebut tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Alamat email sudah diverifikasi.',
+            ], 400);
+        }
+
+        $verificationCode = sprintf('%06d', random_int(100000, 999999));
+        Cache::put("email_verify_code_{$user->id}", $verificationCode, now()->addMinutes(60));
+        Cache::put("email_verify_email_{$user->email}", ['code' => $verificationCode, 'user_id' => $user->id], now()->addMinutes(60));
+
+        try {
+            \Illuminate\Support\Facades\Log::info("PASARIA: Resent verification code for {$user->email}: {$verificationCode}");
+        } catch (\Throwable $logErr) {}
+
+        $responsePayload = [
+            'success' => true,
+            'message' => 'Kode verifikasi baru telah dikirimkan ke email Anda.',
+        ];
+
+        if (app()->environment('testing', 'local')) {
+            $responsePayload['verification_code'] = $verificationCode;
+        }
+
+        return response()->json($responsePayload, 200);
     }
 
     /**

@@ -159,6 +159,32 @@ export const api = {
     }
   },
 
+  async verifyEmail(code: string, email?: string): Promise<{ success: boolean; message: string; user?: User }> {
+    const res = await fetch('/api/auth/verify-email', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ code, email }),
+    });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.message || 'Gagal memverifikasi email');
+    }
+    return json;
+  },
+
+  async resendVerification(email?: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ email }),
+    });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.message || 'Gagal mengirim ulang kode verifikasi');
+    }
+    return json;
+  },
+
   async getMe(): Promise<User | null> {
     try {
       const res = await fetch('/api/auth/me', { headers: getAuthHeaders() });

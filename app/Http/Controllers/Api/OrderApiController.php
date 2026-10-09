@@ -257,6 +257,12 @@ class OrderApiController extends Controller
                     'message' => 'Akses ditolak. Anda bukan pemilik toko untuk pesanan ini.',
                 ], 403);
             }
+            if ($user->shop->status !== 'approved') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Toko Anda belum disetujui untuk memproses pesanan.',
+                ], 403);
+            }
         }
 
         $newStatus = strtolower(trim($request->input('status', '')));

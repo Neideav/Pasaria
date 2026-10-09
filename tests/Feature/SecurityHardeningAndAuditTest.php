@@ -44,6 +44,7 @@ class SecurityHardeningAndAuditTest extends TestCase
             'password' => Hash::make('password123'),
             'role' => 'customer',
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
 
         $this->otherCustomer = User::create([
@@ -53,6 +54,7 @@ class SecurityHardeningAndAuditTest extends TestCase
             'password' => Hash::make('password123'),
             'role' => 'customer',
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
 
         $this->seller = User::create([
@@ -62,6 +64,7 @@ class SecurityHardeningAndAuditTest extends TestCase
             'password' => Hash::make('password123'),
             'role' => 'seller',
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
 
         $this->otherSeller = User::create([
@@ -71,6 +74,7 @@ class SecurityHardeningAndAuditTest extends TestCase
             'password' => Hash::make('password123'),
             'role' => 'seller',
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
 
         $this->admin = User::create([

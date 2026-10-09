@@ -99,6 +99,8 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 |---|---|---|---|
 | POST | /api/auth/login | Api\AuthApiController@login | Public |
 | POST | /api/auth/register | Api\AuthApiController@register | Public |
+| POST | /api/auth/verify-email | Api\AuthApiController@verifyEmail | Public / Authenticated |
+| POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
 | GET | /api/products | Api\ProductApiController@index | Public |
 | GET | /api/products/{slug} | Api\ProductApiController@show | Public |

@@ -185,6 +185,12 @@ class SellerApiController extends Controller
             if (!$user->shop || $user->shop->id !== $product->shop_id) {
                 return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
             }
+            if ($user->shop->status !== 'approved') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Toko Anda belum disetujui untuk mengubah stok produk.',
+                ], 403);
+            }
         }
 
         $request->validate([
@@ -268,6 +274,20 @@ class SellerApiController extends Controller
         $shop = $user->shop;
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
+        }
+
+        if ($shop->status !== 'approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Toko Anda belum disetujui untuk mengajukan penarikan dana.',
+            ], 403);
+        }
+
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Verifikasi email diperlukan untuk mengajukan penarikan dana.',
+            ], 403);
         }
 
         $request->validate([

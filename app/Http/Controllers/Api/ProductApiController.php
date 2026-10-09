@@ -232,6 +232,13 @@ class ProductApiController extends Controller
             ], 403);
         }
 
+        if (!$user->isAdmin() && (!$shop || $shop->status !== 'approved')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Toko Anda belum disetujui untuk menjual produk di PASARIA.',
+            ], 403);
+        }
+
         $request->validate([
             'name'           => 'required|string|max:255',
             'category'       => 'required|string|max:100',
@@ -323,6 +330,12 @@ class ProductApiController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak memiliki hak untuk menghapus produk toko lain.',
+                ], 403);
+            }
+            if ($user->shop->status !== 'approved') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Toko Anda belum disetujui atau sedang ditangguhkan.',
                 ], 403);
             }
         }

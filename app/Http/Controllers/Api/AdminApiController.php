@@ -104,8 +104,16 @@ class AdminApiController extends Controller
             'status' => 'required|string|in:active,suspended',
         ]);
 
-        $newStatus = $request->input('status');
+        $newStatus = strtolower(trim((string) $request->input('status')));
         $targetUser->status = $newStatus;
+
+        // If user is suspended, revoke all active Sanctum tokens and suspend their shop
+        if ($newStatus === 'suspended') {
+            $targetUser->tokens()->delete();
+            if ($targetUser->shop) {
+                $targetUser->shop->update(['status' => 'suspended', 'verified' => false]);
+            }
+        }
         $targetUser->save();
 
         AdminAction::create([
@@ -113,7 +121,7 @@ class AdminApiController extends Controller
             'action' => 'update_user_status',
             'target_type' => 'user',
             'target_id' => $targetUser->id,
-            'details_json' => ['new_status' => $newStatus],
+            'details_json' => ['new_status' => $newStatus, 'tokens_revoked' => ($newStatus === 'suspended')],
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
         ]);
@@ -168,10 +176,24 @@ class AdminApiController extends Controller
             'status' => 'required|string|in:approved,rejected,suspended,pending',
         ]);
 
-        $status = $request->input('status');
+        $status = strtolower(trim((string) $request->input('status')));
         $shop->status = $status;
         $shop->verified = ($status === 'approved');
         $shop->save();
+
+        // Synchronize owner role and active tokens based on lifecycle transition
+        if ($status === 'approved') {
+            if ($shop->user && !$shop->user->isAdmin()) {
+                $shop->user->update(['role' => 'seller']);
+            }
+        } elseif (in_array($status, ['rejected', 'suspended'], true)) {
+            if ($shop->user && !$shop->user->isAdmin()) {
+                $shop->user->update(['role' => 'customer']);
+                if ($status === 'suspended') {
+                    $shop->user->tokens()->delete();
+                }
+            }
+        }
 
         AdminAction::create([
             'user_id' => $user->id,

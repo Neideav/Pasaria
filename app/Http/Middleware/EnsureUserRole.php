@@ -16,7 +16,7 @@ class EnsureUserRole
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        $user = $request->user();
+        $user = $request->user()?->fresh() ?? $request->user();
 
         if (!$user) {
             return response()->json([

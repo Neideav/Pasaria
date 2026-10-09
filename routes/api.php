@@ -58,17 +58,19 @@ Route::post('/config/demo-mode', [ConfigApiController::class, 'toggleDemoMode'])
 Route::post('/orders/calculate', [OrderApiController::class, 'calculate']);
 
 // =========================================================================
-// 2. AUTHENTICATION (Rate-limited, Public Endpoints)
+// 2. AUTHENTICATION & ACCOUNT ACTIVATION (Rate-limited Endpoints)
 // =========================================================================
 Route::middleware(['throttle:30,1'])->group(function () {
     Route::post('/auth/login', [AuthApiController::class, 'login']);
     Route::post('/auth/register', [AuthApiController::class, 'register']);
+    Route::post('/auth/verify-email', [AuthApiController::class, 'verifyEmail']);
+    Route::post('/auth/resend-verification', [AuthApiController::class, 'resendVerification'])->middleware('throttle:6,1');
 });
 
 // =========================================================================
-// 3. AUTHENTICATED CUSTOMER ENDPOINTS (Requires Sanctum Bearer Token)
+// 3. AUTHENTICATED CUSTOMER ENDPOINTS (Requires Sanctum Bearer Token & Active Account)
 // =========================================================================
-Route::middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['auth:sanctum', 'account.active'])->group(function () {
 
     // Identity, Session & Profile
     Route::get('/auth/me', [AuthApiController::class, 'me']);
@@ -134,7 +136,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 // =========================================================================
 // 4. SELLER CENTER ENDPOINTS (Requires Sanctum + role:seller,admin)
 // =========================================================================
-Route::middleware(['auth:sanctum', 'role:seller,admin'])->group(function () {
+Route::middleware(['auth:sanctum', 'account.active', 'role:seller,admin'])->group(function () {
     Route::get('/seller/dashboard', [SellerApiController::class, 'dashboard']);
     Route::get('/seller/products', [SellerApiController::class, 'products']);
     Route::get('/seller/inventory', [SellerApiController::class, 'inventory']);
@@ -160,7 +162,7 @@ Route::middleware(['auth:sanctum', 'role:seller,admin'])->group(function () {
 // =========================================================================
 // 5. SUPPORT & MODERATION ENDPOINTS (Requires Sanctum + role:support,admin)
 // =========================================================================
-Route::middleware(['auth:sanctum', 'role:support,admin'])->group(function () {
+Route::middleware(['auth:sanctum', 'account.active', 'role:support,admin'])->group(function () {
     Route::get('/admin/reports', [AdminApiController::class, 'reports']);
     Route::put('/admin/reviews/{id}/moderate', [AdminApiController::class, 'moderateReview']);
 });
@@ -168,7 +170,7 @@ Route::middleware(['auth:sanctum', 'role:support,admin'])->group(function () {
 // =========================================================================
 // 6. ADMIN PANEL ENDPOINTS (Requires Sanctum + role:admin)
 // =========================================================================
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::middleware(['auth:sanctum', 'account.active', 'role:admin'])->group(function () {
     Route::get('/admin/dashboard', [AdminApiController::class, 'dashboard']);
     Route::get('/admin/users', [AdminApiController::class, 'users']);
     Route::put('/admin/users/{id}/status', [AdminApiController::class, 'updateUserStatus']);
