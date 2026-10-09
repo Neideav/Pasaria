@@ -135,21 +135,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+      className="motion-modal-backdrop fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
     >
+      {/* Motion Point #21: AuthModal Centered Scale Entrance (scale(0.96) -> scale(1) in 220ms) */}
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
-        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 border border-slate-100 text-left"
+        className="motion-modal relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 border border-slate-100 text-left"
       >
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Tutup modal autentikasi"
-          className="absolute right-5 top-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
+          className="motion-press absolute right-5 top-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
         >
           <X className="w-4 h-4" />
         </button>
@@ -174,7 +175,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Notice message */}
         {message && !errorMsg && (
-          <div className="p-3.5 mb-5 rounded-2xl bg-[#003d29]/5 border border-[#003d29]/20 text-[#003d29] text-xs font-medium flex items-center gap-3 shadow-2xs animate-in fade-in">
+          <div className="p-3.5 mb-5 rounded-2xl bg-[#003d29]/5 border border-[#003d29]/20 text-[#003d29] text-xs font-medium flex items-center gap-3 shadow-2xs">
             <div className="w-6 h-6 rounded-full bg-[#003d29]/10 flex items-center justify-center shrink-0 text-[#003d29]">
               <Info className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
@@ -189,9 +190,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
-        {/* Login Form */}
+        {/* Motion Point #22: Login vs Register View Horizontal Slide / Crossfade (180ms var(--ease-out)) */}
         {tab === 'login' ? (
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+          <form key="login-form" onSubmit={handleLoginSubmit} className="motion-auth-form-enter-reverse space-y-4 text-xs">
             <div>
               <label htmlFor="auth-login-identifier" className="block text-[11px] font-semibold text-slate-700 mb-1">
                 Email atau Username
@@ -239,7 +240,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="button"
                   onClick={() => setShowLoginPassword((prev) => !prev)}
                   aria-label={showLoginPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                  className="motion-press absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
                 >
                   {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -249,7 +250,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full min-h-[44px] py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-2"
+              className="motion-press active:scale-[0.97] w-full min-h-[44px] py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-2"
             >
               {loading ? 'Memproses Masuk...' : 'Masuk ke PASARIA'}
             </button>
@@ -269,8 +270,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           </form>
         ) : (
-          /* Register Form - Single-Column Linear Layout */
-          <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
+          /* Register Form - Single-Column Linear Layout with Motion Point #22 horizontal slide */
+          <form key="register-form" onSubmit={handleRegisterSubmit} className="motion-auth-form-enter space-y-3.5 text-xs">
             <div>
               <label htmlFor="auth-reg-name" className="block text-[11px] font-semibold text-slate-700 mb-1">
                 Nama Lengkap
@@ -338,7 +339,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="button"
                   onClick={() => setShowRegPassword((prev) => !prev)}
                   aria-label={showRegPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                  className="motion-press absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
                 >
                   {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -364,7 +365,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="button"
                   onClick={() => setShowRegConfirmPassword((prev) => !prev)}
                   aria-label={showRegConfirmPassword ? 'Sembunyikan konfirmasi kata sandi' : 'Tampilkan konfirmasi kata sandi'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                  className="motion-press absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
                 >
                   {showRegConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -374,7 +375,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full min-h-[44px] py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-3"
+              className="motion-press active:scale-[0.97] w-full min-h-[44px] py-3 px-4 rounded-full font-bold text-xs sm:text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] shadow-md shadow-emerald-950/10 cursor-pointer disabled:opacity-50 mt-3"
             >
               {loading ? 'Mendaftarkan...' : 'Buat Akun Baru'}
             </button>

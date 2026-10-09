@@ -372,14 +372,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="motion-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs"
     >
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="checkout-modal-title"
-        className="bg-white w-full max-w-4xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden text-left"
+        className="motion-modal bg-white w-full max-w-4xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden text-left"
       >
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
@@ -400,10 +400,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Tutup modal checkout"
-            className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-colors cursor-pointer"
+            className="motion-press w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Motion Point #24: Step Progression Bar Linear Transition (transition: width 250ms var(--ease-out)) */}
+        <div
+          className="w-full bg-slate-100 h-1 overflow-hidden shrink-0"
+          role="progressbar"
+          aria-valuenow={step === 'delivery' ? 50 : 100}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Progres langkah checkout"
+        >
+          <div
+            className="h-full bg-[#003d29] transition-[width] duration-250 ease-[var(--ease-out)]"
+            style={{ width: step === 'delivery' ? '50%' : '100%' }}
+          />
         </div>
 
         {/* Body Content */}
@@ -603,9 +618,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <label
                           key={c.id}
                           htmlFor={`courier-${c.id}`}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
+                          className={`motion-press p-3.5 rounded-2xl border transition-[border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] active:scale-[0.98] cursor-pointer flex items-center justify-between text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
                             isSelected
-                              ? 'border-[#003d29] bg-emerald-50/50 ring-1 ring-[#003d29]'
+                              ? 'border-[#003d29] bg-emerald-50/50 ring-2 ring-[#003d29]/20 shadow-xs'
                               : 'border-slate-200 hover:border-slate-300 bg-white'
                           }`}
                         >
@@ -641,7 +656,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <button
                   type="button"
                   onClick={handleProceedToPayment}
-                  className="w-full min-h-[44px] py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10"
+                  className="motion-press active:scale-[0.97] w-full min-h-[44px] py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10"
                 >
                   <span>Lanjut ke Metode Pembayaran</span>
                   <ArrowRight className="w-4 h-4" />
@@ -668,9 +683,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <label
                           key={pm.id}
                           htmlFor={`payment-${pm.id}`}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
+                          className={`motion-press p-3.5 rounded-2xl border transition-[border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] active:scale-[0.98] cursor-pointer flex items-center gap-3 text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
                             isSelected
-                              ? 'border-[#003d29] bg-emerald-50/50 ring-1 ring-[#003d29]'
+                              ? 'border-[#003d29] bg-emerald-50/50 ring-2 ring-[#003d29]/20 shadow-xs'
                               : 'border-slate-200 hover:border-slate-300 bg-white'
                           }`}
                         >
@@ -697,7 +712,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setStep('delivery')}
-                    className="w-1/3 min-h-[44px] py-3 px-4 rounded-full border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-colors cursor-pointer"
+                    className="motion-press active:scale-[0.97] w-1/3 min-h-[44px] py-3 px-4 rounded-full border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform] duration-160 ease-[var(--ease-out)] cursor-pointer"
                   >
                     Kembali
                   </button>
@@ -705,7 +720,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     type="button"
                     onClick={handleCompleteOrder}
                     disabled={isSubmitting}
-                    className="w-2/3 min-h-[44px] py-3.5 px-6 rounded-full font-black text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10 disabled:opacity-40"
+                    className="motion-press active:scale-[0.97] w-2/3 min-h-[44px] py-3.5 px-6 rounded-full font-black text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10 disabled:opacity-40"
                   >
                     <Lock className="w-4 h-4" />
                     <span className="tabular-nums">{isSubmitting ? 'Memproses Pesanan...' : `Bayar ${formatRupiah(calcTotal)}`}</span>

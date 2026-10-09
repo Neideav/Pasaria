@@ -116,8 +116,14 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-4xl h-[620px] rounded-3xl shadow-2xl border border-slate-100 flex overflow-hidden text-left">
+    <div
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="motion-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs"
+    >
+      <div className="motion-modal bg-white w-full max-w-4xl h-[620px] rounded-3xl shadow-2xl border border-slate-100 flex overflow-hidden text-left">
         {/* Left: Conversation List */}
         <div className="w-1/3 border-r border-slate-100 flex flex-col bg-slate-50/50">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
@@ -143,7 +149,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                   <button
                     key={conv.id}
                     onClick={() => setActiveConv(conv)}
-                    className={`w-full p-3.5 flex items-start gap-3 transition-colors text-left cursor-pointer ${
+                    className={`motion-press w-full p-3.5 flex items-start gap-3 transition-colors text-left cursor-pointer ${
                       isSelected ? 'bg-emerald-50/70 border-l-4 border-[#003d29]' : 'hover:bg-slate-100/70'
                     }`}
                   >
@@ -193,8 +199,10 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             )}
 
             <button
+              type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              aria-label="Tutup jendela chat"
+              className="motion-press w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -210,10 +218,11 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               ) : (
                 messages.map((m) => {
                   const isMine = m.sender_type === 'customer';
+                  // Motion Point #26: ChatModal Message Bubble Entry Slide-Up (translateY(8px) in 180ms)
                   return (
                     <div
                       key={m.id}
-                      className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+                      className={`motion-message-bubble flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                     >
                       <div
                         className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed ${
@@ -246,8 +255,9 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               {quickReplies.map((qr, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => setInputMessage(qr)}
-                  className="px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-600 hover:text-[#003d29] transition-colors cursor-pointer shrink-0"
+                  className="motion-press active:scale-[0.96] px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-600 hover:text-[#003d29] transition-all cursor-pointer shrink-0"
                 >
                   {qr}
                 </button>
@@ -268,7 +278,8 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               <button
                 type="submit"
                 disabled={!inputMessage.trim() || sending}
-                className="w-10 h-10 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer shrink-0"
+                aria-label="Kirim pesan"
+                className="motion-press active:scale-[0.92] w-10 h-10 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white flex items-center justify-center transition-[background-color,transform] duration-160 ease-[var(--ease-out)] disabled:opacity-40 cursor-pointer shrink-0"
               >
                 <Send className="w-4 h-4" />
               </button>

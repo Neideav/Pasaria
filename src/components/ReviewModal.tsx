@@ -65,11 +65,24 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 text-left relative">
+    <div
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="motion-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="review-modal-title"
+        className="motion-modal bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 text-left relative"
+      >
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-5 right-5 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+          aria-label="Tutup modal ulasan"
+          className="motion-press absolute top-5 right-5 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -102,6 +115,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 Kualitas Produk & Kepuasan:
               </label>
               <div className="flex items-center gap-2">
+                {/* Motion Point #28: ReviewModal Star Rating Hover Scale & Click Bounce */}
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
@@ -109,7 +123,8 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     onClick={() => setRating(star)}
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
-                    className="p-1 focus:outline-none cursor-pointer"
+                    aria-label={`Beri ${star} bintang`}
+                    className="motion-press p-1 focus:outline-none cursor-pointer hover:scale-125 active:scale-90 transition-transform duration-120 ease-[var(--ease-out)] origin-center"
                   >
                     <Star
                       className={`w-7 h-7 transition-colors ${
@@ -164,14 +179,14 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+                className="motion-press active:scale-[0.97] px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2.5 rounded-full font-bold text-white bg-[#003d29] hover:bg-[#064e3b] transition-all disabled:opacity-40 cursor-pointer"
+                className="motion-press active:scale-[0.97] px-6 py-2.5 rounded-full font-bold text-white bg-[#003d29] hover:bg-[#064e3b] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] disabled:opacity-40 cursor-pointer"
               >
                 {submitting ? 'Mengirim...' : 'Kirim Ulasan'}
               </button>

@@ -149,6 +149,86 @@
   }
 }
 
+/* Motion Point #21 & #23 & #27: Centered Modal Dialog Entrance (scale(0.96) -> scale(1) in 220ms) */
+.motion-modal {
+  transform-origin: center center;
+  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+  animation: motionModalIn 220ms var(--ease-out) forwards;
+}
+
+@keyframes motionModalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Motion Point #21 & #23: Modal Backdrop Fade (opacity in 200ms) */
+.motion-modal-backdrop {
+  transition: opacity 200ms var(--ease-out);
+  animation: motionBackdropIn 200ms var(--ease-out) forwards;
+}
+
+@keyframes motionBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Motion Point #22: AuthModal Login vs Register Horizontal Slide & Crossfade (180ms) */
+.motion-auth-form-enter {
+  animation: authFormIn 180ms var(--ease-out) forwards;
+}
+
+@keyframes authFormIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.motion-auth-form-enter-reverse {
+  animation: authFormInReverse 180ms var(--ease-out) forwards;
+}
+
+@keyframes authFormInReverse {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Motion Point #26: ChatModal Message Bubble slide-up entrance (translateY(8px) in 180ms) */
+.motion-message-bubble {
+  animation: messageBubbleIn 180ms var(--ease-out) forwards;
+}
+
+@keyframes messageBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @starting-style {
   .motion-popover,
   .motion-popover-160 {
@@ -159,10 +239,25 @@
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
   }
-}
-
-.motion-modal {
-  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+  .motion-modal {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  .motion-modal-backdrop {
+    opacity: 0;
+  }
+  .motion-auth-form-enter {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  .motion-auth-form-enter-reverse {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  .motion-message-bubble {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .motion-toast {
@@ -185,7 +280,12 @@
   .motion-search-suggestions,
   .motion-badge-pop,
   .motion-sticky-bottom,
-  .motion-tab-pane {
+  .motion-tab-pane,
+  .motion-modal,
+  .motion-modal-backdrop,
+  .motion-auth-form-enter,
+  .motion-auth-form-enter-reverse,
+  .motion-message-bubble {
     animation: none !important;
     transform: none !important;
     opacity: 1 !important;
