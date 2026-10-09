@@ -331,49 +331,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               >
                 {loading ? (isId ? 'Memproses Masuk...' : 'Signing in...') : isId ? 'Masuk ke Akun' : 'Log in'}
               </button>
-
-              {/* Quick Demo Credentials */}
-              <div className="pt-2">
-                <div className="text-[11px] font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{isId ? 'Pilih Akun Demo (1-Klik Isi):' : 'Instant Demo Accounts:'}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUsername('customer@pasaria.id');
-                      setPassword('password123');
-                    }}
-                    className="p-2 rounded-xl bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 text-left transition-all cursor-pointer group"
-                  >
-                    <div className="font-bold text-[11px] text-slate-800 group-hover:text-emerald-800">Pembeli</div>
-                    <div className="text-[10px] text-slate-500 truncate">customer@...</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUsername('seller@pasaria.id');
-                      setPassword('password123');
-                    }}
-                    className="p-2 rounded-xl bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 text-left transition-all cursor-pointer group"
-                  >
-                    <div className="font-bold text-[11px] text-slate-800 group-hover:text-emerald-800">Penjual</div>
-                    <div className="text-[10px] text-slate-500 truncate">seller@...</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUsername('admin@pasaria.id');
-                      setPassword('admin123');
-                    }}
-                    className="p-2 rounded-xl bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 text-left transition-all cursor-pointer group"
-                  >
-                    <div className="font-bold text-[11px] text-slate-800 group-hover:text-emerald-800">Admin</div>
-                    <div className="text-[10px] text-slate-500 truncate">admin@...</div>
-                  </button>
-                </div>
-              </div>
             </form>
           )}
 
