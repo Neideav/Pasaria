@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { CartItem, User, DeliveryShipment, UserAddress } from '../types';
 import { ProductVisual } from './ProductVisual';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import { formatRupiah } from '../utils/formatters';
 
 export interface CourierOption {
@@ -192,6 +192,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const calcTotal = serverCalculation?.total ?? Math.max(0, calcSubtotal + calcShipping + calcTax - calcDiscount);
 
   const handleCompleteOrder = async () => {
+    if (isSubmitting) return;
+
     if (!recipientName.trim() || !addressLine.trim() || !city.trim()) {
       setValidationError('Mohon lengkapi alamat pengiriman secara lengkap.');
       return;
@@ -241,9 +243,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         checkpoints: [],
       };
 
+      setIdempotencyKey(`idemp-${Date.now()}`);
       onOrderSuccess(res.order_number, shipment, true);
     } catch (err: any) {
-      setValidationError(err.message || 'Gagal membuat pesanan. Silakan coba lagi.');
+      const errorMsg =
+        (err instanceof ApiError && err.getFirstValidationError()) ||
+        err.message ||
+        'Gagal memproses pesanan. Silakan periksa kembali rincian data Anda.';
+      setValidationError(errorMsg);
+    } finally {
       setIsSubmitting(false);
     }
   };

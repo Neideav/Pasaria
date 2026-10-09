@@ -89,6 +89,56 @@ class LedgerService
     }
 
     /**
+     * Debit seller wallet when an escrow-released completed order is refunded.
+     */
+    public function debitRefund(Shop $shop, float $refundAmount, Order $order, string $refundReference): ?WalletTransaction
+    {
+        return DB::transaction(function () use ($shop, $refundAmount, $order, $refundReference) {
+            $wallet = Wallet::where('shop_id', $shop->id)->lockForUpdate()->first();
+            if (!$wallet) {
+                return null;
+            }
+
+            // Prevent duplicate debit for the same refund reference
+            $alreadyDebited = WalletTransaction::where('wallet_id', $wallet->id)
+                ->where('reference_type', 'refund')
+                ->where('reference_id', $refundReference)
+                ->exists();
+
+            if ($alreadyDebited) {
+                return null;
+            }
+
+            // Proportional clawback of seller's net earnings (deducting marketplace fee)
+            $orderSubtotal = max(1.0, (float) $order->subtotal);
+            $proportion = min(1.0, $refundAmount / (float) max(1.0, $order->total));
+            $subtotalPortion = round($orderSubtotal * $proportion, 2);
+            $platformFeePortion = round($subtotalPortion * 0.05, 2);
+            $sellerDebitAmount = max(0.0, round($subtotalPortion - $platformFeePortion, 2));
+
+            // Decrement wallet balance
+            $wallet->decrement('balance', min((float) $wallet->balance, $sellerDebitAmount));
+            $wallet->refresh();
+
+            $orderNumber = $order->order_number ?: $order->master_order_number;
+
+            $transaction = WalletTransaction::create([
+                'wallet_id'      => $wallet->id,
+                'type'           => 'debit',
+                'amount'         => $sellerDebitAmount,
+                'balance_after'  => (float) $wallet->available_balance,
+                'reference_type' => 'refund',
+                'reference_id'   => $refundReference,
+                'description'    => "Penyesuaian pengembalian dana pesanan #{$orderNumber} (Ref: {$refundReference})",
+            ]);
+
+            $shop->decrement('total_sales', min((float) $shop->total_sales, $subtotalPortion));
+
+            return $transaction;
+        }, 3);
+    }
+
+    /**
      * Reserve seller funds for payout request atomically.
      *
      * @param Shop $shop

@@ -51,6 +51,8 @@ export default function App() {
   >('home');
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedShopProfile, setSelectedShopProfile] = useState<Shop | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -156,7 +158,23 @@ export default function App() {
 
   // On mount: authenticate with Sanctum session & load data
   useEffect(() => {
+    const unsub = api.onUnauthorized(() => {
+      setUser(null);
+      localStorage.removeItem('pasaria_user');
+      setCartItems([]);
+      setOrders([]);
+      setView((currView) =>
+        ['profile', 'orders', 'delivery', 'shop_dashboard', 'admin'].includes(currView) ? 'home' : currView
+      );
+      setAuthMessage('Sesi login Anda telah berakhir. Silakan masuk kembali.');
+      setAuthModalOpen(true);
+    });
+
     bootstrapSession();
+
+    return () => {
+      unsub();
+    };
   }, []);
 
   const bootstrapSession = async () => {
@@ -242,6 +260,8 @@ export default function App() {
   }, [user?.id]);
 
   const loadProducts = async () => {
+    setProductsLoading(true);
+    setProductsError(null);
     try {
       const selectedCat =
         filters.category && filters.category !== 'all'
@@ -302,8 +322,11 @@ export default function App() {
 
       setProducts(list);
       setVisibleCount(INITIAL_VISIBLE_COUNT);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load products:', err);
+      setProductsError(err.message || 'Gagal memuat katalog produk.');
+    } finally {
+      setProductsLoading(false);
     }
   };
 
@@ -675,7 +698,22 @@ export default function App() {
                 </div>
               </div>
 
-              {currentProducts.length > 0 ? (
+              {productsLoading ? (
+                <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
+                  <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-slate-500 font-medium">Memuat rekomendasi produk PASARIA...</span>
+                </div>
+              ) : productsError ? (
+                <div className="py-12 px-6 rounded-2xl bg-rose-50 border border-rose-200 text-center space-y-3 max-w-md mx-auto">
+                  <p className="text-xs font-semibold text-rose-700">{productsError}</p>
+                  <button
+                    onClick={() => loadProducts()}
+                    className="px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Coba Lagi
+                  </button>
+                </div>
+              ) : currentProducts.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
                   {currentProducts.map((p) => (
                     <ProductCard

@@ -187,4 +187,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'role:admin'])->group(funct
     Route::get('/admin/payouts', [AdminApiController::class, 'payouts']);
     Route::post('/admin/payouts/{id}/approve', [AdminApiController::class, 'approvePayout']);
     Route::post('/admin/payouts/{id}/reject', [AdminApiController::class, 'rejectPayout']);
+
+    // Customer Refunds Review
+    Route::get('/admin/refunds', [AdminApiController::class, 'refunds']);
 });

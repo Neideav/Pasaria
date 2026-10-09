@@ -32,6 +32,11 @@ class Order extends Model
         'voucher_discount',
         'idempotency_key',
         'items_json',
+        'cancelled_at',
+        'cancelled_by',
+        'cancellation_reason',
+        'refund_status',
+        'refund_amount',
     ];
 
     protected $casts = [
@@ -42,8 +47,11 @@ class Order extends Model
         'shipping_cost' => 'decimal:2',
         'total' => 'decimal:2',
         'voucher_discount' => 'decimal:2',
+        'refund_amount' => 'decimal:2',
         'user_id' => 'integer',
         'shop_id' => 'integer',
+        'cancelled_by' => 'integer',
+        'cancelled_at' => 'datetime',
     ];
 
     public function user()
@@ -74,6 +82,11 @@ class Order extends Model
     public function returns()
     {
         return $this->hasMany(OrderReturn::class);
+    }
+
+    public function refunds()
+    {
+        return $this->hasMany(Refund::class);
     }
 
     public function subOrders()

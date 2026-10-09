@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Store, User, MessageCircle, Clock, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Send, Store, MessageCircle, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { Conversation, Message, User as UserType } from '../types';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import { formatDateTime } from '../utils/formatters';
 
 interface ChatModalProps {
@@ -22,26 +22,13 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isOpen && currentUser) {
-      loadConversations();
-    }
-  }, [isOpen, currentUser]);
-
-  useEffect(() => {
-    if (activeConv) {
-      loadMessages(activeConv.id);
-    }
-  }, [activeConv?.id]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     try {
       setLoading(true);
       const list = await api.getConversations();
@@ -55,29 +42,76 @@ export const ChatModal: React.FC<ChatModalProps> = ({
           // Start conversation with this shop
           try {
             const newConv = await api.startConversation(initialShopId);
-            setConversations((prev) => [newConv, ...prev]);
+            setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== newConv.id)]);
             setActiveConv(newConv);
           } catch (e) {
             console.warn('Start conversation error:', e);
           }
         }
-      } else if (list.length > 0) {
+      } else if (list.length > 0 && !activeConv) {
         setActiveConv(list[0]);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Load conversations error:', e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [initialShopId, activeConv]);
 
-  const loadMessages = async (convId: number) => {
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      loadConversations();
+    }
+  }, [isOpen, currentUser, loadConversations]);
+
+  const loadMessages = useCallback(async (convId: number, silent: boolean = false) => {
+    if (!silent) setMessagesLoading(true);
     try {
       const msgs = await api.getMessages(convId);
-      setMessages(msgs || []);
+      setMessages((prev) => {
+        // Merge and deduplicate by message id to prevent duplicate renders
+        const map = new Map<number, Message>();
+        msgs.forEach((m) => map.set(m.id, m));
+        // Keep optimistic/pending if any, but backend msgs are authoritative
+        return Array.from(map.values()).sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      });
     } catch (e) {
       console.warn('Load messages error:', e);
+    } finally {
+      if (!silent) setMessagesLoading(false);
+      setIsRefreshing(false);
     }
+  }, []);
+
+  // Initial message load on active conversation switch
+  useEffect(() => {
+    if (activeConv) {
+      loadMessages(activeConv.id, false);
+    }
+  }, [activeConv?.id, loadMessages]);
+
+  // Periodic bounded polling for conversation updates (every 5 seconds while open)
+  useEffect(() => {
+    if (!isOpen || !activeConv) return;
+
+    const intervalId = setInterval(() => {
+      loadMessages(activeConv.id, true);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [isOpen, activeConv?.id, loadMessages]);
+
+  // Auto-scroll to bottom on message update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleManualRefresh = () => {
+    if (!activeConv) return;
+    setIsRefreshing(true);
+    loadMessages(activeConv.id, false);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -85,12 +119,21 @@ export const ChatModal: React.FC<ChatModalProps> = ({
     if (!inputMessage.trim() || !activeConv || sending) return;
 
     const text = inputMessage.trim();
-    setInputMessage('');
     setSending(true);
+    setSendError(null);
 
     try {
       const newMsg = await api.sendMessage(activeConv.id, text);
-      setMessages((prev) => [...prev, newMsg]);
+      setInputMessage('');
+      setMessages((prev) => {
+        const map = new Map<number, Message>();
+        prev.forEach((m) => map.set(m.id, m));
+        map.set(newMsg.id, newMsg);
+        return Array.from(map.values()).sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      });
+
       // Update snippet in conversation list
       setConversations((prev) =>
         prev.map((c) =>
@@ -99,8 +142,9 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             : c
         )
       );
-    } catch (e) {
-      console.warn('Send message error:', e);
+    } catch (err: any) {
+      const msg = err instanceof ApiError ? err.message : 'Gagal mengirim pesan. Silakan coba lagi.';
+      setSendError(msg);
     } finally {
       setSending(false);
     }
@@ -142,7 +186,10 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                 return (
                   <button
                     key={conv.id}
-                    onClick={() => setActiveConv(conv)}
+                    onClick={() => {
+                      setActiveConv(conv);
+                      setSendError(null);
+                    }}
                     className={`w-full p-3.5 flex items-start gap-3 transition-colors text-left cursor-pointer ${
                       isSelected ? 'bg-emerald-50/70 border-l-4 border-[#003d29]' : 'hover:bg-slate-100/70'
                     }`}
@@ -182,9 +229,9 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                   <h3 className="text-sm font-bold text-slate-900">
                     {activeConv.shop?.name || `Toko #${activeConv.shop_id}`}
                   </h3>
-                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Online · Layanan Pelanggan Resmi
+                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Pembaruan Berkala Aktif (Sinkronisasi Otomatis)
                   </span>
                 </div>
               </div>
@@ -192,18 +239,55 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               <div className="text-xs text-slate-400">Pilih percakapan untuk memulai chat</div>
             )}
 
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              {activeConv && (
+                <button
+                  type="button"
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing || messagesLoading}
+                  title="Segarkan pesan"
+                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#003d29]' : ''}`} />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Send Error Notice */}
+          {sendError && (
+            <div className="px-4 py-2 bg-rose-50 border-b border-rose-200 text-rose-700 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{sendError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSendError(null)}
+                className="text-rose-500 hover:text-rose-800 font-bold ml-2 cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          )}
 
           {/* Messages Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#fafafa]">
             {activeConv ? (
-              messages.length === 0 ? (
+              messagesLoading && messages.length === 0 ? (
+                <div className="py-20 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+                  <span>Memuat pesan...</span>
+                </div>
+              ) : messages.length === 0 ? (
                 <div className="py-20 text-center text-xs text-slate-400">
                   Belum ada pesan. Sapa penjual sekarang!
                 </div>
@@ -246,6 +330,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               {quickReplies.map((qr, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => setInputMessage(qr)}
                   className="px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-600 hover:text-[#003d29] transition-colors cursor-pointer shrink-0"
                 >
@@ -263,7 +348,8 @@ export const ChatModal: React.FC<ChatModalProps> = ({
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 placeholder="Tulis pesan ke penjual..."
-                className="flex-1 px-4 py-2.5 rounded-full bg-slate-100 focus:bg-white text-xs border border-transparent focus:border-[#003d29] focus:outline-none transition-all"
+                disabled={sending}
+                className="flex-1 px-4 py-2.5 rounded-full bg-slate-100 focus:bg-white text-xs border border-transparent focus:border-[#003d29] focus:outline-none transition-all disabled:opacity-50"
               />
               <button
                 type="submit"

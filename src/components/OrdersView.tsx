@@ -3,7 +3,7 @@ import { Package, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Star, Shopping
 import { Order, OrderItemType, Product } from '../types';
 import { ProductVisual } from './ProductVisual';
 import { formatRupiah, formatDateTime } from '../utils/formatters';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 
 interface OrdersViewProps {
   orders: Order[];
@@ -73,6 +73,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   };
 
   const handleCancel = async (orderId: number) => {
+    if (cancellingId !== null) return;
     if (!confirm('Apakah Anda yakin ingin membatalkan pesanan ini? Stok akan dikembalikan secara otomatis.')) {
       return;
     }
@@ -81,7 +82,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       await api.cancelOrder(orderId, 'Dibatalkan oleh pembeli');
       if (onRefreshOrders) onRefreshOrders();
     } catch (err: any) {
-      alert(err.message || 'Gagal membatalkan pesanan.');
+      const msg =
+        (err instanceof ApiError && err.getFirstValidationError()) ||
+        err.message ||
+        'Gagal membatalkan pesanan.';
+      alert(msg);
     } finally {
       setCancellingId(null);
     }

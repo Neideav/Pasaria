@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { User, Shop, Product, Order, Review } from '../types';
 import { ProductVisual } from './ProductVisual';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import { formatRupiah, formatDateTime } from '../utils/formatters';
 
 interface ShopDashboardViewProps {
@@ -60,6 +60,8 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   const [shopPhone, setShopPhone] = useState(user?.phone || '+62 812-3456-7890');
   const [isRegistering, setIsRegistering] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
+  const [updatingVariantId, setUpdatingVariantId] = useState<number | null>(null);
+  const [fulfillingOrderId, setFulfillingOrderId] = useState<number | null>(null);
 
   // Seller Data from API
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -200,26 +202,36 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   };
 
   const handleUpdateStock = async (variantId: number, currentStock: number, delta: number) => {
+    if (updatingVariantId !== null) return;
     const next = Math.max(0, currentStock + delta);
+    setUpdatingVariantId(variantId);
     try {
       await api.updateSellerStock(variantId, next);
       setInventoryList((prev) =>
         prev.map((i) => (i.id === variantId ? { ...i, stock: next } : i))
       );
     } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui stok');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || 'Gagal memperbarui stok';
+      alert(msg);
+    } finally {
+      setUpdatingVariantId(null);
     }
   };
 
   const handleFulfillOrder = async (orderId: number, nextStatus: string) => {
+    if (fulfillingOrderId !== null) return;
+    setFulfillingOrderId(orderId);
     try {
       const trk = `PSR-EXP-${Math.floor(10000000 + Math.random() * 90000000)}`;
       await api.updateOrderStatus(orderId, nextStatus, trk, 'PASARIA Express Priority');
       setActionSuccess(`Pesanan #${orderId} berhasil diproses ke status: ${nextStatus}`);
-      loadSellerData();
+      await loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui status pesanan');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || 'Gagal memperbarui status pesanan';
+      alert(msg);
+    } finally {
+      setFulfillingOrderId(null);
     }
   };
 
@@ -231,15 +243,17 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       await api.replyReview(reviewId, text.trim());
       setActionSuccess('Balasan ulasan berhasil dipublikasikan!');
       setReplyTextMap((prev) => ({ ...prev, [reviewId]: '' }));
-      loadSellerData();
+      await loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal membalas ulasan');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || 'Gagal membalas ulasan';
+      alert(msg);
     }
   };
 
   const handleRequestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (payoutLoading) return;
     const amt = parseFloat(payoutAmount);
     if (!amt || amt <= 0) return;
 
@@ -254,10 +268,11 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
       setActionSuccess(`Permintaan penarikan dana ${formatRupiah(amt)} berhasil diajukan.`);
       setPayoutAmount('');
-      loadSellerData();
+      await loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Gagal mengajukan penarikan saldo');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || 'Gagal mengajukan penarikan saldo';
+      alert(msg);
     } finally {
       setPayoutLoading(false);
     }
@@ -555,20 +570,26 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                     <td className="py-3 px-4 text-right">
                       <div className="inline-flex items-center gap-1">
                         <button
+                          type="button"
+                          disabled={updatingVariantId === inv.id}
                           onClick={() => handleUpdateStock(inv.id, inv.stock, -1)}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer disabled:opacity-40"
                         >
                           -
                         </button>
                         <button
+                          type="button"
+                          disabled={updatingVariantId === inv.id}
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 5)}
-                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer"
+                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer disabled:opacity-40"
                         >
                           +5
                         </button>
                         <button
+                          type="button"
+                          disabled={updatingVariantId === inv.id}
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 20)}
-                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer"
+                          className="px-2.5 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] cursor-pointer disabled:opacity-40"
                         >
                           +20
                         </button>
@@ -624,10 +645,12 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
+                        disabled={fulfillingOrderId === ord.id}
                         onClick={() => handleFulfillOrder(ord.id, 'shipped')}
-                        className="px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs"
+                        className="px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs disabled:opacity-50"
                       >
-                        Kirim Barang (Generate Resi)
+                        {fulfillingOrderId === ord.id ? 'Memproses Resi...' : 'Kirim Barang (Generate Resi)'}
                       </button>
                     </div>
                   </div>

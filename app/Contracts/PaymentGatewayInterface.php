@@ -44,9 +44,19 @@ interface PaymentGatewayInterface
      *   'provider'       => string,
      * ]
      *
-     * @param array $payload
-     * @param array $headers
-     * @return array
+    /**
+     * Parse webhook payload into canonical normalized payment structure.
      */
     public function parseWebhook(array $payload, array $headers): array;
+
+    /**
+     * Process refund with the payment provider.
+     *
+     * @param Payment $payment
+     * @param float $amount
+     * @param string $reason
+     * @param array $options
+     * @return array
+     */
+    public function processRefund(Payment $payment, float $amount, string $reason, array $options = []): array;
 }

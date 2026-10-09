@@ -9,6 +9,10 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\CheckoutService;
 use App\Services\PricingService;
+use App\Services\OrderStateMachine;
+use App\Services\LedgerService;
+use App\Services\RefundService;
+use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,11 +21,22 @@ class OrderApiController extends Controller
 {
     protected CheckoutService $checkoutService;
     protected PricingService $pricingService;
+    protected OrderStateMachine $stateMachine;
+    protected LedgerService $ledgerService;
+    protected RefundService $refundService;
 
-    public function __construct(CheckoutService $checkoutService, PricingService $pricingService)
-    {
+    public function __construct(
+        CheckoutService $checkoutService,
+        PricingService $pricingService,
+        OrderStateMachine $stateMachine,
+        LedgerService $ledgerService,
+        RefundService $refundService
+    ) {
         $this->checkoutService = $checkoutService;
-        $this->pricingService = $pricingService;
+        $this->pricingService  = $pricingService;
+        $this->stateMachine    = $stateMachine;
+        $this->ledgerService   = $ledgerService;
+        $this->refundService   = $refundService;
     }
 
     /**
@@ -276,69 +291,88 @@ class OrderApiController extends Controller
             }
         }
 
+        $request->validate([
+            'status'          => 'required|string',
+            'tracking_number' => 'nullable|string|max:100',
+        ]);
+
         $newStatus = strtolower(trim($request->input('status', '')));
         $currentStatus = strtolower($order->status);
 
-        // State Machine validation
-        $allowedTransitions = [
-            'pending_payment' => ['paid', 'cancelled'],
-            'paid'            => ['processing', 'cancelled'],
-            'processing'      => ['packed', 'shipped', 'cancelled'],
-            'packed'          => ['shipped', 'cancelled'],
-            'shipped'         => ['delivered'],
-            'delivered'       => ['completed', 'return_requested'],
-            'return_requested'=> ['refunded', 'completed'],
-            'completed'       => [],
-            'cancelled'       => [],
-            'refunded'        => [],
-        ];
-
         if ($currentStatus === $newStatus) {
-            // No state change
             return response()->json([
                 'success' => true,
                 'message' => 'Status pesanan tidak berubah.',
-                'data' => $order,
+                'data'    => $order,
             ]);
         }
 
-        if (!isset($allowedTransitions[$currentStatus]) || !in_array($newStatus, $allowedTransitions[$currentStatus], true)) {
-            // Admin can override except terminal completed/cancelled
-            if (!$user->isAdmin() || in_array($currentStatus, ['cancelled', 'completed', 'refunded'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Transisi status dari '{$currentStatus}' ke '{$newStatus}' tidak diizinkan.",
-                ], 422);
+        $userRole = $user->isAdmin() ? 'admin' : ($user->isSeller() ? 'seller' : 'customer');
+
+        try {
+            $this->stateMachine->assertCanTransition($currentStatus, $newStatus, $userRole);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($order, $newStatus, $request) {
+            $order = Order::where('id', $order->id)->lockForUpdate()->first();
+            $order->status = $newStatus;
+            if ($request->has('tracking_number')) {
+                $order->tracking_number = trim($request->input('tracking_number'));
             }
-        }
+            $order->save();
 
-        $order->status = $newStatus;
-        if ($request->has('tracking_number')) {
-            $order->tracking_number = trim($request->input('tracking_number'));
-        }
-        $order->save();
-
-        // Release escrow and credit seller wallet when order transitions to completed
-        if ($newStatus === 'completed') {
-            $ledgerService = app(\App\Services\LedgerService::class);
-            if ($order->subOrders()->exists()) {
-                foreach ($order->subOrders as $sub) {
-                    $ledgerService->creditSale($sub);
+            // Release escrow and credit seller wallet when order transitions to completed
+            if ($newStatus === OrderStateMachine::STATUS_COMPLETED) {
+                if ($order->subOrders()->exists()) {
+                    foreach ($order->subOrders as $sub) {
+                        $this->ledgerService->creditSale($sub);
+                    }
+                } else {
+                    $this->ledgerService->creditSale($order);
                 }
-            } else {
-                $ledgerService->creditSale($order);
             }
-        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Status pesanan berhasil diperbarui.',
-            'data' => $order,
-        ]);
+            // Sync shipment status if exists
+            if ($order->shipment) {
+                if ($newStatus === OrderStateMachine::STATUS_SHIPPED) {
+                    $order->shipment->update([
+                        'status'          => 'in_transit',
+                        'status_label'    => 'Pesanan Sedang Dikirim',
+                        'tracking_number' => $order->tracking_number,
+                    ]);
+                } elseif ($newStatus === OrderStateMachine::STATUS_DELIVERED || $newStatus === OrderStateMachine::STATUS_COMPLETED) {
+                    $order->shipment->update([
+                        'status'       => 'delivered',
+                        'status_label' => 'Pesanan Telah Tiba di Tujuan',
+                    ]);
+                }
+            }
+
+            try {
+                Notification::create([
+                    'user_id'    => $order->user_id,
+                    'title'      => 'Pembaruan Status Pesanan',
+                    'message'    => "Status pesanan #{$order->order_number} diperbarui menjadi: " . OrderStateMachine::getStatusLabel($newStatus),
+                    'type'       => 'order',
+                    'action_url' => "/orders/{$order->order_number}",
+                ]);
+            } catch (\Throwable $e) {}
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Status pesanan berhasil diperbarui.',
+                'data'    => $order,
+            ]);
+        });
     }
 
     /**
-     * Cancel order (Customer or Admin) with atomic inventory restock.
+     * Cancel order (Customer, Seller, or Admin) with atomic inventory restock and refund initiation.
      */
     public function cancel(Request $request, int $id): JsonResponse
     {
@@ -352,30 +386,49 @@ class OrderApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Pesanan tidak ditemukan.'], 404);
         }
 
-        if ($order->user_id !== $user->id && !$user->isAdmin()) {
+        $isBuyer = ($order->user_id === $user->id);
+        $isSeller = ($user->shop && $order->shop_id === $user->shop->id);
+        $isAdmin = $user->isAdmin();
+
+        if (!$isBuyer && !$isSeller && !$isAdmin) {
             return response()->json([
                 'success' => false,
-                'message' => 'Akses ditolak.',
+                'message' => 'Akses ditolak. Anda tidak berhak membatalkan pesanan ini.',
             ], 403);
         }
 
-        if (!in_array($order->status, ['pending_payment', 'paid', 'processing'], true)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pesanan tidak dapat dibatalkan karena sudah dikemas, dikirim, atau selesai.',
-            ], 422);
-        }
+        $reason = trim((string) $request->input('reason', $isBuyer ? 'Dibatalkan oleh pembeli' : ($isSeller ? 'Dibatalkan oleh penjual (Stok habis)' : 'Dibatalkan oleh administrator')));
 
-        // Restore stock and payment/voucher status atomically in transaction
-        DB::transaction(function () use ($order) {
-            $ordersToCancel = [$order];
-            if ($order->subOrders()->exists()) {
-                foreach ($order->subOrders as $sub) {
+        return DB::transaction(function () use ($order, $user, $reason) {
+            $lockedOrder = Order::where('id', $order->id)->lockForUpdate()->first();
+
+            // 1. Idempotency Guard: If already cancelled, do not cancel or restock again!
+            if ($lockedOrder->status === OrderStateMachine::STATUS_CANCELLED) {
+                return response()->json([
+                    'success'    => true,
+                    'message'    => 'Pesanan sudah dibatalkan sebelumnya.',
+                    'idempotent' => true,
+                    'data'       => $lockedOrder,
+                ], 200);
+            }
+
+            // 2. Eligibility Guard
+            if (!$this->stateMachine->isCancellable($lockedOrder, $user)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Pesanan dengan status '" . OrderStateMachine::getStatusLabel($lockedOrder->status) . "' sudah tidak dapat dibatalkan.",
+                ], 422);
+            }
+
+            $ordersToCancel = [$lockedOrder];
+            if ($lockedOrder->subOrders()->exists()) {
+                foreach ($lockedOrder->subOrders()->lockForUpdate()->get() as $sub) {
                     $ordersToCancel[] = $sub;
                 }
             }
 
             foreach ($ordersToCancel as $ord) {
+                // Restock inventory exactly once
                 foreach ($ord->items as $item) {
                     if ($item->product_id) {
                         Product::where('id', $item->product_id)->increment('stock', $item->quantity);
@@ -385,35 +438,61 @@ class OrderApiController extends Controller
                     }
                 }
 
-                if ($ord->payment && in_array($ord->payment->status, ['pending', 'processing'])) {
-                    $ord->payment->update(['status' => 'failed']);
+                // Handle payment status
+                if ($ord->payment) {
+                    if (in_array($ord->payment->status, ['pending', 'processing'], true)) {
+                        $ord->payment->update(['status' => 'failed']);
+                    } elseif ($ord->payment->status === 'paid') {
+                        // Order was already paid: initiate refund flow
+                        $this->refundService->processRefund(
+                            $ord,
+                            (float) $ord->total,
+                            "Pengembalian dana pembatalan pesanan: {$reason}",
+                            null,
+                            $user
+                        );
+                    }
                 }
 
                 if ($ord->shipment && $ord->shipment->status === 'pending') {
                     $ord->shipment->update([
-                        'status' => 'cancelled',
+                        'status'       => 'cancelled',
                         'status_label' => 'Pesanan Dibatalkan',
                     ]);
                 }
 
-                $ord->status = 'cancelled';
+                $ord->status = OrderStateMachine::STATUS_CANCELLED;
+                $ord->cancelled_at = now();
+                $ord->cancelled_by = $user->id;
+                $ord->cancellation_reason = $reason;
                 $ord->save();
             }
 
-            // Restore voucher usage quota and remove redemption record
-            if (!empty($order->voucher_code)) {
-                $voucher = \App\Models\Voucher::where('code', $order->voucher_code)->first();
+            // Restore voucher usage quota
+            if (!empty($lockedOrder->voucher_code)) {
+                $voucher = \App\Models\Voucher::where('code', $lockedOrder->voucher_code)->first();
                 if ($voucher) {
                     $voucher->decrement('usage_count');
                 }
-                \App\Models\VoucherRedemption::where('order_id', $order->id)->delete();
+                \App\Models\VoucherRedemption::where('order_id', $lockedOrder->id)->delete();
             }
-        });
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Pesanan berhasil dibatalkan dan stok produk telah dikembalikan.',
-            'data' => $order,
-        ]);
+            // Safe notification
+            try {
+                Notification::create([
+                    'user_id'    => $lockedOrder->user_id,
+                    'title'      => 'Pesanan Dibatalkan',
+                    'message'    => "Pesanan #{$lockedOrder->order_number} telah dibatalkan. Alasan: {$reason}",
+                    'type'       => 'order',
+                    'action_url' => "/orders/{$lockedOrder->order_number}",
+                ]);
+            } catch (\Throwable $e) {}
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pesanan berhasil dibatalkan dan stok produk telah dikembalikan.',
+                'data'    => $lockedOrder->fresh(),
+            ]);
+        }, 3);
     }
 }

@@ -55,8 +55,8 @@ app/
 │   ├── Controllers/Api/           # API endpoints (Auth, Products, Cart, Orders, Seller, Admin)
 │   ├── Middleware/                # Request processing and authentication checks
 │   └── Resources/                 # Allowlist API Resources (PublicUser, PublicReview, PublicQuestion, PublicTracking, ShipmentDetail)
-├── Models/                        # Eloquent models (User, Shop, Product, Order, Shipment, etc.)
-└── Services/                      # Pure business logic (CheckoutService, PricingService)
+├── Models/                        # Eloquent models (User, Shop, Product, Order, Payment, Refund, OrderReturn, etc.)
+└── Services/                      # Pure business logic (CheckoutService, PricingService, OrderStateMachine, RefundService, LedgerService)
 database/
 ├── migrations/                    # Database schema definitions and historical tables
 └── seeders/                       # Database seeders for initial data
@@ -94,6 +94,7 @@ wallets (id PK, user_id FK -> users.id, shop_id FK -> shops.id, balance decimal,
 wallet_transactions (id PK, wallet_id FK -> wallets.id, type enum[credit|debit], amount decimal, balance_after decimal, reference_type string, reference_id string, description text)
 seller_payouts (id PK, shop_id FK -> shops.id, amount decimal, bank_name string, account_number string, account_holder string, status enum[pending|processing|completed|rejected], reference_id string, processed_by FK nullable, processed_at datetime nullable, failure_reason text nullable)
 payment_events (id PK, payment_id FK nullable, event_id string nullable, provider string, event_type string, payload_json json, status enum[processed|rejected], created_at datetime)
+refunds (id PK, order_id FK -> orders.id, payment_id FK -> payments.id, return_id FK nullable, shop_id FK -> shops.id, user_id FK -> users.id, type enum[full|partial], amount decimal, currency string, reason text, status enum[pending|processing|completed|failed], provider string, refund_reference string unique, provider_reference string nullable, processed_by FK nullable, processed_at datetime nullable)
 <!-- END AUTO GENERATED: DATABASE_SCHEMA -->
 
 Full catalog for all 30+ tables is recorded in `.agents/references/database-schema.md`.
@@ -113,11 +114,15 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | GET,POST | /api/cart | Api\CartApiController | Public or Authenticated |
 | POST | /api/orders/calculate | Api\OrderApiController@calculate | Authenticated |
 | GET,POST | /api/orders | Api\OrderApiController | Authenticated |
+| PUT | /api/orders/{id}/status | Api\OrderApiController@updateStatus | Seller / Admin |
+| POST | /api/orders/{id}/cancel | Api\OrderApiController@cancel | Customer / Seller / Admin |
 | POST | /api/payments/webhook/{provider?} | Api\PaymentWebhookController@handle | Public (Gateway Signature Auth) |
 | GET | /api/deliveries/{code} | Api\DeliveryApiController@show | Public |
 | GET,POST | /api/reviews | Api\ReviewApiController | Public, Authenticated |
 | GET,POST | /api/conversations | Api\ChatApiController | Authenticated |
 | GET,POST | /api/returns | Api\ReturnApiController | Authenticated |
+| POST | /api/returns/{id}/respond | Api\ReturnApiController@sellerRespond | Seller |
+| POST | /api/disputes/{id}/resolve | Api\ReturnApiController@resolveDispute | Admin / Support |
 | GET | /api/seller/dashboard | Api\SellerApiController@dashboard | Seller |
 | GET,PUT | /api/seller/products | Api\SellerApiController | Seller |
 | GET | /api/seller/finances | Api\SellerApiController@finances | Seller |
@@ -127,6 +132,7 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | GET | /api/admin/payouts | Api\AdminApiController@payouts | Admin |
 | POST | /api/admin/payouts/{id}/approve | Api\AdminApiController@approvePayout | Admin |
 | POST | /api/admin/payouts/{id}/reject | Api\AdminApiController@rejectPayout | Admin |
+| GET | /api/admin/refunds | Api\AdminApiController@refunds | Admin |
 | GET | /api/config | Api\ConfigApiController@getDemoMode | Public |
 <!-- END AUTO GENERATED: ROUTING_MATRIX -->
 

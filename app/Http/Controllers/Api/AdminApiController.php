@@ -417,4 +417,35 @@ class AdminApiController extends Controller
             ], 422);
         }
     }
+
+    /**
+     * List customer refunds with pagination and filters. Admin only.
+     */
+    public function refunds(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $query = \App\Models\Refund::with(['order', 'shop', 'user', 'processor'])->orderBy('id', 'desc');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $refunds = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $refunds->items(),
+            'pagination' => [
+                'current_page' => $refunds->currentPage(),
+                'last_page' => $refunds->lastPage(),
+                'per_page' => $refunds->perPage(),
+                'total' => $refunds->total(),
+            ],
+        ]);
+    }
 }

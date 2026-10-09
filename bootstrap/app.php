@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Enable stateful Sanctum frontend SPA integration
         $middleware->statefulApi();
 
+        // Enforce hardened HTTP security headers and CSP
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserRole::class,
             'account.active' => \App\Http\Middleware\EnsureAccountActive::class,

@@ -99,4 +99,38 @@ class SandboxPaymentGateway implements PaymentGatewayInterface
         $canonicalString = "{$orderNumber}:{$amount}:{$status}";
         return hash_hmac('sha256', $canonicalString, $this->secret);
     }
+
+    public function processRefund(Payment $payment, float $amount, string $reason, array $options = []): array
+    {
+        if (app()->environment('production')) {
+            throw new PaymentConfigurationException(
+                'Sandbox payment provider tidak dapat digunakan di lingkungan production.'
+            );
+        }
+
+        if (isset($options['simulate_failure']) && $options['simulate_failure']) {
+            return [
+                'success'        => false,
+                'status'         => 'failed',
+                'failure_reason' => 'Simulasi penolakan refund dari bank mitra sandbox.',
+            ];
+        }
+
+        $refundId = 'REF-MOCK-' . strtoupper(Str::random(10));
+
+        return [
+            'success'            => true,
+            'refund_id'          => $refundId,
+            'amount'             => $amount,
+            'status'             => 'completed',
+            'provider'           => 'sandbox',
+            'provider_reference' => $refundId,
+            'raw_response'       => [
+                'mock'        => true,
+                'message'     => 'Refund berhasil diproses pada gateway sandbox',
+                'refund_id'   => $refundId,
+                'refunded_at' => now()->toIso8601String(),
+            ],
+        ];
+    }
 }
