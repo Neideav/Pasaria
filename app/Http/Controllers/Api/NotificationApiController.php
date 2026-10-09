@@ -43,7 +43,17 @@ class NotificationApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        Notification::where('id', $id)->where('user_id', $user->id)->update(['is_read' => true]);
+        $notification = Notification::find($id);
+        if (!$notification) {
+            return response()->json(['success' => false, 'message' => 'Notifikasi tidak ditemukan.'], 404);
+        }
+
+        if ($notification->user_id !== $user->id && !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $notification->is_read = true;
+        $notification->save();
 
         return response()->json([
             'success' => true,

@@ -53,7 +53,8 @@ HTTP JSON Response to Client { success, message, data }
 app/
 ├── Http/
 │   ├── Controllers/Api/           # API endpoints (Auth, Products, Cart, Orders, Seller, Admin)
-│   └── Middleware/                # Request processing and authentication checks
+│   ├── Middleware/                # Request processing and authentication checks
+│   └── Resources/                 # Allowlist API Resources (PublicUser, PublicReview, PublicQuestion, PublicTracking, ShipmentDetail)
 ├── Models/                        # Eloquent models (User, Shop, Product, Order, Shipment, etc.)
 └── Services/                      # Pure business logic (CheckoutService, PricingService)
 database/

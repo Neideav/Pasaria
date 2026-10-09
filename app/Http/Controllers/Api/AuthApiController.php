@@ -321,6 +321,16 @@ class AuthApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
+        $forbiddenFields = ['role', 'status', 'balance', 'is_admin', 'email_verified_at', 'id', 'email'];
+        foreach ($forbiddenFields as $ff) {
+            if ($request->has($ff)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$ff}' tidak dapat diubah melalui endpoint profil.",
+                ], 422);
+            }
+        }
+
         $request->validate([
             'name'    => 'nullable|string|max:255',
             'phone'   => 'nullable|string|max:50',

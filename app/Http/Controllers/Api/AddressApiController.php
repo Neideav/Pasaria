@@ -40,6 +40,13 @@ class AddressApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
+        if ($request->has('user_id') && (int) $request->input('user_id') !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak diizinkan mengubah kepemilikan alamat.',
+            ], 403);
+        }
+
         $request->validate([
             'recipient_name' => 'required|string|max:100',
             'phone'          => 'required|string|max:30',
@@ -96,6 +103,13 @@ class AddressApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Anda tidak memiliki hak akses ke alamat ini.',
+            ], 403);
+        }
+
+        if ($request->has('user_id') && (int) $request->input('user_id') !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak diizinkan mengubah kepemilikan alamat.',
             ], 403);
         }
 

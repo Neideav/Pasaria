@@ -50,16 +50,27 @@ class OrderApiController extends Controller
             'idempotency_key' => 'nullable|string|max:100',
         ]);
 
-        try {
-            $payload = $request->all();
-            if ($request->hasHeader('Idempotency-Key') && empty($payload['idempotency_key'])) {
-                $payload['idempotency_key'] = $request->header('Idempotency-Key');
+        $tamperFields = ['status', 'paid_at', 'refund_status'];
+        foreach ($tamperFields as $tf) {
+            if ($request->has($tf)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$tf}' dikontrol oleh server dan tidak boleh ditentukan dalam request.",
+                ], 422);
             }
+        }
 
-            // Customer info defaults to authenticated user
-            $payload['customer_name'] = $payload['customer_name'] ?? $user->name;
-            $payload['customer_email'] = $user->email;
-            $payload['customer_phone'] = $payload['customer_phone'] ?? $user->phone;
+        try {
+            $payload = [
+                'items' => $request->input('items'),
+                'shipping_address' => $request->input('shipping_address'),
+                'customer_name' => $request->input('customer_name', $user->name),
+                'customer_email' => $user->email,
+                'customer_phone' => $request->input('customer_phone', $user->phone),
+                'payment_method' => $request->input('payment_method', 'cod'),
+                'voucher_code' => $request->input('voucher_code'),
+                'idempotency_key' => $request->input('idempotency_key') ?: $request->header('Idempotency-Key'),
+            ];
 
             $result = $this->checkoutService->checkout($payload, $user->id);
 

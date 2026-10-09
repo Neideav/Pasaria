@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PublicUserResource;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Shop;
@@ -39,6 +40,9 @@ class ChatApiController extends Controller
             $lastMsg = $c->messages()->latest()->first();
             $arr = $c->toArray();
             $arr['last_message'] = $lastMsg ? $lastMsg->message : 'Belum ada pesan';
+            if ($c->customer) {
+                $arr['customer'] = (new PublicUserResource($c->customer))->resolve();
+            }
             return $arr;
         });
 
@@ -81,9 +85,14 @@ class ChatApiController extends Controller
             ->orderBy('created_at', 'asc')
             ->get();
 
+        $convArr = $conversation->toArray();
+        if ($conversation->customer) {
+            $convArr['customer'] = (new PublicUserResource($conversation->customer))->resolve();
+        }
+
         return response()->json([
             'success'      => true,
-            'conversation' => $conversation,
+            'conversation' => $convArr,
             'data'         => $messages,
         ]);
     }
@@ -162,9 +171,14 @@ class ChatApiController extends Controller
             ['last_message_at' => now()]
         );
 
+        $convArr = $conversation->load(['shop', 'customer'])->toArray();
+        if ($conversation->customer) {
+            $convArr['customer'] = (new PublicUserResource($conversation->customer))->resolve();
+        }
+
         return response()->json([
             'success' => true,
-            'data'    => $conversation->load(['shop', 'customer']),
+            'data'    => $convArr,
         ]);
     }
 }

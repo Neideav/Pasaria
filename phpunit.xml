@@ -21,6 +21,7 @@
         <env name="APP_KEY" value="base64:jtuPhVvis2tagZg5n1m9odS9/DR0O06LVWk2JTCF6R4="/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="CACHE_DRIVER" value="array"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>

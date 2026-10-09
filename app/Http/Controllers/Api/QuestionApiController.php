@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PublicQuestionResource;
 use App\Models\Product;
 use App\Models\ProductQuestion;
 use App\Models\ProductAnswer;
@@ -24,7 +25,7 @@ class QuestionApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $questions,
+            'data' => PublicQuestionResource::collection($questions)->resolve(),
         ]);
     }
 
@@ -60,7 +61,7 @@ class QuestionApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pertanyaan Anda telah diajukan kepada penjual.',
-            'data' => $question->load('user'),
+            'data' => (new PublicQuestionResource($question->load('user')))->resolve(),
         ], 201);
     }
 

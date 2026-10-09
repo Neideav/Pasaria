@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PublicQuestionResource;
+use App\Http\Resources\PublicReviewResource;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ProductImage;
@@ -157,7 +159,7 @@ class ProductApiController extends Controller
     public function show(string $slug): JsonResponse
     {
         try {
-            $product = Product::with(['variants', 'images', 'shop', 'reviews.user', 'reviews.media', 'questions.answers.shop'])
+            $product = Product::with(['variants', 'images', 'shop', 'reviews.user', 'reviews.media', 'questions.user', 'questions.answers.shop'])
                 ->where('slug', $slug)
                 ->orWhere('id', is_numeric($slug) ? (int)$slug : 0)
                 ->first();
@@ -183,6 +185,10 @@ class ProductApiController extends Controller
             if (is_string($productData['specs'] ?? null)) {
                 $productData['specs'] = json_decode($productData['specs'], true) ?? (object)[];
             }
+
+            // Scrub privacy data from nested reviews and questions
+            $productData['reviews'] = PublicReviewResource::collection($product->reviews)->resolve();
+            $productData['questions'] = PublicQuestionResource::collection($product->questions)->resolve();
 
             $related = Product::where('category', $product->category)
                 ->where('id', '!=', $product->id)
@@ -253,6 +259,22 @@ class ProductApiController extends Controller
             'variants.*.price'=> 'required_with:variants|numeric|min:0',
             'variants.*.stock'=> 'required_with:variants|integer|min:0',
         ]);
+
+        if ($request->has('rating') || $request->has('review_count')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Field rating atau review_count tidak boleh dimanipulasi secara manual.',
+            ], 422);
+        }
+
+        if ($request->has('shop_id') && !$user->isAdmin()) {
+            if ((int) $request->input('shop_id') !== (int) ($shop ? $shop->id : 0)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak diizinkan membuat produk atas nama toko lain.',
+                ], 403);
+            }
+        }
 
         $shopId = $shop ? $shop->id : 1;
         $shopName = $shop ? $shop->name : 'PASARIA Official Store';

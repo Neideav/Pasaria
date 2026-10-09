@@ -290,6 +290,16 @@ class SellerApiController extends Controller
             ], 403);
         }
 
+        $forbiddenPayoutFields = ['status', 'reference_id', 'shop_id'];
+        foreach ($forbiddenPayoutFields as $ff) {
+            if ($request->has($ff)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$ff}' dikontrol oleh server dan tidak boleh ditentukan dalam request.",
+                ], 422);
+            }
+        }
+
         $request->validate([
             'amount' => 'required|numeric|min:10000',
             'bank_name' => 'required|string|max:100',

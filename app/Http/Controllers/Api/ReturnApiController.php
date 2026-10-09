@@ -50,6 +50,16 @@ class ReturnApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
+        $forbiddenReturnFields = ['status', 'refund_amount', 'user_id', 'shop_id'];
+        foreach ($forbiddenReturnFields as $ff) {
+            if ($request->has($ff)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$ff}' dikontrol oleh server dan tidak boleh ditentukan dalam request.",
+                ], 422);
+            }
+        }
+
         $request->validate([
             'order_id' => 'required|integer',
             'reason' => 'required|string|in:wrong_item,damaged,defective,missing_item,not_as_described,other',

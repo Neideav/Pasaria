@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PublicReviewResource;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -42,7 +43,7 @@ class ReviewApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $reviews->items(),
+            'data' => PublicReviewResource::collection($reviews->items())->resolve(),
             'pagination' => [
                 'current_page' => $reviews->currentPage(),
                 'last_page' => $reviews->lastPage(),
@@ -160,7 +161,7 @@ class ReviewApiController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Terima kasih! Ulasan Anda telah berhasil disimpan.',
-                'data' => $review->load(['user', 'media']),
+                'data' => (new PublicReviewResource($review->load(['user', 'media'])))->resolve(),
             ], 201);
         });
     }
@@ -201,7 +202,7 @@ class ReviewApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Balasan penjual berhasil dikirim.',
-            'data' => $review,
+            'data' => (new PublicReviewResource($review->load(['user', 'media'])))->resolve(),
         ]);
     }
 }

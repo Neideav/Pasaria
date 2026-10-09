@@ -66,6 +66,16 @@ class ShopApiController extends Controller
             ], 403);
         }
 
+        $protectedFields = ['status', 'verified', 'rating', 'user_id'];
+        foreach ($protectedFields as $pf) {
+            if ($request->has($pf) && !$user->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$pf}' tidak dapat ditentukan saat pendaftaran toko.",
+                ], 422);
+            }
+        }
+
         $request->validate([
             'name' => 'required|string|max:100',
         ]);
@@ -122,6 +132,16 @@ class ShopApiController extends Controller
 
         if (!$user->isAdmin() && $shop->user_id !== $user->id) {
             return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $protectedFields = ['verified', 'status', 'rating', 'user_id', 'total_sales'];
+        foreach ($protectedFields as $pf) {
+            if ($request->has($pf) && !$user->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$pf}' hanya dapat diubah oleh administrator PASARIA.",
+                ], 422);
+            }
         }
 
         $shop->update($request->only([
