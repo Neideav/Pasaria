@@ -105,22 +105,43 @@ class CartApiController extends Controller
                 CartItem::where('cart_id', $cart->id)->delete();
 
                 $rawItems = $request->input('items', []);
+                $mergedItems = [];
+
                 foreach ($rawItems as $item) {
                     $pId = (int) ($item['product_id'] ?? $item['product']['id'] ?? $item['id'] ?? 0);
+                    if ($pId <= 0) continue;
+
                     $product = Product::find($pId);
                     if (!$product) continue;
 
-                    $vId = isset($item['variant_id']) ? (int) $item['variant_id'] : null;
+                    $vId = isset($item['variant_id']) && $item['variant_id'] !== '' && $item['variant_id'] !== null
+                        ? (int) $item['variant_id']
+                        : null;
+
+                    if ($vId !== null) {
+                        $variantExists = ProductVariant::where('id', $vId)->where('product_id', $pId)->exists();
+                        if (!$variantExists) continue;
+                    }
+
                     $qty = max(1, (int) ($item['quantity'] ?? 1));
                     $color = $item['selectedColor'] ?? $item['color'] ?? null;
+                    $lineKey = "{$pId}_" . ($vId ?? 'null') . "_" . ($color ?? 'null');
 
-                    CartItem::create([
-                        'cart_id'        => $cart->id,
-                        'product_id'     => $product->id,
-                        'variant_id'     => $vId,
-                        'quantity'       => $qty,
-                        'selected_color' => $color,
-                    ]);
+                    if (isset($mergedItems[$lineKey])) {
+                        $mergedItems[$lineKey]['quantity'] += $qty;
+                    } else {
+                        $mergedItems[$lineKey] = [
+                            'cart_id'        => $cart->id,
+                            'product_id'     => $product->id,
+                            'variant_id'     => $vId,
+                            'quantity'       => $qty,
+                            'selected_color' => $color,
+                        ];
+                    }
+                }
+
+                foreach ($mergedItems as $itemData) {
+                    CartItem::create($itemData);
                 }
 
                 return response()->json([
@@ -153,16 +174,18 @@ class CartApiController extends Controller
         ]);
 
         $productId = (int) $request->input('product_id');
-        $variantId = $request->has('variant_id') ? (int) $request->input('variant_id') : null;
-        $quantity = (int) $request->input('quantity', 1);
-        $color = $request->input('selectedColor');
+        $variantId = $request->has('variant_id') && $request->input('variant_id') !== '' && $request->input('variant_id') !== null
+            ? (int) $request->input('variant_id')
+            : null;
+        $quantity = max(1, (int) $request->input('quantity', 1));
+        $color = $request->input('selectedColor') ?: $request->input('color');
 
         $product = Product::find($productId);
         if (!$product) {
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
         }
 
-        if ($variantId) {
+        if ($variantId !== null) {
             $variant = ProductVariant::where('id', $variantId)->where('product_id', $productId)->first();
             if (!$variant) {
                 return response()->json(['success' => false, 'message' => 'Varian produk tidak valid.'], 422);
@@ -174,14 +197,16 @@ class CartApiController extends Controller
         $itemQuery = CartItem::where('cart_id', $cart->id)
             ->where('product_id', $productId);
 
-        if ($variantId) {
+        if ($variantId !== null) {
             $itemQuery->where('variant_id', $variantId);
         } else {
             $itemQuery->whereNull('variant_id');
         }
 
-        if ($color) {
+        if (!empty($color)) {
             $itemQuery->where('selected_color', $color);
+        } else {
+            $itemQuery->whereNull('selected_color');
         }
 
         $existingItem = $itemQuery->first();

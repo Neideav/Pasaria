@@ -318,6 +318,18 @@ class OrderApiController extends Controller
         }
         $order->save();
 
+        // Release escrow and credit seller wallet when order transitions to completed
+        if ($newStatus === 'completed') {
+            $ledgerService = app(\App\Services\LedgerService::class);
+            if ($order->subOrders()->exists()) {
+                foreach ($order->subOrders as $sub) {
+                    $ledgerService->creditSale($sub);
+                }
+            } else {
+                $ledgerService->creditSale($order);
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Status pesanan berhasil diperbarui.',
@@ -354,19 +366,48 @@ class OrderApiController extends Controller
             ], 422);
         }
 
-        // Restore stock atomically in transaction
+        // Restore stock and payment/voucher status atomically in transaction
         DB::transaction(function () use ($order) {
-            foreach ($order->items as $item) {
-                if ($item->product_id) {
-                    Product::where('id', $item->product_id)->increment('stock', $item->quantity);
-                }
-                if ($item->variant_id) {
-                    ProductVariant::where('id', $item->variant_id)->increment('stock', $item->quantity);
+            $ordersToCancel = [$order];
+            if ($order->subOrders()->exists()) {
+                foreach ($order->subOrders as $sub) {
+                    $ordersToCancel[] = $sub;
                 }
             }
 
-            $order->status = 'cancelled';
-            $order->save();
+            foreach ($ordersToCancel as $ord) {
+                foreach ($ord->items as $item) {
+                    if ($item->product_id) {
+                        Product::where('id', $item->product_id)->increment('stock', $item->quantity);
+                    }
+                    if ($item->variant_id) {
+                        ProductVariant::where('id', $item->variant_id)->increment('stock', $item->quantity);
+                    }
+                }
+
+                if ($ord->payment && in_array($ord->payment->status, ['pending', 'processing'])) {
+                    $ord->payment->update(['status' => 'failed']);
+                }
+
+                if ($ord->shipment && $ord->shipment->status === 'pending') {
+                    $ord->shipment->update([
+                        'status' => 'cancelled',
+                        'status_label' => 'Pesanan Dibatalkan',
+                    ]);
+                }
+
+                $ord->status = 'cancelled';
+                $ord->save();
+            }
+
+            // Restore voucher usage quota and remove redemption record
+            if (!empty($order->voucher_code)) {
+                $voucher = \App\Models\Voucher::where('code', $order->voucher_code)->first();
+                if ($voucher) {
+                    $voucher->decrement('usage_count');
+                }
+                \App\Models\VoucherRedemption::where('order_id', $order->id)->delete();
+            }
         });
 
         return response()->json([

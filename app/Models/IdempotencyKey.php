@@ -13,12 +13,16 @@ class IdempotencyKey extends Model
         'key',
         'user_id',
         'action',
+        'request_hash',
+        'status',
         'resource_id',
         'response_json',
+        'status_code',
     ];
 
     protected $casts = [
         'response_json' => 'array',
+        'status_code' => 'integer',
     ];
 
     public function user()

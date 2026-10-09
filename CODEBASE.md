@@ -80,16 +80,20 @@ users (id PK, name, email unique, password, role enum[customer|seller|admin], av
 user_addresses (id PK, user_id FK -> users.id, label, recipient_name, phone, address_line, city, postal_code, is_default bool)
 shops (id PK, user_id FK -> users.id, name, slug unique, description text, city, rating decimal, is_verified bool)
 categories (id PK, name, slug unique, item_count int, icon nullable)
-products (id PK, shop_id FK -> shops.id nullable, category_id FK -> categories.id nullable, name, slug unique, price decimal, stock int)
-product_variants (id PK, product_id FK -> products.id, name, sku unique, price decimal, stock int, attributes json)
+products (id PK, shop_id FK -> shops.id nullable, category_id FK -> categories.id nullable, name, slug unique, price decimal, stock int, is_active bool)
+product_variants (id PK, product_id FK -> products.id, name, sku unique, price decimal, stock int, is_active bool, attributes json)
 carts (id PK, user_id FK -> users.id nullable, session_id nullable, status string)
 cart_items (id PK, cart_id FK -> carts.id, product_id FK -> products.id, variant_id FK nullable, quantity int, unit_price decimal)
 orders (id PK, order_number unique, user_id FK -> users.id nullable, parent_id FK nullable, shop_id FK nullable, total_amount decimal, status string)
 order_items (id PK, order_id FK -> orders.id, product_id FK -> products.id, quantity int, unit_price decimal, subtotal decimal)
 shipments (id PK, order_id FK -> orders.id, tracking_number unique, courier, shipping_cost decimal, status string)
 reviews (id PK, user_id FK -> users.id, product_id FK -> products.id, order_id FK nullable, order_item_id unique FK nullable, rating int, comment text)
-idempotency_keys (id PK, key unique string, user_id FK -> users.id nullable, request_hash string, response_body json, status_code int)
+idempotency_keys (id PK, key string, user_id FK -> users.id, action string, request_hash string nullable, status string, response_json longtext, status_code int, unique[user_id, action, key])
 sessions (id PK string, user_id FK -> users.id nullable index, ip_address string nullable, user_agent text nullable, payload longtext, last_activity int index)
+wallets (id PK, user_id FK -> users.id, shop_id FK -> shops.id, balance decimal, reserved_balance decimal, pending_balance decimal, total_withdrawn decimal)
+wallet_transactions (id PK, wallet_id FK -> wallets.id, type enum[credit|debit], amount decimal, balance_after decimal, reference_type string, reference_id string, description text)
+seller_payouts (id PK, shop_id FK -> shops.id, amount decimal, bank_name string, account_number string, account_holder string, status enum[pending|processing|completed|rejected], reference_id string, processed_by FK nullable, processed_at datetime nullable, failure_reason text nullable)
+payment_events (id PK, payment_id FK nullable, event_id string nullable, provider string, event_type string, payload_json json, status enum[processed|rejected], created_at datetime)
 <!-- END AUTO GENERATED: DATABASE_SCHEMA -->
 
 Full catalog for all 30+ tables is recorded in `.agents/references/database-schema.md`.
@@ -109,14 +113,20 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | GET,POST | /api/cart | Api\CartApiController | Public or Authenticated |
 | POST | /api/orders/calculate | Api\OrderApiController@calculate | Authenticated |
 | GET,POST | /api/orders | Api\OrderApiController | Authenticated |
+| POST | /api/payments/webhook/{provider?} | Api\PaymentWebhookController@handle | Public (Gateway Signature Auth) |
 | GET | /api/deliveries/{code} | Api\DeliveryApiController@show | Public |
 | GET,POST | /api/reviews | Api\ReviewApiController | Public, Authenticated |
 | GET,POST | /api/conversations | Api\ChatApiController | Authenticated |
 | GET,POST | /api/returns | Api\ReturnApiController | Authenticated |
 | GET | /api/seller/dashboard | Api\SellerApiController@dashboard | Seller |
 | GET,PUT | /api/seller/products | Api\SellerApiController | Seller |
+| GET | /api/seller/finances | Api\SellerApiController@finances | Seller |
+| POST | /api/seller/payout | Api\SellerApiController@requestPayout | Seller |
 | GET | /api/admin/dashboard | Api\AdminApiController@dashboard | Admin |
 | GET,PUT | /api/admin/users | Api\AdminApiController | Admin |
+| GET | /api/admin/payouts | Api\AdminApiController@payouts | Admin |
+| POST | /api/admin/payouts/{id}/approve | Api\AdminApiController@approvePayout | Admin |
+| POST | /api/admin/payouts/{id}/reject | Api\AdminApiController@rejectPayout | Admin |
 | GET | /api/config | Api\ConfigApiController@getDemoMode | Public |
 <!-- END AUTO GENERATED: ROUTING_MATRIX -->
 

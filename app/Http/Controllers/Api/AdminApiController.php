@@ -12,11 +12,20 @@ use App\Models\OrderReturn;
 use App\Models\Dispute;
 use App\Models\Report;
 use App\Models\AdminAction;
+use App\Models\SellerPayout;
+use App\Services\LedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdminApiController extends Controller
 {
+    protected LedgerService $ledgerService;
+
+    public function __construct(LedgerService $ledgerService)
+    {
+        $this->ledgerService = $ledgerService;
+    }
+
     /**
      * Admin dashboard summary metrics from database.
      */
@@ -305,5 +314,107 @@ class AdminApiController extends Controller
                 'total' => $reports->total(),
             ],
         ]);
+    }
+
+    /**
+     * List seller payouts with pagination and filter. Admin only.
+     */
+    public function payouts(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $query = SellerPayout::with(['shop.user', 'processor'])->orderBy('id', 'desc');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $payouts = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $payouts->items(),
+            'pagination' => [
+                'current_page' => $payouts->currentPage(),
+                'last_page' => $payouts->lastPage(),
+                'per_page' => $payouts->perPage(),
+                'total' => $payouts->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Approve payout request and finalize debit. Admin only.
+     */
+    public function approvePayout(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $payout = SellerPayout::find($id);
+        if (!$payout) {
+            return response()->json(['success' => false, 'message' => 'Permintaan penarikan dana tidak ditemukan.'], 404);
+        }
+
+        // Authorization check: Seller cannot approve their own payout even if they have an admin account!
+        if ($payout->shop && $payout->shop->user_id === $user->id) {
+            return response()->json(['success' => false, 'message' => 'Penjual tidak diperbolehkan menyetujui pengajuan penarikan dana miliknya sendiri.'], 403);
+        }
+
+        try {
+            $this->ledgerService->finalizePayout($payout, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan penarikan dana berhasil disetujui dan dicairkan.',
+                'data' => $payout->fresh(['shop', 'processor']),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Reject payout request and release reservation. Admin only.
+     */
+    public function rejectPayout(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $payout = SellerPayout::find($id);
+        if (!$payout) {
+            return response()->json(['success' => false, 'message' => 'Permintaan penarikan dana tidak ditemukan.'], 404);
+        }
+
+        $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        try {
+            $this->ledgerService->rejectPayout($payout, $user, (string) $request->input('reason'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan penarikan dana ditolak dan reservasi saldo telah dikembalikan.',
+                'data' => $payout->fresh(['shop', 'processor']),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 }

@@ -19,4 +19,25 @@ return [
 
     'shipping_rate_per_shop' => 15000.00,
 
+    'payment' => [
+        'default' => env('PAYMENT_PROVIDER', env('APP_ENV') === 'production' ? 'midtrans' : 'sandbox'),
+        'currency' => 'IDR',
+        'providers' => [
+            'sandbox' => [
+                'webhook_secret' => env('PAYMENT_SANDBOX_SECRET', 'pasaria-sandbox-webhook-secret-token'),
+                'allow_in_production' => false,
+            ],
+            'midtrans' => [
+                'server_key'    => env('MIDTRANS_SERVER_KEY'),
+                'client_key'    => env('MIDTRANS_CLIENT_KEY'),
+                'merchant_id'   => env('MIDTRANS_MERCHANT_ID'),
+                'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
+            ],
+            'xendit' => [
+                'secret_key'    => env('XENDIT_SECRET_KEY'),
+                'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
+            ],
+        ],
+    ],
+
 ];

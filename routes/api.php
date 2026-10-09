@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\AdminApiController;
 use App\Http\Controllers\Api\ReturnApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\ConfigApiController;
+use App\Http\Controllers\Api\PaymentWebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,6 +57,9 @@ Route::post('/config/demo-mode', [ConfigApiController::class, 'toggleDemoMode'])
 
 // Guest Order Preview Calculation (does not create orders or deduct stock)
 Route::post('/orders/calculate', [OrderApiController::class, 'calculate']);
+
+// Payment Webhooks / Notifications (Authenticated via gateway signature/secret)
+Route::post('/payments/webhook/{provider?}', [PaymentWebhookController::class, 'handle']);
 
 // =========================================================================
 // 2. AUTHENTICATION & ACCOUNT ACTIVATION (Rate-limited Endpoints)
@@ -178,4 +182,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'role:admin'])->group(funct
     Route::put('/admin/sellers/{id}/status', [AdminApiController::class, 'updateSellerStatus']);
     Route::get('/admin/audit-logs', [AdminApiController::class, 'auditLogs']);
     Route::post('/disputes/{id}/resolve', [ReturnApiController::class, 'resolveDispute']);
+
+    // Seller Payout Review & Processing
+    Route::get('/admin/payouts', [AdminApiController::class, 'payouts']);
+    Route::post('/admin/payouts/{id}/approve', [AdminApiController::class, 'approvePayout']);
+    Route::post('/admin/payouts/{id}/reject', [AdminApiController::class, 'rejectPayout']);
 });

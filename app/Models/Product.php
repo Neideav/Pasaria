@@ -22,6 +22,7 @@ class Product extends Model
         'rating',
         'review_count',
         'stock',
+        'is_active',
         'colors',
         'specs',
         'shop_id',
@@ -39,6 +40,7 @@ class Product extends Model
         'rating' => 'float',
         'review_count' => 'integer',
         'stock' => 'integer',
+        'is_active' => 'boolean',
         'shop_id' => 'integer',
     ];
 

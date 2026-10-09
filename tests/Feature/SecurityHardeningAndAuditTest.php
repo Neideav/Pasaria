@@ -490,7 +490,8 @@ class SecurityHardeningAndAuditTest extends TestCase
         $successResp->assertStatus(201);
 
         $wallet->refresh();
-        $this->assertEquals(20000.00, (float) $wallet->balance);
+        $this->assertEquals(30000.00, (float) $wallet->reserved_balance);
+        $this->assertEquals(20000.00, (float) $wallet->available_balance);
 
         $this->assertTrue(
             WalletTransaction::where('wallet_id', $wallet->id)

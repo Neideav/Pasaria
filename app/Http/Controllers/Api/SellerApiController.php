@@ -13,6 +13,7 @@ use App\Models\WalletTransaction;
 use App\Models\SellerPayout;
 use App\Models\Review;
 use App\Models\IdempotencyKey;
+use App\Services\LedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,12 @@ use Illuminate\Support\Str;
 
 class SellerApiController extends Controller
 {
+    protected LedgerService $ledgerService;
+
+    public function __construct(LedgerService $ledgerService)
+    {
+        $this->ledgerService = $ledgerService;
+    }
     /**
      * Get seller dashboard statistics.
      */
@@ -242,27 +249,39 @@ class SellerApiController extends Controller
 
         $wallet = Wallet::firstOrCreate(
             ['shop_id' => $shop->id],
-            ['user_id' => $shop->user_id, 'balance' => 0.00]
+            [
+                'user_id'          => $shop->user_id,
+                'balance'          => 0.00,
+                'reserved_balance' => 0.00,
+                'pending_balance'  => 0.00,
+                'total_withdrawn'  => 0.00,
+            ]
         );
 
+        $reconciliation = $this->ledgerService->reconcile($wallet);
         $payouts = SellerPayout::where('shop_id', $shop->id)->orderBy('id', 'desc')->get();
         $transactions = WalletTransaction::where('wallet_id', $wallet->id)->orderBy('id', 'desc')->take(30)->get();
 
         return response()->json([
             'success' => true,
             'data' => [
-                'gross_sales' => $grossSales,
-                'platform_fee' => $platformFee,
-                'net_revenue' => $netRevenue,
-                'available_balance' => (float) $wallet->balance,
-                'payouts' => $payouts,
-                'transactions' => $transactions,
+                'gross_sales'        => $grossSales,
+                'platform_fee'       => $platformFee,
+                'net_revenue'        => $netRevenue,
+                'available_balance'  => (float) $wallet->available_balance,
+                'total_balance'      => (float) $wallet->balance,
+                'reserved_balance'   => (float) $wallet->reserved_balance,
+                'pending_balance'    => (float) $wallet->pending_balance,
+                'total_withdrawn'    => (float) $wallet->total_withdrawn,
+                'reconciliation'     => $reconciliation,
+                'payouts'            => $payouts,
+                'transactions'       => $transactions,
             ],
         ]);
     }
 
     /**
-     * Request payout withdrawal with transaction & idempotency.
+     * Request payout withdrawal with transaction, fund reservation & idempotency.
      */
     public function requestPayout(Request $request): JsonResponse
     {
@@ -290,7 +309,7 @@ class SellerApiController extends Controller
             ], 403);
         }
 
-        $forbiddenPayoutFields = ['status', 'reference_id', 'shop_id'];
+        $forbiddenPayoutFields = ['status', 'reference_id', 'shop_id', 'balance', 'reserved_balance'];
         foreach ($forbiddenPayoutFields as $ff) {
             if ($request->has($ff)) {
                 return response()->json([
@@ -301,16 +320,19 @@ class SellerApiController extends Controller
         }
 
         $request->validate([
-            'amount' => 'required|numeric|min:10000',
-            'bank_name' => 'required|string|max:100',
-            'account_number' => 'required|string|max:50',
-            'account_holder' => 'required|string|max:100',
+            'amount'          => 'required|numeric|min:10000',
+            'bank_name'       => 'required|string|max:100',
+            'account_number'  => 'required|string|max:50',
+            'account_holder'  => 'required|string|max:100',
             'idempotency_key' => 'nullable|string|max:100',
         ]);
 
         $idempotencyKey = $request->header('Idempotency-Key') ?: $request->input('idempotency_key');
         if (!empty($idempotencyKey)) {
-            $cached = IdempotencyKey::where('key', $idempotencyKey)->where('user_id', $user->id)->first();
+            $cached = IdempotencyKey::where('key', $idempotencyKey)
+                ->where('user_id', $user->id)
+                ->where('action', 'payout')
+                ->first();
             if ($cached && !empty($cached->response_json)) {
                 return response()->json($cached->response_json, 200);
             }
@@ -318,63 +340,46 @@ class SellerApiController extends Controller
 
         $amount = (float) $request->input('amount');
 
-        return DB::transaction(function () use ($shop, $user, $amount, $request, $idempotencyKey) {
-            $wallet = Wallet::where('shop_id', $shop->id)->lockForUpdate()->first();
-            if (!$wallet) {
-                $wallet = Wallet::create(['shop_id' => $shop->id, 'user_id' => $shop->user_id, 'balance' => 0]);
-            }
-
-            if ($wallet->balance < $amount) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Saldo dompet tidak mencukupi untuk penarikan ini.',
-                ], 422);
-            }
-
-            $wallet->decrement('balance', $amount);
-            $wallet->refresh();
-
-            $payout = SellerPayout::create([
-                'shop_id' => $shop->id,
-                'amount' => $amount,
-                'bank_name' => $request->input('bank_name'),
+        try {
+            $payout = $this->ledgerService->reservePayout($shop, $amount, [
+                'bank_name'      => $request->input('bank_name'),
                 'account_number' => $request->input('account_number'),
                 'account_holder' => $request->input('account_holder'),
-                'status' => 'pending',
-                'reference_id' => 'PAYOUT-' . date('Ymd') . '-' . strtoupper(Str::random(6)),
-                'note' => 'Permintaan penarikan dana penjual PASARIA',
-            ]);
-
-            WalletTransaction::create([
-                'wallet_id' => $wallet->id,
-                'type' => 'debit',
-                'amount' => $amount,
-                'balance_after' => (float) $wallet->balance,
-                'reference_type' => 'payout',
-                'reference_id' => $payout->reference_id,
-                'description' => 'Penarikan saldo ke rekening ' . $request->input('bank_name'),
-            ]);
+                'note'           => $request->input('note'),
+            ], $idempotencyKey);
 
             $responsePayload = [
                 'success' => true,
-                'message' => 'Permintaan penarikan dana berhasil diajukan.',
-                'data' => $payout,
+                'message' => 'Permintaan penarikan dana berhasil diajukan dan dana telah direservasi.',
+                'data'    => $payout,
             ];
 
             if (!empty($idempotencyKey)) {
                 try {
                     IdempotencyKey::create([
-                        'key' => $idempotencyKey,
-                        'user_id' => $user->id,
-                        'action' => 'payout',
-                        'resource_id' => $payout->reference_id,
+                        'key'           => $idempotencyKey,
+                        'user_id'       => $user->id,
+                        'action'        => 'payout',
+                        'resource_id'   => $payout->reference_id,
                         'response_json' => $responsePayload,
+                        'status'        => 'completed',
+                        'status_code'   => 201,
                     ]);
                 } catch (\Throwable $e) {}
             }
 
             return response()->json($responsePayload, 201);
-        });
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => config('app.debug') ? $e->getMessage() : 'Gagal memproses penarikan dana.',
+            ], 500);
+        }
     }
 
     /**
