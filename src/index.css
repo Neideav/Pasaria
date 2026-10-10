@@ -65,6 +65,10 @@
   transform: scale(0.97);
 }
 
+.duration-120 {
+  transition-duration: 120ms;
+}
+
 .motion-popover {
   transform-origin: var(--transform-origin, top);
   transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
@@ -327,6 +331,34 @@
   }
 }
 
+/* Motion Point #35: CartPage Item Removal Slide-Left & Exit */
+.motion-cart-item-exit {
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
+/* Motion Point #39: CheckoutModal Success Checkmark Stamp Bounce (scale(0.8) -> scale(1.15) -> scale(1) in 280ms) */
+.motion-stamp-bounce {
+  animation: stampBounce 280ms var(--ease-out) forwards;
+}
+
+@keyframes stampBounce {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @starting-style {
   .motion-popover,
   .motion-popover-160 {
@@ -390,10 +422,16 @@
   .motion-message-bubble,
   .motion-toast-enter,
   .motion-toast-exit,
-  .motion-radar-pulse {
+  .motion-radar-pulse,
+  .motion-stamp-bounce {
     animation: none !important;
     transform: none !important;
     opacity: 1 !important;
+  }
+  .motion-cart-item-exit {
+    transform: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.01ms !important;
   }
   .motion-accordion-wrapper {
     transition: none !important;

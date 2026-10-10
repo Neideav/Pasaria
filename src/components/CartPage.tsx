@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Minus, Plus, Trash2, ArrowLeft, ArrowRight, ShoppingBag, Store, ShieldCheck } from 'lucide-react';
 import { CartItem } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -19,6 +19,30 @@ export const CartPage: React.FC<CartPageProps> = ({
   onProceedToCheckout,
   onContinueShopping,
 }) => {
+  // Motion Point #35: Item removal slide-left & collapse
+  const [removingIds, setRemovingIds] = useState<Set<number>>(new Set());
+
+  const handleRemove = (productId: number) => {
+    if (removingIds.has(productId)) return;
+    setRemovingIds((prev) => new Set(prev).add(productId));
+    setTimeout(() => {
+      onRemoveItem(productId);
+      setRemovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+    }, 200);
+  };
+
+  const handleQuantityDecrease = (productId: number, currentQty: number) => {
+    if (currentQty <= 1) {
+      handleRemove(productId);
+    } else {
+      onUpdateQuantity(productId, currentQty - 1);
+    }
+  };
+
   // Group items by seller/shop
   const shopGroups: Record<string, CartItem[]> = {};
   items.forEach((item) => {
@@ -33,6 +57,21 @@ export const CartPage: React.FC<CartPageProps> = ({
   const tax = Math.round(subtotal * 0.11); // PPN 11%
   const total = subtotal + tax;
 
+  // Motion Point #37: Subtotal Rolling Counter Transition with momentary micro color pulse
+  const [isHighlighting, setIsHighlighting] = useState(false);
+  const prevSubtotalRef = useRef(subtotal);
+
+  useEffect(() => {
+    if (prevSubtotalRef.current !== subtotal) {
+      prevSubtotalRef.current = subtotal;
+      setIsHighlighting(true);
+      const timer = setTimeout(() => {
+        setIsHighlighting(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [subtotal]);
+
   if (items.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-20 text-center">
@@ -43,7 +82,7 @@ export const CartPage: React.FC<CartPageProps> = ({
         <p className="text-xs text-slate-500 mb-6">Anda belum menambahkan produk ke keranjang belanja.</p>
         <button
           onClick={onContinueShopping}
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] transition-all cursor-pointer shadow-xs"
+          className="motion-press active:scale-[0.97] inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] transition-[transform,background-color,box-shadow] duration-160 ease-[var(--ease-out)] cursor-pointer shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Mulai Belanja di PASARIA</span>
@@ -65,7 +104,7 @@ export const CartPage: React.FC<CartPageProps> = ({
         </div>
         <button
           onClick={onContinueShopping}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
+          className="motion-press active:scale-[0.97] inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Lanjut Belanja</span>
@@ -92,62 +131,79 @@ export const CartPage: React.FC<CartPageProps> = ({
 
               {/* Items in this shop */}
               <div className="divide-y divide-slate-100">
-                {shopItems.map((item) => (
-                  <div
-                    key={`${item.product.id}-${item.selectedColor}-${item.variant_id}`}
-                    className="py-4 first:pt-1 last:pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-18 h-18 rounded-2xl bg-[#f8f9fa] flex items-center justify-center p-2 shrink-0 border border-slate-100">
-                        <ProductVisual imageKey={item.product.image} name={item.product.name} size="sm" />
+                {shopItems.map((item) => {
+                  const isRemoving = removingIds.has(item.product.id);
+                  return (
+                    <div
+                      key={`${item.product.id}-${item.selectedColor}-${item.variant_id}`}
+                      className={`py-4 first:pt-1 last:pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-[transform,opacity] duration-200 ease-[var(--ease-out)] ${
+                        isRemoving ? 'motion-cart-item-exit' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-18 h-18 rounded-2xl bg-[#f8f9fa] flex items-center justify-center p-2 shrink-0 border border-slate-100">
+                          <ProductVisual imageKey={item.product.image} name={item.product.name} size="sm" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900 line-clamp-1">
+                            {item.product.name}
+                          </h4>
+                          <div className="text-xs text-slate-500 mb-1">
+                            {item.selectedColor ? `Warna: ${item.selectedColor}` : item.product.category}
+                          </div>
+                          <div className={`text-sm font-extrabold tabular-nums transition-colors duration-200 ease-[var(--ease-out)] ${
+                            isHighlighting ? 'text-emerald-700' : 'text-[#003d29]'
+                          }`}>
+                            {formatRupiah(item.product.price)}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900 line-clamp-1">
-                          {item.product.name}
-                        </h4>
-                        <div className="text-xs text-slate-500 mb-1">
-                          {item.selectedColor ? `Warna: ${item.selectedColor}` : item.product.category}
+
+                      {/* Stepper & Subtotal */}
+                      <div className="flex items-center justify-between sm:justify-end gap-5 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        {/* Motion Point #36: Stepper Click Feedback (motion-press active:scale-[0.92] transition-transform duration-120) */}
+                        <div className="flex items-center bg-slate-100 rounded-full px-2.5 py-1 border border-slate-200/60">
+                          <button
+                            onClick={() => handleQuantityDecrease(item.product.id, item.quantity)}
+                            className="motion-press active:scale-[0.92] transition-transform duration-120 w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
+                            title="Kurangi kuantitas"
+                            aria-label="Kurangi kuantitas"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-8 text-center text-xs font-bold text-slate-900 tabular-nums">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
+                            className="motion-press active:scale-[0.92] transition-transform duration-120 w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
+                            title="Tambah kuantitas"
+                            aria-label="Tambah kuantitas"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
                         </div>
-                        <div className="text-sm font-extrabold text-[#003d29] tabular-nums">
-                          {formatRupiah(item.product.price)}
+
+                        {/* Motion Point #37: Subtotal row item */}
+                        <div className={`text-sm font-extrabold tabular-nums min-w-[90px] text-right transition-colors duration-200 ease-[var(--ease-out)] ${
+                          isHighlighting ? 'text-emerald-700' : 'text-slate-900'
+                        }`}>
+                          {formatRupiah(item.product.price * item.quantity)}
                         </div>
+
+                        {/* Motion Point #36: Trash button feedback */}
+                        <button
+                          onClick={() => handleRemove(item.product.id)}
+                          className="motion-press active:scale-[0.92] transition-transform duration-120 w-8 h-8 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 flex items-center justify-center cursor-pointer"
+                          title="Hapus"
+                          aria-label="Hapus produk dari keranjang"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-
-                    {/* Stepper & Subtotal */}
-                    <div className="flex items-center justify-between sm:justify-end gap-5 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                      <div className="flex items-center bg-slate-100 rounded-full px-2.5 py-1 border border-slate-200/60">
-                        <button
-                          onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
-                          className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="w-8 text-center text-xs font-bold text-slate-900 tabular-nums">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
-                          className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900 cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      <div className="text-sm font-extrabold text-slate-900 tabular-nums min-w-[90px] text-right">
-                        {formatRupiah(item.product.price * item.quantity)}
-                      </div>
-
-                      <button
-                        onClick={() => onRemoveItem(item.product.id)}
-                        className="w-8 h-8 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 flex items-center justify-center transition-colors cursor-pointer"
-                        title="Hapus"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -160,14 +216,23 @@ export const CartPage: React.FC<CartPageProps> = ({
               Ringkasan Belanja
             </h3>
 
+            {/* Motion Point #37: Subtotal and Total rolling counter transition */}
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between text-slate-600">
                 <span>Total Harga ({items.reduce((s, i) => s + i.quantity, 0)} barang)</span>
-                <span className="font-semibold text-slate-900 tabular-nums">{formatRupiah(subtotal)}</span>
+                <span className={`font-semibold tabular-nums transition-colors duration-200 ease-[var(--ease-out)] ${
+                  isHighlighting ? 'text-emerald-700' : 'text-slate-900'
+                }`}>
+                  {formatRupiah(subtotal)}
+                </span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Pajak PPN (11%)</span>
-                <span className="font-semibold text-slate-900 tabular-nums">{formatRupiah(tax)}</span>
+                <span className={`font-semibold tabular-nums transition-colors duration-200 ease-[var(--ease-out)] ${
+                  isHighlighting ? 'text-emerald-700' : 'text-slate-900'
+                }`}>
+                  {formatRupiah(tax)}
+                </span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Estimasi Biaya Pengiriman</span>
@@ -175,7 +240,9 @@ export const CartPage: React.FC<CartPageProps> = ({
               </div>
               <div className="border-t border-slate-100 pt-3 flex justify-between items-baseline text-sm font-bold text-slate-900">
                 <span>Total Tagihan</span>
-                <span className="text-xl font-black text-[#003d29] tabular-nums">
+                <span className={`text-xl font-black tabular-nums transition-colors duration-200 ease-[var(--ease-out)] ${
+                  isHighlighting ? 'text-emerald-700' : 'text-[#003d29]'
+                }`}>
                   {formatRupiah(total)}
                 </span>
               </div>
@@ -183,7 +250,7 @@ export const CartPage: React.FC<CartPageProps> = ({
 
             <button
               onClick={onProceedToCheckout}
-              className="w-full py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] shadow-md shadow-emerald-950/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="motion-press active:scale-[0.97] w-full py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] shadow-md shadow-emerald-950/10 flex items-center justify-center gap-2 transition-[transform,background-color,box-shadow] duration-160 ease-[var(--ease-out)] cursor-pointer"
             >
               <span>Lanjut ke Pembayaran</span>
               <ArrowRight className="w-4 h-4" />

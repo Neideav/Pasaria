@@ -84,8 +84,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderSuccess,
   subtotal: propSubtotal,
 }) => {
-  const [step, setStep] = useState<'delivery' | 'payment'>('delivery');
+  const [step, setStep] = useState<'delivery' | 'payment' | 'success'>('delivery');
+  const [completedOrder, setCompletedOrder] = useState<{
+    orderNumber: string;
+    shipment: DeliveryShipment;
+  } | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Address State
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
@@ -119,6 +124,41 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [idempotencyKey, setIdempotencyKey] = useState(() => `idemp-${Date.now()}`);
+
+  const handleModalClose = () => {
+    if (step === 'success' && completedOrder) {
+      onOrderSuccess(completedOrder.orderNumber, completedOrder.shipment, true);
+    } else {
+      onClose();
+    }
+  };
+
+  // Motion Point #38: Confetti burst on step === 'success' with isolated canvas and 2.5s auto-cleanup
+  useEffect(() => {
+    if (step === 'success' && confettiCanvasRef.current) {
+      const myConfetti = confetti.create(confettiCanvasRef.current, {
+        resize: true,
+        useWorker: true,
+      });
+
+      myConfetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.5 },
+        colors: ['#003d29', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'],
+        disableForReducedMotion: true,
+      });
+
+      const timer = setTimeout(() => {
+        myConfetti.reset();
+      }, 2500);
+
+      return () => {
+        clearTimeout(timer);
+        myConfetti.reset();
+      };
+    }
+  }, [step]);
 
   // Validation function
   const validateDeliveryForm = (): DeliveryErrors => {
@@ -166,7 +206,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        handleModalClose();
         return;
       }
 
@@ -198,14 +238,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       clearTimeout(timer);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
-
-  useEffect(() => {
-    if (isOpen) {
-      loadAddresses();
-      triggerCalculation();
-    }
-  }, [isOpen, selectedCourierId, appliedVoucher, items]);
+  }, [isOpen, onClose, step, completedOrder]);
 
   const loadAddresses = async () => {
     if (!user) return;
@@ -250,6 +283,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setIsCalculating(false);
     }
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep('delivery');
+      setCompletedOrder(null);
+      setValidationError('');
+      loadAddresses();
+      triggerCalculation();
+    }
+  }, [isOpen, selectedCourierId, appliedVoucher, items]);
 
   const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,8 +380,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         idempotency_key: idempotencyKey,
       });
 
-      confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
-
       const shipment: DeliveryShipment = res.shipment || {
         id: `shp-${res.order_number}`,
         order_number: res.order_number,
@@ -359,7 +400,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         checkpoints: [],
       };
 
-      onOrderSuccess(res.order_number, shipment, true);
+      setCompletedOrder({
+        orderNumber: res.order_number,
+        shipment,
+      });
+      setStep('success');
+      setIsSubmitting(false);
     } catch (err: any) {
       setValidationError(err.message || 'Gagal membuat pesanan. Silakan coba lagi.');
       setIsSubmitting(false);
@@ -370,7 +416,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     <div
       role="presentation"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleModalClose();
       }}
       className="motion-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs"
     >
@@ -379,8 +425,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="checkout-modal-title"
-        className="motion-modal bg-white w-full max-w-4xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden text-left"
+        className="motion-modal relative bg-white w-full max-w-4xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden text-left"
       >
+        {/* Motion Point #38: Isolated Confetti Canvas */}
+        <canvas
+          ref={confettiCanvasRef}
+          className="absolute inset-0 pointer-events-none z-30 w-full h-full rounded-3xl"
+        />
+
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
@@ -392,13 +444,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 Checkout Pembayaran PASARIA
               </h2>
               <p className="text-xs text-slate-400">
-                Langkah {step === 'delivery' ? '1 dari 2: Alamat & Pengiriman' : '2 dari 2: Metode Pembayaran'}
+                {step === 'delivery'
+                  ? 'Langkah 1 dari 2: Alamat & Pengiriman'
+                  : step === 'payment'
+                  ? 'Langkah 2 dari 2: Metode Pembayaran'
+                  : 'Pesanan Berhasil Dikonfirmasi'}
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleModalClose}
             aria-label="Tutup modal checkout"
             className="motion-press w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-colors cursor-pointer"
           >
@@ -422,391 +478,469 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Column: Form Steps */}
-          <div className="lg:col-span-7 space-y-6">
-            {validationError && (
-              <div
-                role="alert"
-                className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2"
-              >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{validationError}</span>
+        {step === 'success' ? (
+          <div className="flex-1 overflow-y-auto p-6 sm:p-12 flex flex-col items-center justify-center text-center">
+            {/* Motion Point #39: Success Checkmark Stamp Bounce (scale(0.8) -> scale(1.15) -> scale(1) in 280ms) */}
+            <div className="motion-stamp-bounce w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-lg shadow-emerald-600/10 mb-5">
+              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+            </div>
+
+            <div className="space-y-2 mb-6 max-w-md">
+              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100/80 text-emerald-800 text-xs font-bold uppercase tracking-wider">
+                ✨ Transaksi Berhasil
+              </span>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                Pembayaran Sukses Dikonfirmasi!
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Terima kasih, pesanan Anda dengan nomor{' '}
+                <span className="font-bold text-slate-900">#{completedOrder?.orderNumber}</span> sedang disiapkan oleh penjual untuk segera dikirimkan.
+              </p>
+            </div>
+
+            {/* Shipment summary card */}
+            {completedOrder && (
+              <div className="w-full max-w-md bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-xs text-left space-y-2.5 mb-6">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                  <span className="text-slate-500">Kurir Pengiriman:</span>
+                  <span className="font-bold text-slate-900">{completedOrder.shipment.courier_name}</span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                  <span className="text-slate-500">Estimasi Tiba:</span>
+                  <span className="font-bold text-emerald-700">{completedOrder.shipment.estimated_arrival}</span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                  <span className="text-slate-500">Penerima & Alamat:</span>
+                  <span className="font-bold text-slate-900 truncate max-w-[200px] sm:max-w-xs">{completedOrder.shipment.delivery_address}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 font-bold">
+                  <span className="text-slate-700">Total Dibayar:</span>
+                  <span className="font-extrabold text-[#003d29] text-sm tabular-nums">
+                    {formatRupiah(completedOrder.shipment.total_amount)}
+                  </span>
+                </div>
               </div>
             )}
 
-            {step === 'delivery' ? (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 mb-3 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#003d29]" />
-                    <span>Alamat Pengiriman</span>
-                  </h3>
+            {/* Action buttons */}
+            <div className="w-full max-w-md flex flex-col sm:flex-row items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (completedOrder) {
+                    onOrderSuccess(completedOrder.orderNumber, completedOrder.shipment, true);
+                  } else {
+                    onClose();
+                  }
+                }}
+                className="motion-press active:scale-[0.97] w-full py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] shadow-md shadow-emerald-950/10 flex items-center justify-center gap-2 cursor-pointer transition-[transform,background-color,box-shadow] duration-160 ease-[var(--ease-out)]"
+              >
+                <Truck className="w-4 h-4" />
+                <span>Lacak Status Pengiriman</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (completedOrder) {
+                    onOrderSuccess(completedOrder.orderNumber, completedOrder.shipment, false);
+                  } else {
+                    onClose();
+                  }
+                }}
+                className="motion-press active:scale-[0.97] w-full sm:w-auto py-3.5 px-6 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-100 border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-[transform,background-color] duration-160 ease-[var(--ease-out)]"
+              >
+                <span>Selesai</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-5 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left Column: Form Steps */}
+            <div className="lg:col-span-7 space-y-6">
+              {validationError && (
+                <div
+                  role="alert"
+                  className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{validationError}</span>
+                </div>
+              )}
 
-                  {/* Single-Column Linear Layout */}
-                  <div className="flex flex-col space-y-3.5 text-xs">
-                    <div>
-                      <label htmlFor="checkout-recipient-name" className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Nama Penerima <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="checkout-recipient-name"
-                        type="text"
-                        autoComplete="name"
-                        value={recipientName}
-                        onChange={(e) => {
-                          setRecipientName(e.target.value);
-                          if (validationError) setValidationError('');
-                        }}
-                        onBlur={() => handleBlur('recipientName')}
-                        aria-invalid={!!(touched.recipientName && fieldErrors.recipientName)}
-                        aria-describedby={touched.recipientName && fieldErrors.recipientName ? 'checkout-recipient-name-error' : undefined}
-                        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
-                          touched.recipientName && fieldErrors.recipientName
-                            ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
-                            : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
-                        } focus:outline-none`}
-                        required
-                      />
-                      {touched.recipientName && fieldErrors.recipientName && (
-                        <p id="checkout-recipient-name-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>{fieldErrors.recipientName}</span>
-                        </p>
-                      )}
-                    </div>
+              {step === 'delivery' ? (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 mb-3 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-[#003d29]" />
+                      <span>Alamat Pengiriman</span>
+                    </h3>
 
-                    <div>
-                      <label htmlFor="checkout-phone" className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Nomor WhatsApp / HP <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="checkout-phone"
-                        type="tel"
-                        inputMode="numeric"
-                        autoComplete="tel"
-                        value={phone}
-                        onChange={(e) => {
-                          setPhone(e.target.value);
-                          if (validationError) setValidationError('');
-                        }}
-                        onBlur={() => handleBlur('phone')}
-                        aria-invalid={!!(touched.phone && fieldErrors.phone)}
-                        aria-describedby={touched.phone && fieldErrors.phone ? 'checkout-phone-error' : undefined}
-                        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
-                          touched.phone && fieldErrors.phone
-                            ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
-                            : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
-                        } focus:outline-none`}
-                        required
-                      />
-                      {touched.phone && fieldErrors.phone && (
-                        <p id="checkout-phone-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>{fieldErrors.phone}</span>
-                        </p>
-                      )}
-                    </div>
+                    {/* Single-Column Linear Layout */}
+                    <div className="flex flex-col space-y-3.5 text-xs">
+                      <div>
+                        <label htmlFor="checkout-recipient-name" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Nama Penerima <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="checkout-recipient-name"
+                          type="text"
+                          autoComplete="name"
+                          value={recipientName}
+                          onChange={(e) => {
+                            setRecipientName(e.target.value);
+                            if (validationError) setValidationError('');
+                          }}
+                          onBlur={() => handleBlur('recipientName')}
+                          aria-invalid={!!(touched.recipientName && fieldErrors.recipientName)}
+                          aria-describedby={touched.recipientName && fieldErrors.recipientName ? 'checkout-recipient-name-error' : undefined}
+                          className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
+                            touched.recipientName && fieldErrors.recipientName
+                              ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
+                              : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
+                          } focus:outline-none`}
+                          required
+                        />
+                        {touched.recipientName && fieldErrors.recipientName && (
+                          <p id="checkout-recipient-name-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{fieldErrors.recipientName}</span>
+                          </p>
+                        )}
+                      </div>
 
-                    <div>
-                      <label htmlFor="checkout-address" className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Alamat Lengkap <span className="text-rose-500">*</span>
-                      </label>
-                      <textarea
-                        id="checkout-address"
-                        rows={2}
-                        autoComplete="street-address"
-                        value={addressLine}
-                        onChange={(e) => {
-                          setAddressLine(e.target.value);
-                          if (validationError) setValidationError('');
-                        }}
-                        onBlur={() => handleBlur('addressLine')}
-                        aria-invalid={!!(touched.addressLine && fieldErrors.addressLine)}
-                        aria-describedby={touched.addressLine && fieldErrors.addressLine ? 'checkout-address-error' : undefined}
-                        className={`w-full px-3.5 py-2.5 rounded-xl border leading-relaxed transition-all ${
-                          touched.addressLine && fieldErrors.addressLine
-                            ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
-                            : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
-                        } focus:outline-none`}
-                        required
-                      />
-                      {touched.addressLine && fieldErrors.addressLine && (
-                        <p id="checkout-address-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>{fieldErrors.addressLine}</span>
-                        </p>
-                      )}
-                    </div>
+                      <div>
+                        <label htmlFor="checkout-phone" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Nomor WhatsApp / HP <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="checkout-phone"
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel"
+                          value={phone}
+                          onChange={(e) => {
+                            setPhone(e.target.value);
+                            if (validationError) setValidationError('');
+                          }}
+                          onBlur={() => handleBlur('phone')}
+                          aria-invalid={!!(touched.phone && fieldErrors.phone)}
+                          aria-describedby={touched.phone && fieldErrors.phone ? 'checkout-phone-error' : undefined}
+                          className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
+                            touched.phone && fieldErrors.phone
+                              ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
+                              : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
+                          } focus:outline-none`}
+                          required
+                        />
+                        {touched.phone && fieldErrors.phone && (
+                          <p id="checkout-phone-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{fieldErrors.phone}</span>
+                          </p>
+                        )}
+                      </div>
 
-                    <div>
-                      <label htmlFor="checkout-city" className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Kota / Kabupaten <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="checkout-city"
-                        type="text"
-                        autoComplete="address-level2"
-                        value={city}
-                        onChange={(e) => {
-                          setCity(e.target.value);
-                          if (validationError) setValidationError('');
-                        }}
-                        onBlur={() => handleBlur('city')}
-                        aria-invalid={!!(touched.city && fieldErrors.city)}
-                        aria-describedby={touched.city && fieldErrors.city ? 'checkout-city-error' : undefined}
-                        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
-                          touched.city && fieldErrors.city
-                            ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
-                            : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
-                        } focus:outline-none`}
-                        required
-                      />
-                      {touched.city && fieldErrors.city && (
-                        <p id="checkout-city-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>{fieldErrors.city}</span>
-                        </p>
-                      )}
-                    </div>
+                      <div>
+                        <label htmlFor="checkout-address" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Alamat Lengkap <span className="text-rose-500">*</span>
+                        </label>
+                        <textarea
+                          id="checkout-address"
+                          rows={2}
+                          autoComplete="street-address"
+                          value={addressLine}
+                          onChange={(e) => {
+                            setAddressLine(e.target.value);
+                            if (validationError) setValidationError('');
+                          }}
+                          onBlur={() => handleBlur('addressLine')}
+                          aria-invalid={!!(touched.addressLine && fieldErrors.addressLine)}
+                          aria-describedby={touched.addressLine && fieldErrors.addressLine ? 'checkout-address-error' : undefined}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border leading-relaxed transition-all ${
+                            touched.addressLine && fieldErrors.addressLine
+                              ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
+                              : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
+                          } focus:outline-none`}
+                          required
+                        />
+                        {touched.addressLine && fieldErrors.addressLine && (
+                          <p id="checkout-address-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{fieldErrors.addressLine}</span>
+                          </p>
+                        )}
+                      </div>
 
-                    <div>
-                      <label htmlFor="checkout-postal-code" className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Kode Pos <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="checkout-postal-code"
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="postal-code"
-                        value={postalCode}
-                        onChange={(e) => {
-                          setPostalCode(e.target.value);
-                          if (validationError) setValidationError('');
-                        }}
-                        onBlur={() => handleBlur('postalCode')}
-                        aria-invalid={!!(touched.postalCode && fieldErrors.postalCode)}
-                        aria-describedby={touched.postalCode && fieldErrors.postalCode ? 'checkout-postal-code-error' : undefined}
-                        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
-                          touched.postalCode && fieldErrors.postalCode
-                            ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
-                            : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
-                        } focus:outline-none`}
-                        required
-                      />
-                      {touched.postalCode && fieldErrors.postalCode && (
-                        <p id="checkout-postal-code-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>{fieldErrors.postalCode}</span>
-                        </p>
-                      )}
+                      <div>
+                        <label htmlFor="checkout-city" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Kota / Kabupaten <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="checkout-city"
+                          type="text"
+                          autoComplete="address-level2"
+                          value={city}
+                          onChange={(e) => {
+                            setCity(e.target.value);
+                            if (validationError) setValidationError('');
+                          }}
+                          onBlur={() => handleBlur('city')}
+                          aria-invalid={!!(touched.city && fieldErrors.city)}
+                          aria-describedby={touched.city && fieldErrors.city ? 'checkout-city-error' : undefined}
+                          className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
+                            touched.city && fieldErrors.city
+                              ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
+                              : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
+                          } focus:outline-none`}
+                          required
+                        />
+                        {touched.city && fieldErrors.city && (
+                          <p id="checkout-city-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{fieldErrors.city}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label htmlFor="checkout-postal-code" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Kode Pos <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="checkout-postal-code"
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="postal-code"
+                          value={postalCode}
+                          onChange={(e) => {
+                            setPostalCode(e.target.value);
+                            if (validationError) setValidationError('');
+                          }}
+                          onBlur={() => handleBlur('postalCode')}
+                          aria-invalid={!!(touched.postalCode && fieldErrors.postalCode)}
+                          aria-describedby={touched.postalCode && fieldErrors.postalCode ? 'checkout-postal-error' : undefined}
+                          className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all ${
+                            touched.postalCode && fieldErrors.postalCode
+                              ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-200 focus:border-rose-500'
+                              : 'border-slate-200 focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29]'
+                          } focus:outline-none`}
+                          required
+                        />
+                        {touched.postalCode && fieldErrors.postalCode && (
+                          <p id="checkout-postal-error" className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium" role="alert">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{fieldErrors.postalCode}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Courier Selection Radio Group */}
+                  <fieldset className="border-0 p-0 m-0 space-y-3" role="radiogroup" aria-labelledby="courier-heading">
+                    <legend id="courier-heading" className="text-sm font-extrabold text-slate-900 mb-3 flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-[#003d29]" />
+                      <span>Pilih Layanan Pengiriman</span>
+                    </legend>
+
+                    <div className="space-y-2.5">
+                      {COURIER_SERVICES.map((c) => {
+                        const isSelected = selectedCourierId === c.id;
+                        return (
+                          <label
+                            key={c.id}
+                            htmlFor={`courier-${c.id}`}
+                            className={`motion-press p-3.5 rounded-2xl border transition-[border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] active:scale-[0.98] cursor-pointer flex items-center justify-between text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
+                              isSelected
+                                ? 'border-[#003d29] bg-emerald-50/50 ring-2 ring-[#003d29]/20 shadow-xs'
+                                : 'border-slate-200 hover:border-slate-300 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="radio"
+                                id={`courier-${c.id}`}
+                                name="courier_option"
+                                value={c.id}
+                                checked={isSelected}
+                                onChange={() => setSelectedCourierId(c.id)}
+                                className="w-4 h-4 text-[#003d29] accent-[#003d29] focus:ring-[#003d29] cursor-pointer"
+                              />
+                              <div>
+                                <div className="flex items-center gap-2 font-bold text-slate-900">
+                                  <span>{c.name}</span>
+                                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                    {c.badge}
+                                  </span>
+                                </div>
+                                <p className="text-slate-500 text-[11px] mt-0.5">{c.service} · {c.eta}</p>
+                              </div>
+                            </div>
+                            <div className="font-extrabold text-[#003d29] tabular-nums text-sm">
+                              {c.price === 0 ? 'Gratis' : formatRupiah(c.price)}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+
+                  <button
+                    type="button"
+                    onClick={handleProceedToPayment}
+                    className="motion-press active:scale-[0.97] w-full min-h-[44px] py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10"
+                  >
+                    <span>Lanjut ke Metode Pembayaran</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
                 </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Payment Method Radio Group */}
+                  <fieldset className="border-0 p-0 m-0 space-y-3" role="radiogroup" aria-labelledby="payment-heading">
+                    <legend id="payment-heading" className="text-sm font-extrabold text-slate-900 mb-3 flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-[#003d29]" />
+                      <span>Pilih Metode Pembayaran</span>
+                    </legend>
 
-                {/* Courier Selection Radio Group */}
-                <fieldset className="border-0 p-0 m-0 space-y-3" role="radiogroup" aria-labelledby="courier-heading">
-                  <legend id="courier-heading" className="text-sm font-extrabold text-slate-900 mb-3 flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-[#003d29]" />
-                    <span>Pilih Layanan Pengiriman</span>
-                  </legend>
-
-                  <div className="space-y-2.5">
-                    {COURIER_SERVICES.map((c) => {
-                      const isSelected = selectedCourierId === c.id;
-                      return (
-                        <label
-                          key={c.id}
-                          htmlFor={`courier-${c.id}`}
-                          className={`motion-press p-3.5 rounded-2xl border transition-[border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] active:scale-[0.98] cursor-pointer flex items-center justify-between text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
-                            isSelected
-                              ? 'border-[#003d29] bg-emerald-50/50 ring-2 ring-[#003d29]/20 shadow-xs'
-                              : 'border-slate-200 hover:border-slate-300 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
+                    <div className="space-y-3">
+                      {[
+                        { id: 'qris', name: 'QRIS (GoPay, OVO, Dana, ShopeePay, BCA)', desc: 'Scan instan otomatis terverifikasi' },
+                        { id: 'virtual_account', name: 'Virtual Account (BCA, Mandiri, BRI, BNI)', desc: 'Konfirmasi otomatis tanpa upload bukti' },
+                        { id: 'credit', name: 'Kartu Kredit / Debit Online', desc: 'Proteksi 3D Secure 256-bit SSL' },
+                        { id: 'cod', name: 'Cash on Delivery (COD)', desc: 'Bayar tunai ke kurir saat barang tiba' },
+                      ].map((pm) => {
+                        const isSelected = paymentMethod === pm.id;
+                        return (
+                          <label
+                            key={pm.id}
+                            htmlFor={`payment-${pm.id}`}
+                            className={`motion-press p-3.5 rounded-2xl border transition-[border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] active:scale-[0.98] cursor-pointer flex items-center gap-3 text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
+                              isSelected
+                                ? 'border-[#003d29] bg-emerald-50/50 ring-2 ring-[#003d29]/20 shadow-xs'
+                                : 'border-slate-200 hover:border-slate-300 bg-white'
+                            }`}
+                          >
                             <input
                               type="radio"
-                              id={`courier-${c.id}`}
-                              name="courier_option"
-                              value={c.id}
+                              id={`payment-${pm.id}`}
+                              name="payment_method"
+                              value={pm.id}
                               checked={isSelected}
-                              onChange={() => setSelectedCourierId(c.id)}
+                              onChange={() => setPaymentMethod(pm.id as any)}
                               className="w-4 h-4 text-[#003d29] accent-[#003d29] focus:ring-[#003d29] cursor-pointer"
                             />
                             <div>
-                              <div className="flex items-center gap-2 font-bold text-slate-900">
-                                <span>{c.name}</span>
-                                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
-                                  {c.badge}
-                                </span>
-                              </div>
-                              <p className="text-slate-500 text-[11px] mt-0.5">{c.service} · {c.eta}</p>
+                              <div className="font-bold text-slate-900">{pm.name}</div>
+                              <div className="text-[11px] text-slate-500">{pm.desc}</div>
                             </div>
-                          </div>
-                          <div className="font-extrabold text-[#003d29] tabular-nums text-sm">
-                            {c.price === 0 ? 'Gratis' : formatRupiah(c.price)}
-                          </div>
-                        </label>
-                      );
-                    })}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setStep('delivery')}
+                      className="motion-press active:scale-[0.97] w-1/3 min-h-[44px] py-3 px-4 rounded-full border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform] duration-160 ease-[var(--ease-out)] cursor-pointer"
+                    >
+                      Kembali
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCompleteOrder}
+                      disabled={isSubmitting}
+                      className="motion-press active:scale-[0.97] w-2/3 min-h-[44px] py-3.5 px-6 rounded-full font-black text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10 disabled:opacity-40"
+                    >
+                      <Lock className="w-4 h-4" />
+                      <span className="tabular-nums">{isSubmitting ? 'Memproses Pesanan...' : `Bayar ${formatRupiah(calcTotal)}`}</span>
+                    </button>
                   </div>
-                </fieldset>
-
-                <button
-                  type="button"
-                  onClick={handleProceedToPayment}
-                  className="motion-press active:scale-[0.97] w-full min-h-[44px] py-3.5 px-6 rounded-full font-bold text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10"
-                >
-                  <span>Lanjut ke Metode Pembayaran</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Payment Method Radio Group */}
-                <fieldset className="border-0 p-0 m-0 space-y-3" role="radiogroup" aria-labelledby="payment-heading">
-                  <legend id="payment-heading" className="text-sm font-extrabold text-slate-900 mb-3 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-[#003d29]" />
-                    <span>Pilih Metode Pembayaran</span>
-                  </legend>
-
-                  <div className="space-y-3">
-                    {[
-                      { id: 'qris', name: 'QRIS (GoPay, OVO, Dana, ShopeePay, BCA)', desc: 'Scan instan otomatis terverifikasi' },
-                      { id: 'virtual_account', name: 'Virtual Account (BCA, Mandiri, BRI, BNI)', desc: 'Konfirmasi otomatis tanpa upload bukti' },
-                      { id: 'credit', name: 'Kartu Kredit / Debit Online', desc: 'Proteksi 3D Secure 256-bit SSL' },
-                      { id: 'cod', name: 'Cash on Delivery (COD)', desc: 'Bayar tunai ke kurir saat barang tiba' },
-                    ].map((pm) => {
-                      const isSelected = paymentMethod === pm.id;
-                      return (
-                        <label
-                          key={pm.id}
-                          htmlFor={`payment-${pm.id}`}
-                          className={`motion-press p-3.5 rounded-2xl border transition-[border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] active:scale-[0.98] cursor-pointer flex items-center gap-3 text-xs focus-within:ring-2 focus-within:ring-[#003d29] focus-within:border-[#003d29] ${
-                            isSelected
-                              ? 'border-[#003d29] bg-emerald-50/50 ring-2 ring-[#003d29]/20 shadow-xs'
-                              : 'border-slate-200 hover:border-slate-300 bg-white'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            id={`payment-${pm.id}`}
-                            name="payment_method"
-                            value={pm.id}
-                            checked={isSelected}
-                            onChange={() => setPaymentMethod(pm.id as any)}
-                            className="w-4 h-4 text-[#003d29] accent-[#003d29] focus:ring-[#003d29] cursor-pointer"
-                          />
-                          <div>
-                            <div className="font-bold text-slate-900">{pm.name}</div>
-                            <div className="text-[11px] text-slate-500">{pm.desc}</div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStep('delivery')}
-                    className="motion-press active:scale-[0.97] w-1/3 min-h-[44px] py-3 px-4 rounded-full border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform] duration-160 ease-[var(--ease-out)] cursor-pointer"
-                  >
-                    Kembali
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCompleteOrder}
-                    disabled={isSubmitting}
-                    className="motion-press active:scale-[0.97] w-2/3 min-h-[44px] py-3.5 px-6 rounded-full font-black text-sm text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[background-color,transform,box-shadow] duration-160 ease-[var(--ease-out)] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-950/10 disabled:opacity-40"
-                  >
-                    <Lock className="w-4 h-4" />
-                    <span className="tabular-nums">{isSubmitting ? 'Memproses Pesanan...' : `Bayar ${formatRupiah(calcTotal)}`}</span>
-                  </button>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column: Order Summary & Voucher */}
-          <div className="lg:col-span-5 space-y-5">
-            {/* Voucher Box */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2 text-xs">
-              <label htmlFor="checkout-coupon-code" className="font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
-                <Tag className="w-4 h-4 text-[#003d29]" />
-                <span>Miliki Kode Voucher Promo?</span>
-              </label>
-              <form onSubmit={handleApplyCoupon} className="flex gap-2">
-                <input
-                  id="checkout-coupon-code"
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value)}
-                  placeholder="Contoh: PASARIA50"
-                  className="flex-1 px-3 py-2 min-h-[40px] rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] uppercase font-bold text-xs transition-all"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 min-h-[40px] rounded-xl bg-[#003d29] text-white font-bold text-xs hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-colors cursor-pointer"
-                >
-                  Terapkan
-                </button>
-              </form>
-              {appliedVoucher && (
-                <div className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Voucher {appliedVoucher} aktif! Hemat <span className="tabular-nums">{formatRupiah(calcDiscount)}</span></span>
-                </div>
-              )}
-              {voucherError && (
-                <div className="text-[11px] text-rose-600 font-medium">{voucherError}</div>
               )}
             </div>
 
-            {/* Price Breakdown */}
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-2xs space-y-3 text-xs">
-              <h4 className="font-extrabold text-slate-900 pb-2 border-b border-slate-200">
-                Rincian Pembayaran
-              </h4>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-slate-600">
-                  <span>Subtotal Produk</span>
-                  <span className="font-bold text-slate-900 tabular-nums">{formatRupiah(calcSubtotal)}</span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Biaya Pengiriman ({selectedCourier.name.split(' ')[0]})</span>
-                  <span className="font-bold text-slate-900 tabular-nums">
-                    {calcShipping === 0 ? 'Gratis' : formatRupiah(calcShipping)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Pajak Pertambahan Nilai (PPN 11%)</span>
-                  <span className="font-bold text-slate-900 tabular-nums">{formatRupiah(calcTax)}</span>
-                </div>
-                {calcDiscount > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-bold">
-                    <span>Diskon Promo Voucher</span>
-                    <span className="tabular-nums">- {formatRupiah(calcDiscount)}</span>
+            {/* Right Column: Order Summary & Voucher */}
+            <div className="lg:col-span-5 space-y-5">
+              {/* Voucher Box */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2 text-xs">
+                <label htmlFor="checkout-coupon-code" className="font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+                  <Tag className="w-4 h-4 text-[#003d29]" />
+                  <span>Miliki Kode Voucher Promo?</span>
+                </label>
+                <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <input
+                    id="checkout-coupon-code"
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="Contoh: PASARIA50"
+                    className="flex-1 px-3 py-2 min-h-[40px] rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29] focus:border-[#003d29] uppercase font-bold text-xs transition-all"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 min-h-[40px] rounded-xl bg-[#003d29] text-white font-bold text-xs hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-colors cursor-pointer"
+                  >
+                    Terapkan
+                  </button>
+                </form>
+                {appliedVoucher && (
+                  <div className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Voucher {appliedVoucher} aktif! Hemat <span className="tabular-nums">{formatRupiah(calcDiscount)}</span></span>
                   </div>
                 )}
-                <div className="border-t border-slate-200 pt-2.5 flex justify-between items-baseline text-sm font-extrabold text-slate-900">
-                  <span>Total Tagihan</span>
-                  <span className="text-lg font-black text-[#003d29] tabular-nums">
-                    {formatRupiah(calcTotal)}
-                  </span>
-                </div>
+                {voucherError && (
+                  <div className="text-[11px] text-rose-600 font-medium">{voucherError}</div>
+                )}
               </div>
 
-              <div className="pt-2 text-[10px] text-slate-400 flex items-center gap-1.5 justify-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Transaksi dijamin aman dengan rekening escrow PASARIA</span>
+              {/* Price Breakdown */}
+              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-2xs space-y-3 text-xs">
+                <h4 className="font-extrabold text-slate-900 pb-2 border-b border-slate-200">
+                  Rincian Pembayaran
+                </h4>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal Produk</span>
+                    <span className="font-bold text-slate-900 tabular-nums">{formatRupiah(calcSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Biaya Pengiriman ({selectedCourier.name.split(' ')[0]})</span>
+                    <span className="font-bold text-slate-900 tabular-nums">
+                      {calcShipping === 0 ? 'Gratis' : formatRupiah(calcShipping)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Pajak Pertambahan Nilai (PPN 11%)</span>
+                    <span className="font-bold text-slate-900 tabular-nums">{formatRupiah(calcTax)}</span>
+                  </div>
+                  {calcDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span>Diskon Promo Voucher</span>
+                      <span className="tabular-nums">- {formatRupiah(calcDiscount)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-200 pt-2.5 flex justify-between items-baseline text-sm font-extrabold text-slate-900">
+                    <span>Total Tagihan</span>
+                    <span className="text-lg font-black text-[#003d29] tabular-nums">
+                      {formatRupiah(calcTotal)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-[10px] text-slate-400 flex items-center gap-1.5 justify-center">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Transaksi dijamin aman dengan rekening escrow PASARIA</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
