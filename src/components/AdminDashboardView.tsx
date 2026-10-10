@@ -38,6 +38,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
+  const [flashAction, setFlashAction] = useState<{ id: string | number; type: 'success' | 'danger' } | null>(null);
 
   useEffect(() => {
     loadDashboard();
@@ -100,6 +101,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
   const handleToggleUser = async (userId: number, currentStatus: string) => {
     const nextStatus = currentStatus === 'suspended' ? 'active' : 'suspended';
+    setFlashAction({ id: `user-${userId}`, type: nextStatus === 'active' ? 'success' : 'danger' });
+    setTimeout(() => setFlashAction(null), 400);
+
     try {
       await api.toggleUserStatus(userId, nextStatus);
       const msg = `Status pengguna #${userId} berhasil diubah ke ${nextStatus}`;
@@ -113,6 +117,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   };
 
   const handleApproveSeller = async (shopId: number, status: 'approved' | 'rejected') => {
+    setFlashAction({ id: shopId, type: status === 'approved' ? 'success' : 'danger' });
+    setTimeout(() => setFlashAction(null), 400);
+
     try {
       await api.approveSeller(shopId, status);
       const msg = `Toko #${shopId} berhasil di-${status === 'approved' ? 'setujui' : 'tolak'}`;
@@ -127,6 +134,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   };
 
   const handleModerateReview = async (reviewId: number, status: 'approved' | 'hidden' | 'active') => {
+    setFlashAction({ id: `review-${reviewId}`, type: status === 'approved' || status === 'active' ? 'success' : 'danger' });
+    setTimeout(() => setFlashAction(null), 400);
+
     try {
       await api.moderateReview(reviewId, status);
       const msg = `Ulasan #${reviewId} telah diatur ke status ${status}`;
@@ -140,6 +150,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   };
 
   const handleResolveDispute = async (disputeId: number, resolution: string) => {
+    setFlashAction({ id: `dispute-${disputeId}`, type: resolution === 'refund_buyer' ? 'success' : 'danger' });
+    setTimeout(() => setFlashAction(null), 400);
+
     try {
       await api.resolveDispute(disputeId, resolution, 'Keputusan oleh Tim Resolusi PASARIA');
       const msg = `Sengketa #${disputeId} berhasil diselesaikan (${resolution})`;
@@ -172,7 +185,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         <button
           onClick={onNavigateHome}
           aria-label="Kembali ke Toko Utama PASARIA"
-          className="min-h-[44px] inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+          className="min-h-[44px] inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali ke Toko Utama</span>
@@ -186,7 +199,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Admin Navigation Tabs */}
+      {/* Admin Navigation Tabs (Motion Point #51) */}
       <div
         role="tablist"
         aria-label="Navigasi Menu Admin"
@@ -212,7 +225,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               aria-controls={`admin-panel-${tab.id}`}
               tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[#003d29] ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96] ${
                 isActive
                   ? 'bg-[#003d29] text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200/80'
@@ -225,17 +238,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         })}
       </div>
 
-      {/* Tab 1: Overview */}
+      {/* Tab 1: Overview (Motion Point #51: Tab Crossfade & Stat Card Hover) */}
       {activeTab === 'overview' && (
         <div
           id="admin-panel-overview"
           role="tabpanel"
           aria-labelledby="admin-tab-overview"
           tabIndex={0}
-          className="space-y-8 focus:outline-none"
+          className="motion-tab-pane space-y-8 focus:outline-none"
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs hover:-translate-y-1 hover:shadow-md transition-[transform,box-shadow] duration-200 cursor-default">
               <div className="text-slate-400 text-xs font-semibold mb-1">Total Pendapatan (GMV)</div>
               <div className="text-xl font-extrabold text-[#003d29] tabular-nums">
                 {formatRupiah(metrics?.total_revenue || 0)}
@@ -243,7 +256,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <div className="text-[11px] text-emerald-700 font-medium mt-1">Platform Multi-Vendor</div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs hover:-translate-y-1 hover:shadow-md transition-[transform,box-shadow] duration-200 cursor-default">
               <div className="text-slate-400 text-xs font-semibold mb-1">Total Transaksi</div>
               <div className="text-xl font-extrabold text-slate-900 tabular-nums">
                 {metrics?.total_orders || 0}
@@ -251,7 +264,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <div className="text-[11px] text-slate-500 mt-1">Pesanan Terverifikasi</div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs hover:-translate-y-1 hover:shadow-md transition-[transform,box-shadow] duration-200 cursor-default">
               <div className="text-slate-400 text-xs font-semibold mb-1">Pengguna Aktif</div>
               <div className="text-xl font-extrabold text-slate-900 tabular-nums">
                 {metrics?.total_users || 0}
@@ -259,7 +272,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <div className="text-[11px] text-slate-500 mt-1">Customer & Seller</div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs hover:-translate-y-1 hover:shadow-md transition-[transform,box-shadow] duration-200 cursor-default">
               <div className="text-slate-400 text-xs font-semibold mb-1">Seller Terdaftar</div>
               <div className="text-xl font-extrabold text-slate-900 tabular-nums">
                 {metrics?.total_sellers || 0}
@@ -269,7 +282,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4">
+            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 hover:-translate-y-1 hover:shadow-md transition-[transform,box-shadow] duration-200">
               <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                 <Store className="w-4 h-4 text-[#003d29]" />
                 Antrean Verifikasi Toko
@@ -280,13 +293,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <button
                 onClick={() => setActiveTab('sellers')}
                 aria-label="Tinjau antrean pengajuan pendaftaran seller baru"
-                className="w-full min-h-[44px] py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                className="w-full min-h-[44px] py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
               >
                 Tinjau Pengajuan Seller
               </button>
             </div>
 
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4">
+            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 hover:-translate-y-1 hover:shadow-md transition-[transform,box-shadow] duration-200">
               <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                 <RotateCcw className="w-4 h-4 text-rose-600" />
                 Sengketa Retur & Komplain
@@ -297,13 +310,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <button
                 onClick={() => setActiveTab('disputes')}
                 aria-label="Buka pusat resolusi sengketa dan komplain retur barang"
-                className="w-full min-h-[44px] py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600"
+                className="w-full min-h-[44px] py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600 motion-press active:scale-[0.96]"
               >
                 Buka Pusat Resolusi
               </button>
             </div>
 
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4">
+            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 hover:-translate-y-1 hover:shadow-md transition-[transform,box-shadow] duration-200">
               <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                 <FileText className="w-4 h-4 text-amber-600" />
                 Moderasi Ulasan
@@ -314,7 +327,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <button
                 onClick={() => setActiveTab('reviews')}
                 aria-label="Buka daftar ulasan untuk proses moderasi"
-                className="w-full min-h-[44px] py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-amber-600"
+                className="w-full min-h-[44px] py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-amber-600 motion-press active:scale-[0.96]"
               >
                 Moderasi Ulasan
               </button>
@@ -323,14 +336,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Tab 2: Users Management */}
+      {/* Tab 2: Users Management (Motion Point #51 & #52) */}
       {activeTab === 'users' && (
         <div
           id="admin-panel-users"
           role="tabpanel"
           aria-labelledby="admin-tab-users"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs focus:outline-none"
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-extrabold text-slate-900 text-sm">Daftar Pengguna Platform</h3>
@@ -349,51 +362,63 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {usersList.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/50">
-                    <td className="py-3.5 px-4 font-bold text-slate-900">{u.name}</td>
-                    <td className="py-3.5 px-4 text-slate-600">{u.email}</td>
-                    <td className="py-3.5 px-4 font-semibold uppercase tracking-wider text-[11px] text-[#003d29]">
-                      {u.role}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        u.status === 'suspended' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
-                      }`}>
-                        {u.status || 'active'}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      {u.role !== 'admin' && (
-                        <button
-                          onClick={() => handleToggleUser(u.id, u.status || 'active')}
-                          aria-label={`${u.status === 'suspended' ? 'Aktifkan kembali akun' : 'Tangguhkan akun'} ${u.name}`}
-                          className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors inline-flex items-center justify-center focus:outline-none focus:ring-2 ${
-                            u.status === 'suspended'
-                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 focus:ring-emerald-600'
-                              : 'bg-rose-50 hover:bg-rose-100 text-rose-600 focus:ring-rose-600'
-                          }`}
-                        >
-                          {u.status === 'suspended' ? 'Aktifkan Kembali' : 'Bekukan Akun'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {usersList.map((u) => {
+                  const isFlashed = flashAction && flashAction.id === `user-${u.id}`;
+                  return (
+                    <tr
+                      key={u.id}
+                      className={`transition-colors duration-200 ${
+                        isFlashed
+                          ? flashAction.type === 'success'
+                            ? 'bg-emerald-50/70'
+                            : 'bg-rose-50/70'
+                          : 'hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 font-bold text-slate-900">{u.name}</td>
+                      <td className="py-3.5 px-4 text-slate-600">{u.email}</td>
+                      <td className="py-3.5 px-4 font-semibold uppercase tracking-wider text-[11px] text-[#003d29]">
+                        {u.role}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          u.status === 'suspended' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
+                        }`}>
+                          {u.status || 'active'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        {u.role !== 'admin' && (
+                          <button
+                            onClick={() => handleToggleUser(u.id, u.status || 'active')}
+                            aria-label={`${u.status === 'suspended' ? 'Aktifkan kembali akun' : 'Tangguhkan akun'} ${u.name}`}
+                            className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors inline-flex items-center justify-center focus:outline-none focus:ring-2 motion-press active:scale-[0.96] ${
+                              u.status === 'suspended'
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 focus:ring-emerald-600'
+                                : 'bg-rose-50 hover:bg-rose-100 text-rose-600 focus:ring-rose-600'
+                            }`}
+                          >
+                            {u.status === 'suspended' ? 'Aktifkan Kembali' : 'Bekukan Akun'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* Tab 3: Sellers Verification */}
+      {/* Tab 3: Sellers Verification (Motion Point #51 & #52: Seller Moderation Action Approval/Rejection Flash) */}
       {activeTab === 'sellers' && (
         <div
           id="admin-panel-sellers"
           role="tabpanel"
           aria-labelledby="admin-tab-sellers"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 focus:outline-none"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 className="font-extrabold text-slate-900 text-sm">Pengajuan Verifikasi Seller & Merchant</h3>
@@ -404,45 +429,65 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
           <div className="space-y-4">
             {sellersList.length > 0 ? (
-              sellersList.map((s) => (
-                <div key={s.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[#003d29]">
-                      {(s.name || 'PA').slice(0, 2).toUpperCase()}
+              sellersList.map((s) => {
+                const isFlashed = flashAction && flashAction.id === s.id;
+                return (
+                  <div
+                    key={s.id}
+                    className={`p-4 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors duration-200 ${
+                      isFlashed
+                        ? flashAction.type === 'success'
+                          ? 'bg-emerald-50/70'
+                          : 'bg-rose-50/70'
+                        : 'bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[#003d29]">
+                        {(s.name || 'PA').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">{s.name}</h4>
+                        <p className="text-xs text-slate-500">
+                          {s.city || 'Indonesia'} · {s.user?.email || 'Seller Resmi'} · <span className="tabular-nums font-semibold">{s.products_count ?? 0}</span> Produk
+                        </p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 inline-block ${
+                          s.verified || s.status === 'approved' ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'
+                        }`}>
+                          {s.verified || s.status === 'approved' ? 'Official Store Terverifikasi' : 'Menunggu Verifikasi'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{s.name}</h4>
-                      <p className="text-xs text-slate-500">
-                        {s.city || 'Indonesia'} · {s.user?.email || 'Seller Resmi'} · <span className="tabular-nums font-semibold">{s.products_count ?? 0}</span> Produk
-                      </p>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 inline-block ${
-                        s.verified || s.status === 'approved' ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'
-                      }`}>
-                        {s.verified || s.status === 'approved' ? 'Official Store Terverifikasi' : 'Menunggu Verifikasi'}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleApproveSeller(s.id, 'approved')}
+                        aria-label={`Setujui pendaftaran toko ${s.name}`}
+                        className="min-h-[44px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
+                      >
+                        Setujui Toko
+                      </button>
+                      <button
+                        onClick={() => handleApproveSeller(s.id, 'rejected')}
+                        aria-label={`Tolak pendaftaran toko ${s.name}`}
+                        className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600 motion-press active:scale-[0.96]"
+                      >
+                        Tolak Toko
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleApproveSeller(s.id, 'approved')}
-                      aria-label={`Setujui pendaftaran toko ${s.name}`}
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
-                    >
-                      Setujui Toko
-                    </button>
-                    <button
-                      onClick={() => handleApproveSeller(s.id, 'rejected')}
-                      aria-label={`Tolak pendaftaran toko ${s.name}`}
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600"
-                    >
-                      Tolak Toko
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <>
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div
+                  className={`p-4 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors duration-200 ${
+                    flashAction && flashAction.id === 1
+                      ? flashAction.type === 'success'
+                        ? 'bg-emerald-50/70'
+                        : 'bg-rose-50/70'
+                      : 'bg-slate-50'
+                  }`}
+                >
                   <div className="flex items-center gap-3.5">
                     <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[#003d29]">
                       PA
@@ -459,21 +504,29 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     <button
                       onClick={() => handleApproveSeller(1, 'approved')}
                       aria-label="Setujui pendaftaran toko PASARIA Audio Official"
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                      className="min-h-[44px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
                     >
                       Setujui Toko
                     </button>
                     <button
                       onClick={() => handleApproveSeller(1, 'rejected')}
                       aria-label="Tolak pendaftaran toko PASARIA Audio Official"
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600"
+                      className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600 motion-press active:scale-[0.96]"
                     >
                       Tolak Toko
                     </button>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div
+                  className={`p-4 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors duration-200 ${
+                    flashAction && flashAction.id === 2
+                      ? flashAction.type === 'success'
+                        ? 'bg-emerald-50/70'
+                        : 'bg-rose-50/70'
+                      : 'bg-slate-50'
+                  }`}
+                >
                   <div className="flex items-center gap-3.5">
                     <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[#003d29]">
                       NG
@@ -490,14 +543,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     <button
                       onClick={() => handleApproveSeller(2, 'approved')}
                       aria-label="Setujui pendaftaran toko NextGen Soundworks"
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                      className="min-h-[44px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
                     >
                       Setujui Toko
                     </button>
                     <button
                       onClick={() => handleApproveSeller(2, 'rejected')}
                       aria-label="Tolak pendaftaran toko NextGen Soundworks"
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600"
+                      className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-600 motion-press active:scale-[0.96]"
                     >
                       Tolak Toko
                     </button>
@@ -509,19 +562,27 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Tab 4: Review Moderation */}
+      {/* Tab 4: Review Moderation (Motion Point #51 & #52) */}
       {activeTab === 'reviews' && (
         <div
           id="admin-panel-reviews"
           role="tabpanel"
           aria-labelledby="admin-tab-reviews"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 focus:outline-none"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 className="font-extrabold text-slate-900 text-sm">Daftar & Moderasi Ulasan</h3>
           </div>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 flex flex-col sm:flex-row sm:items-start justify-between gap-4 text-xs">
+          <div
+            className={`p-4 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-start justify-between gap-4 text-xs transition-colors duration-200 ${
+              flashAction && flashAction.id === 'review-1'
+                ? flashAction.type === 'success'
+                  ? 'bg-emerald-50/70'
+                  : 'bg-rose-50/70'
+                : 'bg-slate-50'
+            }`}
+          >
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-bold text-slate-900">Pembeli Terverifikasi (Order #<span className="tabular-nums">9945284820</span>)</span>
@@ -535,14 +596,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <button
                 onClick={() => handleModerateReview(1, 'active')}
                 aria-label="Setujui ulasan pembeli order 9945284820"
-                className="min-h-[40px] px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="min-h-[40px] px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 motion-press active:scale-[0.96]"
               >
                 Setujui
               </button>
               <button
                 onClick={() => handleModerateReview(1, 'hidden')}
                 aria-label="Sembunyikan ulasan pembeli order 9945284820"
-                className="min-h-[40px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-rose-600"
+                className="min-h-[40px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-rose-600 motion-press active:scale-[0.96]"
               >
                 Sembunyikan
               </button>
@@ -551,19 +612,27 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Tab 5: Disputes */}
+      {/* Tab 5: Disputes (Motion Point #51 & #52) */}
       {activeTab === 'disputes' && (
         <div
           id="admin-panel-disputes"
           role="tabpanel"
           aria-labelledby="admin-tab-disputes"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs space-y-4 focus:outline-none"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 className="font-extrabold text-slate-900 text-sm">Pusat Sengketa Retur & Komplain Pembeli</h3>
           </div>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-3 text-xs">
+          <div
+            className={`p-4 rounded-2xl border border-slate-200/60 space-y-3 text-xs transition-colors duration-200 ${
+              flashAction && flashAction.id === 'dispute-1'
+                ? flashAction.type === 'success'
+                  ? 'bg-emerald-50/70'
+                  : 'bg-rose-50/70'
+                : 'bg-slate-50'
+            }`}
+          >
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-900">
                 Sengketa #<span className="tabular-nums">1</span> · Pesanan #<span className="tabular-nums">ORD-9945284820</span>
@@ -579,14 +648,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <button
                 onClick={() => handleResolveDispute(1, 'refund_buyer')}
                 aria-label="Kabulkan pengembalian dana pembeli untuk sengketa nomor 1"
-                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
               >
                 Kabulkan Pengembalian Dana Pembeli
               </button>
               <button
                 onClick={() => handleResolveDispute(1, 'reject_claim')}
                 aria-label="Tolak komplain retur untuk sengketa nomor 1"
-                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-slate-400"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold cursor-pointer inline-flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 motion-press active:scale-[0.96]"
               >
                 Tolak Komplain
               </button>
@@ -602,7 +671,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="admin-tab-reports"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs focus:outline-none"
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-extrabold text-slate-900 text-sm">Laporan Indikasi Pelanggaran</h3>
@@ -635,7 +704,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="admin-tab-audit"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs focus:outline-none"
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-extrabold text-slate-900 text-sm">Riwayat Log Audit Administrator</h3>
