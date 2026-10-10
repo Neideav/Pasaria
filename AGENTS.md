@@ -48,7 +48,8 @@ php artisan route:list                     # Inspect registered route list
 - Frontend API calls route through centralized helpers in `src/services/api.ts`.
 
 ## Git workflow
-- Active working branch is `production`.
+- Active working branch is `testing`.
+- Never commit or push directly to `production` or `main`.
 - Format commits following Conventional Commits (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`).
 - Stage only relevant files explicitly; avoid broad directory staging.
 

@@ -35,9 +35,13 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | GET | /api/products | Api\ProductApiController@index | Public |
 | POST | /api/products | Api\ProductApiController@store | Seller, Admin |
 | GET | /api/products/{slug} | Api\ProductApiController@show | Public |
+| PUT | /api/products/{id} | Api\ProductApiController@update | Seller, Admin |
 | DELETE | /api/products/{id} | Api\ProductApiController@destroy | Seller, Admin |
+| PATCH | /api/products/{id}/status | Api\ProductApiController@toggleStatus | Seller, Admin |
 | GET | /api/products/{id}/reviews | Api\ReviewApiController@index | Public |
 | GET | /api/products/{id}/questions | Api\QuestionApiController@index | Public |
+| POST | /api/upload | Api\UploadApiController@upload | Authenticated |
+| DELETE | /api/upload | Api\UploadApiController@delete | Authenticated |
 | GET | /api/shops/following | Api\ShopApiController@following | Authenticated |
 | GET | /api/shops/{slugOrId} | Api\ShopApiController@show | Public |
 | POST | /api/shops | Api\ShopApiController@store | Authenticated |
@@ -52,6 +56,8 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | POST | /api/auth/login | Api\AuthApiController@login | Public |
 | POST | /api/auth/register | Api\AuthApiController@register | Public |
 | POST | /api/auth/logout | Api\AuthApiController@logout | Authenticated |
+| POST | /api/auth/verify-email | Api\AuthApiController@verifyEmail | Public / Authenticated |
+| POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
 | GET | /api/user | Api\AuthApiController@me | Authenticated |
 | PUT | /api/user/profile | Api\AuthApiController@updateProfile | Authenticated |
@@ -71,6 +77,7 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | GET | /api/orders/{orderNumber} | Api\OrderApiController@show | Authenticated |
 | PUT,PATCH | /api/orders/{id}/status | Api\OrderApiController@updateStatus | Authenticated |
 | POST | /api/orders/{id}/cancel | Api\OrderApiController@cancel | Authenticated |
+| POST | /api/payments/webhook/{provider?} | Api\PaymentWebhookController@handle | Public (Gateway Signature Auth) |
 | POST | /api/reviews | Api\ReviewApiController@store | Authenticated |
 | POST | /api/reviews/{id}/reply | Api\ReviewApiController@reply | Seller |
 | POST | /api/questions | Api\QuestionApiController@store | Authenticated |
@@ -94,6 +101,7 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | GET | /api/seller/products | Api\SellerApiController@products | Seller |
 | GET | /api/seller/inventory | Api\SellerApiController@inventory | Seller |
 | GET | /api/seller/orders | Api\SellerApiController@orders | Seller |
+| PUT | /api/seller/inventory/{id}/stock | Api\SellerApiController@updateStock | Seller |
 | PUT | /api/seller/products/{id}/stock | Api\SellerApiController@updateStock | Seller |
 | GET | /api/seller/finances | Api\SellerApiController@finances | Seller |
 | POST | /api/seller/payout | Api\SellerApiController@requestPayout | Seller |
@@ -105,6 +113,10 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | PUT | /api/admin/reviews/{id}/moderate | Api\AdminApiController@moderateReview | Admin |
 | GET | /api/admin/audit-logs | Api\AdminApiController@auditLogs | Admin |
 | GET | /api/admin/reports | Api\AdminApiController@reports | Admin |
+| GET | /api/admin/payouts | Api\AdminApiController@payouts | Admin |
+| POST | /api/admin/payouts/{id}/approve | Api\AdminApiController@approvePayout | Admin |
+| POST | /api/admin/payouts/{id}/reject | Api\AdminApiController@rejectPayout | Admin |
+| GET | /api/admin/refunds | Api\AdminApiController@refunds | Admin |
 | GET | /api/config | Api\ConfigApiController@getDemoMode | Public |
 | GET | /api/config/demo-mode | Api\ConfigApiController@getDemoMode | Public |
 | POST | /api/config/demo-mode | Api\ConfigApiController@toggleDemoMode | Public |

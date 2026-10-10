@@ -1,6 +1,6 @@
 # Codebase Reference (PASARIA Marketplace)
 
-Deep factual reference for AI agents and developers. **Last verified: 2026-10-08.**
+Deep factual reference for AI agents and developers. **Last verified: 2026-10-10.**
 If you modify code that alters architecture, models, routes, or services documented here, update this file in the same change.
 Consult [`AGENTS.md`](./AGENTS.md) for working instructions and operational boundaries.
 
@@ -15,7 +15,7 @@ Consult [`AGENTS.md`](./AGENTS.md) for working instructions and operational boun
 | Database | MariaDB / MySQL | Relational engine with foreign key constraints, SQLite for tests |
 | API authentication | Laravel Sanctum 4.0 | Bearer token authorization via personal_access_tokens |
 | Frontend framework | React 19.3.0 | TypeScript 7.0.2, Single Page Application |
-| Bundler and tooling | Vite 8.3.4 | Tailwind CSS v4.3.3, Lucide React icons, Motion animations |
+| Bundler and tooling | Vite 8.3.4 | Tailwind CSS v4.3.3, Lucide React icons, UI Motion physics tokens |
 | Test suite | PHPUnit 11.0.0 | Unit and Feature tests with in-memory SQLite |
 | Container runtime | Docker | Multi-stage build (Node 22 builder into PHP 8.2 Apache) |
 <!-- END AUTO GENERATED: STACK_MATRIX -->
@@ -38,7 +38,10 @@ app/Http/Controllers/Api/ (Thin HTTP controllers)
   │
   ├── app/Services/ (Core domain services)
   │     ├── PricingService (Server-side calculations for tax, shipping, vouchers)
-  │     └── CheckoutService (Atomic multi-vendor order and shipment creation)
+  │     ├── CheckoutService (Atomic multi-vendor order and shipment creation)
+  │     ├── OrderStateMachine (Order status lifecycle and transition guards)
+  │     ├── RefundService (Refund processing and gateway integration)
+  │     └── LedgerService (Financial ledger and wallet reconciliation)
   │
   ├── app/Models/ (Eloquent ORM entities)
   │     └── MariaDB / SQLite Database
@@ -65,6 +68,7 @@ resources/
 └── views/                         # Blade templates used for server-rendered web fallback
 src/
 ├── components/                    # Reusable React components (Navbar, Modals, ProductCards)
+├── context/                       # React context providers (ToastContext)
 ├── services/                      # Frontend API client and communication adapters
 ├── types/                         # TypeScript interfaces and domain type declarations
 └── App.tsx                        # Root React application component and view switching
@@ -142,7 +146,7 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | GET | /api/config | Api\ConfigApiController@getDemoMode | Public |
 <!-- END AUTO GENERATED: ROUTING_MATRIX -->
 
-Complete routing matrix for all 98 endpoints is recorded in `.agents/references/routes.md`.
+Complete routing matrix for all 89 endpoints is recorded in `.agents/references/routes.md`.
 
 ## Subsystems and deep references
 - [`database-schema.md`](./.agents/references/database-schema.md) covers full relational schema catalog.
