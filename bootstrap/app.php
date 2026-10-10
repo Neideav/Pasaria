@@ -5,6 +5,9 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
+    ->withProviders([
+        \App\Providers\AppServiceProvider::class,
+    ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -53,6 +56,16 @@ return Application::configure(basePath: dirname(__DIR__))
                         'errors' => $e->errors(),
                     ], 422);
                 }
+                if ($e instanceof \Illuminate\Http\Exceptions\ThrottleRequestsException) {
+                    $headers = $e->getHeaders();
+                    $retryAfter = (int) ($headers['Retry-After'] ?? 60);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Terlalu banyak permintaan. Silakan tunggu beberapa saat lagi.',
+                        'retry_after' => $retryAfter,
+                    ], 429, $headers);
+                }
                 if ($e instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException || $e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
                     return response()->json([
                         'success' => false,
@@ -84,4 +97,3 @@ return Application::configure(basePath: dirname(__DIR__))
         }
     })
     ->create();
-
