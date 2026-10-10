@@ -19,9 +19,9 @@ services:
       - pasaria-storage:/var/www/html/storage
       - ./.env:/var/www/html/.env
       - type: bind
-          source: /var/www/pasaria/certs/ap-southeast-1-bundle.pem
-          target: /etc/ssl/rds/ap-southeast-1-bundle.pem
-          read_only: true
+        source: /var/www/pasaria/certs/ap-southeast-1-bundle.pem
+        target: /etc/ssl/rds/ap-southeast-1-bundle.pem
+        read_only: true
 
     networks:
       - pasaria-network
