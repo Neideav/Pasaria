@@ -25,9 +25,10 @@ bun run dev                                # Start Vite frontend server
 bun run lint                               # Run TypeScript type check (tsc --noEmit)
 bun run build                              # Compile production frontend bundle
 
-# Database operations
+# Database and cache operations
 php artisan migrate                        # Run pending database migrations
 php artisan route:list                     # Inspect registered route list
+php artisan cache:clear                    # Clear application cache and rate limit counters
 ```
 
 ## Critical rules (READ FIRST)
@@ -45,6 +46,8 @@ php artisan route:list                     # Inspect registered route list
 - Multi-vendor checkouts must run inside database transactions to atomically generate parent orders, vendor sub-orders, stock deductions, and shipments.
 - Discard client-submitted prices; calculate totals, shipping rates, voucher discounts, and 11 percent tax strictly server-side.
 - Return structured API responses containing explicit HTTP status codes and standard JSON envelopes.
+- Configure rate limiters centrally in `app/Providers/AppServiceProvider.php` via `RateLimiter::for()`; avoid scattershot throttle definitions.
+- Deliver HTTP 429 responses using standardized JSON envelopes with `success`, `message`, and `retry_after` keys.
 - Frontend API calls route through centralized helpers in `src/services/api.ts`.
 
 ## Git workflow

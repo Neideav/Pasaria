@@ -29,6 +29,8 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 
 ## API routes
 
+All API routes are wrapped in global `throttle:api` (60 req/min for guest, 120 req/min for authenticated). Sensitive mutation routes apply specialized named rate limiters.
+
 | Method | Endpoint | Handler | Access |
 |---|---|---|---|
 | GET | /api/categories | Api\CategoryApiController@index | Public |
@@ -40,8 +42,8 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | PATCH | /api/products/{id}/status | Api\ProductApiController@toggleStatus | Seller, Admin |
 | GET | /api/products/{id}/reviews | Api\ReviewApiController@index | Public |
 | GET | /api/products/{id}/questions | Api\QuestionApiController@index | Public |
-| POST | /api/upload | Api\UploadApiController@upload | Authenticated |
-| DELETE | /api/upload | Api\UploadApiController@delete | Authenticated |
+| POST | /api/upload | Api\UploadApiController@upload | Authenticated (throttle:uploads) |
+| DELETE | /api/upload | Api\\UploadApiController@delete | Authenticated |
 | GET | /api/shops/following | Api\ShopApiController@following | Authenticated |
 | GET | /api/shops/{slugOrId} | Api\ShopApiController@show | Public |
 | POST | /api/shops | Api\ShopApiController@store | Authenticated |
@@ -49,15 +51,15 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | POST | /api/shops/{id}/follow | Api\ShopApiController@follow | Authenticated |
 | DELETE | /api/shops/{id}/follow | Api\ShopApiController@unfollow | Authenticated |
 | GET | /api/vouchers | Api\VoucherApiController@index | Public |
-| POST | /api/vouchers/validate | Api\VoucherApiController@validateCode | Public |
+| POST | /api/vouchers/validate | Api\VoucherApiController@validateCode | Public / Authenticated (throttle:vouchers-validate) |
 | GET | /api/deliveries | Api\DeliveryApiController@index | Public |
 | POST | /api/deliveries | Api\DeliveryApiController@store | Public |
 | GET | /api/deliveries/{code} | Api\DeliveryApiController@show | Public |
-| POST | /api/auth/login | Api\AuthApiController@login | Public |
-| POST | /api/auth/register | Api\AuthApiController@register | Public |
+| POST | /api/auth/login | Api\AuthApiController@login | Public (throttle:auth-login) |
+| POST | /api/auth/register | Api\AuthApiController@register | Public (throttle:auth-register) |
 | POST | /api/auth/logout | Api\AuthApiController@logout | Authenticated |
 | POST | /api/auth/verify-email | Api\AuthApiController@verifyEmail | Public / Authenticated |
-| POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated |
+| POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated (throttle:auth-resend) |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
 | GET | /api/user | Api\AuthApiController@me | Authenticated |
 | PUT | /api/user/profile | Api\AuthApiController@updateProfile | Authenticated |
@@ -72,7 +74,7 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | POST | /api/cart/item | Api\CartApiController@addItem | Public or Authenticated |
 | DELETE | /api/cart | Api\CartApiController@clearCart | Public or Authenticated |
 | POST | /api/orders/calculate | Api\OrderApiController@calculate | Authenticated |
-| POST | /api/orders | Api\OrderApiController@store | Authenticated |
+| POST | /api/orders | Api\OrderApiController@store | Authenticated (throttle:orders-create) |
 | GET | /api/orders | Api\OrderApiController@index | Authenticated |
 | GET | /api/orders/{orderNumber} | Api\OrderApiController@show | Authenticated |
 | PUT,PATCH | /api/orders/{id}/status | Api\OrderApiController@updateStatus | Authenticated |
@@ -88,7 +90,7 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | GET | /api/conversations | Api\ChatApiController@getConversations | Authenticated |
 | POST | /api/conversations/start | Api\ChatApiController@startConversation | Authenticated |
 | GET | /api/conversations/{id}/messages | Api\ChatApiController@getMessages | Authenticated |
-| POST | /api/conversations/messages | Api\ChatApiController@sendMessage | Authenticated |
+| POST | /api/conversations/messages | Api\ChatApiController@sendMessage | Authenticated (throttle:messages-send) |
 | GET | /api/returns | Api\ReturnApiController@index | Authenticated |
 | POST | /api/returns | Api\ReturnApiController@store | Authenticated |
 | POST | /api/returns/{id}/respond | Api\ReturnApiController@sellerRespond | Seller |
@@ -102,7 +104,7 @@ Routing matrix for PASARIA Multi-Vendor Marketplace.
 | GET | /api/seller/inventory | Api\SellerApiController@inventory | Seller |
 | GET | /api/seller/orders | Api\SellerApiController@orders | Seller |
 | PUT | /api/seller/inventory/{id}/stock | Api\SellerApiController@updateStock | Seller |
-| PUT | /api/seller/products/{id}/stock | Api\SellerApiController@updateStock | Seller |
+| PUT | /api/seller/products/{id}/stock | Api\\SellerApiController@updateStock | Seller |
 | GET | /api/seller/finances | Api\SellerApiController@finances | Seller |
 | POST | /api/seller/payout | Api\SellerApiController@requestPayout | Seller |
 | GET | /api/admin/dashboard | Api\AdminApiController@dashboard | Admin |
