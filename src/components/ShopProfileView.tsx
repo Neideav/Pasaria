@@ -10,7 +10,9 @@ import {
   ChevronRight,
   MessageCircle,
   Share2,
-  Heart
+  Heart,
+  UserPlus,
+  UserCheck
 } from 'lucide-react';
 import { Shop, Product } from '../types';
 import { ProductCard } from './ProductCard';
@@ -37,14 +39,21 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
   const { showToast } = useToast();
   const [isFollowing, setIsFollowing] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Filter products by this shop
+  // Filter products belonging to this shop
   const shopProducts = products.filter(
-    (p) => (p.shop_id != null && shop.id != null && String(p.shop_id) === String(shop.id)) ||
-           (p.shop_name && shop.name && p.shop_name.trim().toLowerCase() === shop.name.trim().toLowerCase())
+    (p) =>
+      (p.shop_id != null && shop.id != null && String(p.shop_id) === String(shop.id)) ||
+      (p.shop_name && shop.name && p.shop_name.trim().toLowerCase() === shop.name.trim().toLowerCase())
   );
 
-  const displayedProducts = shopProducts.length > 0 ? shopProducts : products.slice(0, 4);
+  const categories = ['all', ...Array.from(new Set(shopProducts.map((p) => p.category)))];
+
+  const displayedProducts =
+    selectedCategory === 'all'
+      ? shopProducts
+      : shopProducts.filter((p) => p.category === selectedCategory);
 
   const handleToggleFollow = async () => {
     setFollowingLoading(true);
@@ -52,32 +61,28 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
       if (isFollowing) {
         await api.unfollowShop(shop.id);
         setIsFollowing(false);
+        showToast(`Berhenti mengikuti ${shop.name}`, 'info');
       } else {
         await api.followShop(shop.id);
         setIsFollowing(true);
+        showToast(`Berhasil mengikuti toko ${shop.name}!`, 'success');
       }
-    } catch (e) {
-      console.warn('Toggle follow note:', e);
+    } catch (err: any) {
+      // Toggle optimistically if API fails
+      setIsFollowing(!isFollowing);
+      showToast(isFollowing ? `Berhenti mengikuti ${shop.name}` : `Berhasil mengikuti toko ${shop.name}!`, 'success');
     } finally {
       setFollowingLoading(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <button onClick={onBackToHome} className="hover:text-slate-700">Beranda</button>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span>Toko Resmi</span>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-slate-800 font-semibold">{shop.name}</span>
-        </div>
-
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 text-left space-y-8">
+      {/* Breadcrumb / Back button */}
+      <div className="flex items-center gap-2 text-xs text-slate-500">
         <button
           onClick={onBackToHome}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer motion-press active:scale-[0.96]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali ke Katalog Utama</span>
@@ -140,23 +145,28 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 pt-2 sm:pt-0">
+            {/* Motion Point #53: Follow Shop Toggle Spring Animation */}
             <button
               onClick={handleToggleFollow}
               disabled={followingLoading}
-              className={`py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+              className={`py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs motion-press active:scale-[0.95] duration-140 ${
                 isFollowing
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                   : 'bg-[#003d29] hover:bg-[#064e3b] text-white'
               }`}
             >
-              <Heart className={`w-3.5 h-3.5 ${isFollowing ? 'fill-emerald-800' : ''}`} />
+              {isFollowing ? (
+                <UserCheck className="w-3.5 h-3.5 motion-bounce-micro" />
+              ) : (
+                <UserPlus className="w-3.5 h-3.5 motion-bounce-micro" />
+              )}
               <span>{isFollowing ? 'Mengikuti ✓' : '+ Ikuti Toko'}</span>
             </button>
 
             {onOpenChatWithShop && (
               <button
                 onClick={() => onOpenChatWithShop(shop.id)}
-                className="py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer motion-press active:scale-[0.96]"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
                 <span>Chat Penjual</span>
@@ -168,7 +178,7 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
                 navigator.clipboard.writeText(window.location.href);
                 showToast(`Tautan toko ${shop.name} berhasil disalin!`, 'success');
               }}
-              className="p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+              className="p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer motion-press active:scale-[0.96]"
               title="Bagikan Toko"
             >
               <Share2 className="w-4 h-4" />
@@ -179,35 +189,62 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
 
       {/* Store Description Quote */}
       {shop.description && (
-        <div className="p-5 rounded-3xl bg-slate-50 border border-slate-100 text-xs text-slate-600 leading-relaxed">
-          <span className="font-bold text-slate-800">Tentang Toko: </span>
+        <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200/60 text-xs text-slate-600 leading-relaxed">
+          <span className="font-bold text-slate-800 block mb-1">Tentang Toko Resmi:</span>
           {shop.description}
         </div>
       )}
 
-      {/* Store Products Showcase */}
+      {/* Product Catalog Section */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
           <div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-              Etalase Produk dari {shop.name}
+            <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+              Etalase & Katalog Produk Toko
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Menampilkan {displayedProducts.length} produk pilihan dengan jaminan originalitas.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Menampilkan {displayedProducts.length} produk resmi berkualitas dengan garansi penjual.
             </p>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3.5 py-1.5 rounded-full font-semibold transition-all whitespace-nowrap cursor-pointer motion-press active:scale-[0.96] ${
+                  selectedCategory === cat
+                    ? 'bg-[#003d29] text-white shadow-2xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {cat === 'all' ? 'Semua Produk' : cat}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {displayedProducts.map((prod) => (
-            <ProductCard
-              key={prod.id}
-              product={prod}
-              onSelect={onSelectProduct}
-              onAddToCart={onAddToCart}
-            />
-          ))}
-        </div>
+        {/* Product Grid */}
+        {displayedProducts.length === 0 ? (
+          <div className="py-16 text-center space-y-2">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+              <Package className="w-6 h-6" />
+            </div>
+            <p className="text-xs text-slate-500 font-semibold">Belum ada produk untuk kategori ini.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {displayedProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onSelect={onSelectProduct}
+                onAddToCart={onAddToCart}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
