@@ -36,6 +36,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [newAddressLine, setNewAddressLine] = useState('');
   const [newCity, setNewCity] = useState('');
   const [newPostalCode, setNewPostalCode] = useState('');
+  const [removingAddressId, setRemovingAddressId] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -132,6 +133,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   const handleDeleteAddress = async (id: number) => {
+    setRemovingAddressId(id);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
     const addressToDelete = addresses.find((a) => a.id === id);
     try {
       await api.deleteAddress(id);
@@ -165,6 +169,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       }
     } catch (err: any) {
       showToast(err.message || 'Gagal menghapus alamat', 'error');
+    } finally {
+      setRemovingAddressId(null);
+    }
+  };
+
+  const handleSetDefaultAddress = async (id: number) => {
+    try {
+      await api.setDefaultAddress(id);
+      setAddresses((prev) =>
+        prev.map((a) => ({
+          ...a,
+          is_default: a.id === id,
+        }))
+      );
+      showToast('Alamat utama berhasil diubah.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Gagal mengubah alamat utama', 'error');
     }
   };
 
@@ -186,7 +207,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
         <button
           onClick={onNavigateHome}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer motion-press active:scale-[0.96]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali ke Beranda</span>
@@ -216,7 +237,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 p-2 bg-[#003d29] text-white rounded-full hover:bg-[#064e3b] transition-colors shadow-md cursor-pointer"
+                className="absolute bottom-0 right-0 p-2 bg-[#003d29] text-white rounded-full hover:bg-[#064e3b] transition-colors shadow-md cursor-pointer motion-press active:scale-[0.96]"
                 title="Ganti Foto"
               >
                 <Camera className="w-3.5 h-3.5" />
@@ -298,7 +319,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] transition-all cursor-pointer flex items-center gap-2 shadow-2xs disabled:opacity-50"
+              className="px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] transition-all cursor-pointer flex items-center gap-2 shadow-2xs disabled:opacity-50 motion-press active:scale-[0.96]"
             >
               {savedSuccess ? (
                 <>
@@ -322,7 +343,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
           <button
             onClick={() => setShowAddAddress(!showAddAddress)}
-            className="px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs motion-press active:scale-[0.96]"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Tambah Alamat Baru</span>
@@ -389,13 +410,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddAddress(false)}
-                className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 font-semibold cursor-pointer"
+                className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 font-semibold cursor-pointer motion-press active:scale-[0.96]"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-full bg-[#003d29] text-white font-bold cursor-pointer"
+                className="px-5 py-2 rounded-full bg-[#003d29] text-white font-bold cursor-pointer motion-press active:scale-[0.96]"
               >
                 Simpan Alamat
               </button>
@@ -410,32 +431,49 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               Belum ada alamat tambahan yang tersimpan.
             </div>
           ) : (
-            addresses.map((addr) => (
-              <div
-                key={addr.id}
-                className="p-4 rounded-2xl bg-white border border-slate-200/70 flex items-center justify-between text-xs gap-3"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900">{addr.recipient_name}</span>
-                    <span className="text-slate-400">· {addr.phone}</span>
-                    {addr.is_default && (
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.2 rounded-full">
-                        Alamat Utama
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-slate-600 mt-1">{addr.address_line}, {addr.city} {addr.postal_code}</p>
-                </div>
-                <button
-                  onClick={() => handleDeleteAddress(addr.id)}
-                  className="p-2 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer shrink-0"
-                  title="Hapus Alamat"
+            addresses.map((addr) => {
+              const isRemoving = removingAddressId === addr.id;
+              return (
+                <div
+                  key={addr.id}
+                  className={`p-4 rounded-2xl bg-white border border-slate-200/70 flex items-center justify-between text-xs gap-3 transition-[transform,opacity] duration-200 ease-[var(--ease-out)] ${
+                    isRemoving ? 'motion-address-exit -translate-x-full opacity-0 pointer-events-none' : ''
+                  }`}
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">{addr.recipient_name}</span>
+                      <span className="text-slate-400">· {addr.phone}</span>
+                      {addr.is_default && (
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.2 rounded-full">
+                          Alamat Utama
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-slate-600 mt-1">{addr.address_line}, {addr.city} {addr.postal_code}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!addr.is_default && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefaultAddress(addr.id)}
+                        className="text-[11px] font-semibold text-emerald-800 hover:text-emerald-950 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 motion-press active:scale-[0.96] transition-colors cursor-pointer"
+                      >
+                        Jadikan Utama
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAddress(addr.id)}
+                      className="p-2 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer shrink-0 motion-press active:scale-[0.96]"
+                      title="Hapus Alamat"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
