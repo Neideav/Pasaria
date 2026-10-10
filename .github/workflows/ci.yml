@@ -21,6 +21,11 @@ jobs:
   backend-quality-gate:
     name: Backend CI (PHP 8.2 & Laravel 11)
     runs-on: ubuntu-latest
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:jtuPhVvis2tagZg5n1m9odS9/DR0O06LVWk2JTCF6R4=
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
 
     steps:
       - name: Checkout Repository
@@ -59,7 +64,7 @@ jobs:
           exit $LINT_ERRORS
 
       - name: Verify Route Matrix Compilation
-        run: php artisan route:list
+        run: php artisan route:list --env=testing
 
       - name: Run Automated Test Suite (In-Memory SQLite)
         run: vendor/bin/phpunit --no-coverage

@@ -43,7 +43,7 @@ else
 fi
 
 echo -e "\n[4/7] Route Compilation Check..."
-if php artisan route:list > /dev/null; then
+if APP_ENV="${APP_ENV:-testing}" APP_KEY="${APP_KEY:-base64:jtuPhVvis2tagZg5n1m9odS9/DR0O06LVWk2JTCF6R4=}" DB_CONNECTION="${DB_CONNECTION:-sqlite}" DB_DATABASE="${DB_DATABASE:-:memory:}" php artisan route:list --env=testing > /dev/null; then
     echo "✅ All Laravel routes compiled successfully without conflicts."
 else
     echo "❌ Route compilation failed."
