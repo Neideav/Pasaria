@@ -69,6 +69,14 @@
   transition-duration: 120ms;
 }
 
+.duration-140 {
+  transition-duration: 140ms;
+}
+
+.duration-250 {
+  transition-duration: 250ms;
+}
+
 .motion-popover {
   transform-origin: var(--transform-origin, top);
   transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
@@ -359,6 +367,39 @@
   }
 }
 
+/* Motion Point #45: ProfileView Address Card Delete Slide-Out & Fade Exit */
+.motion-address-exit {
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
+/* Motion Point #53: ShopProfileView Follow Shop Toggle Micro-Bounce */
+.motion-bounce-micro {
+  animation: bounceMicro 240ms var(--ease-out) forwards;
+}
+
+@keyframes bounceMicro {
+  0% {
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Motion Point #54: WishlistView Item Removal Grid Exit Animation */
+.motion-wishlist-item-exit {
+  transform: scale(0.95);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
 @starting-style {
   .motion-popover,
   .motion-popover-160 {
@@ -423,12 +464,19 @@
   .motion-toast-enter,
   .motion-toast-exit,
   .motion-radar-pulse,
-  .motion-stamp-bounce {
+  .motion-stamp-bounce,
+  .motion-bounce-micro {
     animation: none !important;
     transform: none !important;
     opacity: 1 !important;
   }
-  .motion-cart-item-exit {
+  .motion-cart-item-exit,
+  .motion-address-exit {
+    transform: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.01ms !important;
+  }
+  .motion-wishlist-item-exit {
     transform: none !important;
     opacity: 0 !important;
     transition: opacity 0.01ms !important;
