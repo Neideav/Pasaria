@@ -26,7 +26,7 @@ Consult [`AGENTS.md`](./AGENTS.md) for working instructions and operational boun
 HTTP Request (React 19 SPA / Client)
   │
   ▼
-routes/api.php (Route dispatcher and middleware assignment)
+routes/api.php (Route dispatcher and middleware assignment, wrapped in throttle:api)
   │
   ▼
 Sanctum Middleware (Bearer token resolution via personal_access_tokens)
@@ -34,17 +34,17 @@ Sanctum Middleware (Bearer token resolution via personal_access_tokens)
   ▼
 app/Http/Controllers/Api/ (Thin HTTP controllers)
   │
-  ├── FormRequest validation (Payload structure and permission checks)
+  ├─- FormRequest validation (Payload structure and permission checks)
   │
-  ├── app/Services/ (Core domain services)
-  │     ├── PricingService (Server-side calculations for tax, shipping, vouchers)
-  │     ├── CheckoutService (Atomic multi-vendor order and shipment creation)
-  │     ├── OrderStateMachine (Order status lifecycle and transition guards)
-  │     ├── RefundService (Refund processing and gateway integration)
-  │     └── LedgerService (Financial ledger and wallet reconciliation)
+  ├─- app/Services/ (Core domain services)
+  │     ├─- PricingService (Server-side calculations for tax, shipping, vouchers)
+  │     ├─- CheckoutService (Atomic multi-vendor order and shipment creation)
+  │     ├─- OrderStateMachine (Order status lifecycle and transition guards)
+  │     ├─- RefundService (Refund processing and gateway integration)
+  │     └─- LedgerService (Financial ledger and wallet reconciliation)
   │
-  ├── app/Models/ (Eloquent ORM entities)
-  │     └── MariaDB / SQLite Database
+  ├─- app/Models/ (Eloquent ORM entities)
+  │     └─- MariaDB / SQLite Database
   │
   ▼
 HTTP JSON Response to Client { success, message, data }
@@ -59,6 +59,7 @@ app/
 │   ├── Middleware/                # Request processing and authentication checks
 │   └── Resources/                 # Allowlist API Resources (PublicUser, PublicReview, PublicQuestion, PublicTracking, ShipmentDetail)
 ├── Models/                        # Eloquent models (User, Shop, Product, Order, Payment, Refund, OrderReturn, etc.)
+├── Providers/                     # Service providers (AppServiceProvider defining RateLimiter policies)
 └── Services/                      # Pure business logic (CheckoutService, PricingService, OrderStateMachine, RefundService, LedgerService)
 database/
 ├── migrations/                    # Database schema definitions and historical tables
@@ -76,6 +77,30 @@ tests/
 ├── Feature/                       # End-to-end and integration feature tests
 └── Unit/                          # Isolated service and calculation tests
 ```
+
+## Rate limiting architecture
+
+Configured via `app/Providers/AppServiceProvider.php` using Laravel 11 `RateLimiter::for()` and registered in `bootstrap/app.php`.
+
+### Named limiters
+
+| Limiter | Target | Quota | Key segmentation |
+|---|---|---|---|
+| `api` | All `/api/*` routes | 60 req/min (guest), 120 req/min (auth) | IP address (guest) or User ID (auth) |
+| `auth-login` | `POST /api/auth/login` | 5 req/min | Composite `identifier (email/username) + IP`, with 10 req/min per IP fallback |
+| `auth-register` | `POST /api/auth/register` | 5 req/min | IP address |
+| `auth-resend` | `POST /api/auth/resend-verification` | 3 req/min | Composite `email + IP`, or IP fallback |
+| `vouchers-validate` | `POST /api/vouchers/validate` | 10 req/min | User ID or IP address |
+| `orders-create` | `POST /api/orders` | 10 req/min | User ID or IP address |
+| `uploads` | `POST /api/upload` | 10 req/min | User ID or IP address |
+| `messages-send` | `POST /api/conversations/messages` | 30 req/min | User ID or IP address |
+
+### Standardized 429 response envelope
+
+Handled in `bootstrap/app.php` via `ThrottleRequestsException`:
+- HTTP status: `429 Too Many Requests`
+- Headers: `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`
+- Payload: `{"success": false, "message": "Terlalu banyak permintaan. Silakan tunggu beberapa saat lagi.", "retry_after": <seconds>}`
 
 ## Compact schema notation
 
@@ -111,25 +136,26 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 <!-- BEGIN AUTO GENERATED: ROUTING_MATRIX -->
 | Method | Endpoint | Handler | Access |
 |---|---|---|---|
-| POST | /api/auth/login | Api\AuthApiController@login | Public |
-| POST | /api/auth/register | Api\AuthApiController@register | Public |
+| POST | /api/auth/login | Api\AuthApiController@login | Public (throttle:auth-login) |
+| POST | /api/auth/register | Api\AuthApiController@register | Public (throttle:auth-register) |
 | POST | /api/auth/verify-email | Api\AuthApiController@verifyEmail | Public / Authenticated |
-| POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated |
+| POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated (throttle:auth-resend) |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
 | GET | /api/products | Api\ProductApiController@index | Public |
 | POST,PUT,DELETE | /api/products | Api\ProductApiController | Seller / Admin |
 | PATCH | /api/products/{id}/status | Api\ProductApiController@toggleStatus | Seller / Admin |
 | GET | /api/products/{slug} | Api\ProductApiController@show | Public |
-| POST,DELETE | /api/upload | Api\UploadApiController | Authenticated |
+| POST,DELETE | /api/upload | Api\UploadApiController | Authenticated (throttle:uploads) |
 | GET,POST | /api/cart | Api\CartApiController | Public or Authenticated |
 | POST | /api/orders/calculate | Api\OrderApiController@calculate | Authenticated |
-| GET,POST | /api/orders | Api\OrderApiController | Authenticated |
+| GET,POST | /api/orders | Api\OrderApiController | Authenticated (POST throttle:orders-create) |
 | PUT | /api/orders/{id}/status | Api\OrderApiController@updateStatus | Seller / Admin |
 | POST | /api/orders/{id}/cancel | Api\OrderApiController@cancel | Customer / Seller / Admin |
 | POST | /api/payments/webhook/{provider?} | Api\PaymentWebhookController@handle | Public (Gateway Signature Auth) |
 | GET | /api/deliveries/{code} | Api\DeliveryApiController@show | Public |
 | GET,POST | /api/reviews | Api\ReviewApiController | Public, Authenticated |
 | GET,POST | /api/conversations | Api\ChatApiController | Authenticated |
+| POST | /api/conversations/messages | Api\ChatApiController@sendMessage | Authenticated (throttle:messages-send) |
 | GET,POST | /api/returns | Api\ReturnApiController | Authenticated |
 | POST | /api/returns/{id}/respond | Api\ReturnApiController@sellerRespond | Seller |
 | POST | /api/disputes/{id}/resolve | Api\ReturnApiController@resolveDispute | Admin / Support |
