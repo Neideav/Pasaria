@@ -46,7 +46,7 @@ interface NavbarProps {
   onNavigateAdmin?: () => void;
   onNavigateSettings?: () => void;
   onOpenChat?: () => void;
-  onOpenAuth: () => void;
+  onOpenAuth: (tab?: 'login' | 'register') => void;
   onLogout: () => void;
   products: Product[];
 }

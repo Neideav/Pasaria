@@ -8,6 +8,7 @@ interface AuthModalProps {
   onClose: () => void;
   onLoginSuccess: (user: User) => void;
   message?: string;
+  initialTab?: 'login' | 'register';
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -15,8 +16,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   onLoginSuccess,
   message,
+  initialTab = 'login',
 }) => {
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [tab, setTab] = useState<'login' | 'register'>(initialTab);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setTab(initialTab);
+      setErrorMsg('');
+    }
+  }, [isOpen, initialTab]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);

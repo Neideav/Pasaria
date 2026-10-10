@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Navbar } from "./components/Navbar";
 import { HeroBanner } from "./components/HeroBanner";
+import { CategoryRecommendationBar } from "./components/CategoryRecommendationBar";
 import { ProductFilterBar } from "./components/ProductFilterBar";
 import { ProductCard } from "./components/ProductCard";
 import { ProductDetailPage } from "./components/ProductDetailPage";
 import { ServicesSection } from "./components/ServicesSection";
+import { TestimonialsSection } from "./components/TestimonialsSection";
+import { CTASection } from "./components/CTASection";
 import { Footer } from "./components/Footer";
 import { CheckoutModal } from "./components/CheckoutModal";
 import { CartPage } from "./components/CartPage";
 import { SearchPage } from "./components/SearchPage";
 import { AuthModal } from "./components/AuthModal";
+import { AuthPage } from "./components/AuthPage";
 import { ProfileView } from "./components/ProfileView";
 import { OrdersView } from "./components/OrdersView";
 import { DeliveryView } from "./components/DeliveryView";
@@ -33,7 +37,7 @@ import {
 } from "./types";
 import { api } from "./services/api";
 import { Language, translations } from "./i18n/translations";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { ToastProvider, useToast } from "./context/ToastContext";
 
 function AppContent() {
@@ -53,9 +57,12 @@ function AppContent() {
     | "wishlist"
     | "following"
     | "admin"
+    | "auth"
   >("home");
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedShopProfile, setSelectedShopProfile] = useState<Shop | null>(
     null,
@@ -130,6 +137,7 @@ function AppContent() {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authInitialTab, setAuthInitialTab] = useState<'login' | 'register'>('login');
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
 
   // New Modals
@@ -148,19 +156,47 @@ function AppContent() {
   const [returnOrder, setReturnOrder] = useState<Order | null>(null);
 
   // Filter & pagination state
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    category: string;
+    minPrice: number;
+    maxPrice: number;
+    minRating: number;
+    color?: string;
+    material?: string;
+    offer?: string;
+    sort: string;
+  }>({
     category: "all",
     minPrice: 0,
     maxPrice: 999999999,
     minRating: 0,
+    color: "all",
+    material: "all",
+    offer: "all",
     sort: "popular",
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const productsPerPage = 8;
+  const INITIAL_VISIBLE_COUNT = 15; // 3 rows maximum on 5-col desktop
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
   // On mount: authenticate with Sanctum session & load data
   useEffect(() => {
+    const unsub = api.onUnauthorized(() => {
+      setUser(null);
+      localStorage.removeItem('pasaria_user');
+      setCartItems([]);
+      setOrders([]);
+      setView((currView) =>
+        ['profile', 'orders', 'delivery', 'shop_dashboard', 'admin'].includes(currView) ? 'home' : currView
+      );
+      setAuthMessage('Sesi login Anda telah berakhir. Silakan masuk kembali.');
+      setAuthModalOpen(true);
+    });
+
     bootstrapSession();
+
+    return () => {
+      unsub();
+    };
   }, []);
 
   const bootstrapSession = async () => {
@@ -296,18 +332,74 @@ function AppContent() {
   }, [user?.id]);
 
   const loadProducts = async () => {
+    setProductsLoading(true);
+    setProductsError(null);
     try {
+      const selectedCat =
+        filters.category && filters.category !== 'all'
+          ? filters.category
+          : activeCategory !== 'all'
+          ? activeCategory
+          : undefined;
+
       const res = await api.getProducts({
         q: searchQuery,
-        category: activeCategory !== "all" ? activeCategory : undefined,
+        category: selectedCat,
         sort: filters.sort,
         minPrice: filters.minPrice,
         maxPrice: filters.maxPrice,
         minRating: filters.minRating,
       });
-      setProducts(res.products || []);
-    } catch (err) {
-      console.error("Failed to load products:", err);
+
+      let list = res.products || [];
+
+      // Frontend UI filter adjustments for color, material, and offer
+      if (filters.color && filters.color !== 'all') {
+        const cLower = filters.color.toLowerCase();
+        list = list.filter((p) => {
+          const nameMatch = p.name?.toLowerCase().includes(cLower);
+          const descMatch = p.description?.toLowerCase().includes(cLower);
+          const colorsMatch = Array.isArray(p.colors)
+            ? p.colors.some((col: any) =>
+                typeof col === 'string'
+                  ? col.toLowerCase().includes(cLower)
+                  : col?.name?.toLowerCase().includes(cLower)
+              )
+            : false;
+          return nameMatch || descMatch || colorsMatch;
+        });
+      }
+
+      if (filters.material && filters.material !== 'all') {
+        const mLower = filters.material.toLowerCase();
+        list = list.filter((p) => {
+          const nameMatch = p.name?.toLowerCase().includes(mLower);
+          const descMatch = p.description?.toLowerCase().includes(mLower);
+          const specsMatch = JSON.stringify(p.specs || {}).toLowerCase().includes(mLower);
+          return nameMatch || descMatch || specsMatch;
+        });
+      }
+
+      if (filters.offer && filters.offer !== 'all') {
+        if (filters.offer === 'discount') {
+          list = list.filter((p) => p.original_price && p.original_price > p.price);
+        } else if (filters.offer === 'official') {
+          list = list.filter((p) => p.shop_name?.toLowerCase().includes('official'));
+        } else if (filters.offer === 'instock') {
+          list = list.filter((p) => p.stock > 0);
+        } else if (filters.offer === 'popular') {
+          list = list.filter((p) => (p.review_count || 0) >= 5 || p.rating >= 4.5);
+        }
+      }
+
+      setProducts(list);
+      setVisibleCount(INITIAL_VISIBLE_COUNT);
+    } catch (err: any) {
+      console.error('Failed to load products:', err);
+      setProductsError(err.message || 'Gagal memuat katalog produk.');
+    } finally {
+      setProductsLoading(false);
+
     }
   };
 
@@ -426,6 +518,10 @@ function AppContent() {
     setProducts((prev) => [newProduct, ...prev]);
   };
 
+  const handleUpdateProduct = async (updatedProduct: Product) => {
+    setProducts((prev) => prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
+  };
+
   const handleDeleteProduct = async (productId: number) => {
     try {
       await api.deleteProduct(productId);
@@ -437,6 +533,13 @@ function AppContent() {
     );
   };
 
+  const handleOpenAuth = (tab: 'login' | 'register' = 'login', message = '') => {
+    setAuthInitialTab(tab);
+    setAuthMessage(message);
+    setView('auth');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Cart operations
   const handleAddToCart = (
     product: Product,
@@ -445,17 +548,8 @@ function AppContent() {
     variantId?: number,
   ): boolean => {
     if (!user) {
-      setAuthMessage(
-        "Silakan masuk ke akun PASARIA Anda untuk memasukkan produk ke keranjang belanja.",
-      );
-      setPendingCartAction({
-        type: "add",
-        product,
-        quantity,
-        color,
-        variantId,
-      });
-      setAuthModalOpen(true);
+      setPendingCartAction({ type: "add", product, quantity, color, variantId });
+      handleOpenAuth("login", "Silakan masuk ke akun PASARIA Anda untuk memasukkan produk ke keranjang belanja.");
       return false;
     }
 
@@ -488,17 +582,8 @@ function AppContent() {
     variantId?: number,
   ) => {
     if (!user) {
-      setAuthMessage(
-        "Silakan masuk ke akun PASARIA Anda untuk langsung melanjutkan pembelian.",
-      );
-      setPendingCartAction({
-        type: "buy",
-        product,
-        quantity,
-        color,
-        variantId,
-      });
-      setAuthModalOpen(true);
+      setPendingCartAction({ type: "buy", product, quantity, color, variantId });
+      handleOpenAuth("login", "Silakan masuk ke akun PASARIA Anda untuk langsung melanjutkan pembelian.");
       return;
     }
     handleAddToCart(product, quantity, color, variantId);
@@ -577,97 +662,113 @@ function AppContent() {
     0,
   );
 
-  // Pagination for Home page
-  const totalPages = Math.ceil(products.length / productsPerPage) || 1;
-  const currentProducts = products.slice(
-    (currentPage - 1) * productsPerPage,
-    currentPage * productsPerPage,
-  );
+  const currentProducts = products.slice(0, visibleCount);
+  const hasMoreProducts = visibleCount < products.length;
 
-  const weeklyProducts = products.slice(0, 4);
+  const weeklyProducts = products.slice(0, 5);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fcfcfc] text-[#1c2a23]">
       {/* 1. Main Sticky Navbar */}
-      <Navbar
-        user={user}
-        cartCount={cartCount}
-        currentLang={lang}
-        onLanguageChange={handleLanguageChange}
-        onNavigateHome={handleNavigateHome}
-        onNavigateCategory={handleNavigateCategory}
-        onNavigateSearch={handleNavigateSearch}
-        onNavigateCart={() => {
-          setView("cart");
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
-        onNavigateProfile={() => {
-          if (!user) {
-            setAuthMessage("Silakan masuk untuk melihat profil akun Anda.");
-            setAuthModalOpen(true);
-          } else {
-            setView("profile");
+      {view !== "auth" && (
+        <Navbar
+          user={user}
+          cartCount={cartCount}
+          currentLang={lang}
+          onLanguageChange={handleLanguageChange}
+          onNavigateHome={handleNavigateHome}
+          onNavigateCategory={handleNavigateCategory}
+          onNavigateSearch={handleNavigateSearch}
+          onNavigateCart={() => {
+            setView("cart");
             window.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        }}
-        onNavigateOrders={() => {
-          if (!user) {
-            setAuthMessage("Silakan masuk untuk melihat riwayat pesanan Anda.");
-            setAuthModalOpen(true);
-          } else {
-            setView("orders");
+          }}
+          onNavigateProfile={() => {
+            if (!user) {
+              handleOpenAuth("login", "Silakan masuk untuk melihat profil akun Anda.");
+            } else {
+              setView("profile");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          onNavigateOrders={() => {
+            if (!user) {
+              handleOpenAuth("login", "Silakan masuk untuk melihat riwayat pesanan Anda.");
+            } else {
+              setView("orders");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          onNavigateWishlist={() => {
+            if (!user) {
+              handleOpenAuth("login", "Silakan masuk untuk melihat daftar produk favorit Anda.");
+            } else {
+              setView("wishlist");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          onNavigateFollowing={() => {
+            if (!user) {
+              handleOpenAuth("login", "Silakan masuk untuk melihat toko yang Anda ikuti.");
+            } else {
+              setView("following");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          onNavigateShop={handleNavigateShop}
+          onNavigateAdmin={() => {
+            setView("admin");
             window.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        }}
-        onNavigateWishlist={() => {
-          if (!user) {
-            setAuthMessage(
-              "Silakan masuk untuk melihat daftar produk favorit Anda.",
-            );
-            setAuthModalOpen(true);
-          } else {
-            setView("wishlist");
+          }}
+          onNavigateSettings={() => {
+            setView("settings");
             window.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        }}
-        onNavigateFollowing={() => {
-          if (!user) {
-            setAuthMessage("Silakan masuk untuk melihat toko yang Anda ikuti.");
-            setAuthModalOpen(true);
-          } else {
-            setView("following");
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        }}
-        onNavigateShop={handleNavigateShop}
-        onNavigateAdmin={() => {
-          setView("admin");
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
-        onNavigateSettings={() => {
-          setView("settings");
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
-        onOpenChat={() => {
-          setChatShopId(undefined);
-          setChatModalOpen(true);
-        }}
-        onOpenAuth={() => {
-          setAuthMessage("");
-          setAuthModalOpen(true);
-        }}
-        onLogout={handleLogout}
-        products={products}
-      />
+          }}
+          onOpenChat={() => {
+            setChatShopId(undefined);
+            setChatModalOpen(true);
+          }}
+          onOpenAuth={(tab?: "login" | "register") => handleOpenAuth(tab || "login")}
+          onLogout={handleLogout}
+          products={products}
+        />
+      )}
 
       {/* 2. Dynamic Page View Router */}
       <main className="flex-1">
         {view === "home" && (
           <div>
             <HeroBanner
-              onBuyNow={() => {
-                if (products.length > 0) {
+              lang={lang}
+              onBuyNow={(category?: string) => {
+                if (category) {
+                  setFilters((prev) => ({ ...prev, category }));
+                } else if (products.length > 0) {
                   handleSelectProduct(products[0]);
+                }
+              }}
+              onContactUs={() => {
+                setChatShopId(undefined);
+                setChatModalOpen(true);
+              }}
+            />
+
+            <CategoryRecommendationBar
+              user={user}
+              lang={lang}
+              selectedCategory={filters.category}
+              onSelectCategory={(slug) => {
+                setFilters((prev) => ({ ...prev, category: slug }));
+                const section = document.getElementById('products-section');
+                if (section) {
+                  section.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+              onViewOrders={() => {
+                if (!user) {
+                  handleOpenAuth('login', 'Silakan masuk untuk melihat riwayat pesanan Anda.');
+                } else {
+                  setView('orders');
                 }
               }}
             />
@@ -681,13 +782,16 @@ function AppContent() {
                   minPrice: 0,
                   maxPrice: 999999999,
                   minRating: 0,
+                  color: "all",
+                  material: "all",
+                  offer: "all",
                   sort: "popular",
                 })
               }
             />
 
             {/* Main Product Grid */}
-            <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
+            <section id="products-section" className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
@@ -700,8 +804,23 @@ function AppContent() {
                 </div>
               </div>
 
-              {currentProducts.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {productsLoading ? (
+                <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
+                  <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-slate-500 font-medium">Memuat rekomendasi produk PASARIA...</span>
+                </div>
+              ) : productsError ? (
+                <div className="py-12 px-6 rounded-2xl bg-rose-50 border border-rose-200 text-center space-y-3 max-w-md mx-auto">
+                  <p className="text-xs font-semibold text-rose-700">{productsError}</p>
+                  <button
+                    onClick={() => loadProducts()}
+                    className="px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Coba Lagi
+                  </button>
+                </div>
+              ) : currentProducts.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
                   {currentProducts.map((p) => (
                     <ProductCard
                       key={p.id}
@@ -717,46 +836,27 @@ function AppContent() {
                 </div>
               )}
 
-              {/* Numbered Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-10">
+              {/* Muat Lebih Banyak Button (Maks 3 baris per tampilan) */}
+              {hasMoreProducts ? (
+                <div className="flex flex-col items-center justify-center mt-10">
                   <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 disabled:opacity-30 cursor-pointer text-xs"
+                    onClick={() => setVisibleCount((prev) => prev + 15)}
+                    className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-full text-xs sm:text-sm font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-800 transition-all cursor-pointer shadow-none active:scale-[0.98]"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <span>Muat Lebih Banyak</span>
+                    <ChevronDown className="w-4 h-4 text-slate-500" />
                   </button>
-
-                  {Array.from({ length: totalPages }).map((_, idx) => {
-                    const pageNum = idx + 1;
-                    const isActive = currentPage === pageNum;
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-9 h-9 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                          isActive
-                            ? "bg-[#003d29] text-white shadow-xs"
-                            : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    onClick={() =>
-                      setCurrentPage(Math.min(totalPages, currentPage + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 disabled:opacity-30 cursor-pointer text-xs"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  <span className="text-[11px] text-slate-400 mt-2 font-medium">
+                    Menampilkan {Math.min(visibleCount, products.length)} dari {products.length} produk
+                  </span>
                 </div>
-              )}
+              ) : products.length > 15 ? (
+                <div className="text-center mt-10">
+                  <p className="text-xs text-slate-400 font-medium">
+                    Semua produk telah ditampilkan ({products.length} produk)
+                  </p>
+                </div>
+              ) : null}
             </section>
 
             {/* Weekly Popular Products */}
@@ -767,7 +867,7 @@ function AppContent() {
                     Produk Terlaris Minggu Ini
                   </h2>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
                   {weeklyProducts.map((p) => (
                     <ProductCard
                       key={`weekly-${p.id}`}
@@ -780,26 +880,36 @@ function AppContent() {
               </section>
             )}
 
-            {/* Services Section */}
+            {/* Services Section (Layanan untuk Membantu Belanja Anda) */}
             <ServicesSection
+              lang={lang}
               onLearnMore={(serviceTitle) => {
                 if (
                   serviceTitle.includes("Payment") ||
-                  serviceTitle.includes("Bayar")
+                  serviceTitle.includes("Bayar") ||
+                  serviceTitle.includes("Pembayaran")
                 ) {
                   setView("cart");
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 } else if (
                   serviceTitle.includes("Delivery") ||
-                  serviceTitle.includes("Kirim")
+                  serviceTitle.includes("Kirim") ||
+                  serviceTitle.includes("Pengiriman")
                 ) {
                   setView("delivery");
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 } else {
-                  window.scrollTo({ top: 400, behavior: "smooth" });
+                  setChatShopId(undefined);
+                  setChatModalOpen(true);
                 }
               }}
             />
+
+            {/* Immersive Parallax App Download CTA Section */}
+            <CTASection lang={lang} />
+
+            {/* Testimonials Section */}
+            <TestimonialsSection lang={lang} />
           </div>
         )}
 
@@ -842,7 +952,10 @@ function AppContent() {
                 minPrice: 0,
                 maxPrice: 999999999,
                 minRating: 0,
-                sort: "popular",
+                  color: "all",
+                  material: "all",
+                  offer: "all",
+                  sort: "popular",
               })
             }
           />
@@ -917,6 +1030,7 @@ function AppContent() {
               localStorage.setItem("pasaria_user", JSON.stringify(updated));
             }}
             onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
             onNavigateHome={handleNavigateHome}
             onSelectProduct={handleSelectProduct}
@@ -1001,6 +1115,19 @@ function AppContent() {
         {view === "admin" && (
           <AdminDashboardView onNavigateHome={handleNavigateHome} />
         )}
+
+        {view === 'auth' && (
+          <AuthPage
+            initialTab={authInitialTab}
+            message={authMessage}
+            lang={lang}
+            onNavigateHome={handleNavigateHome}
+            onLoginSuccess={(loggedInUser) => {
+              handleLoginSuccess(loggedInUser);
+              handleNavigateHome();
+            }}
+          />
+        )}
       </main>
 
       {/* 3. Checkout Modal */}
@@ -1043,18 +1170,7 @@ function AppContent() {
         subtotal={cartSubtotal}
       />
 
-      {/* 4. Auth Modal */}
-      <AuthModal
-        isOpen={authModalOpen}
-        message={authMessage}
-        onClose={() => {
-          setAuthModalOpen(false);
-          setAuthMessage("");
-        }}
-        onLoginSuccess={handleLoginSuccess}
-      />
-
-      {/* 5. Chat Modal */}
+      {/* 4. Auth Modal & Chat */}
       <ChatModal
         isOpen={chatModalOpen}
         onClose={() => setChatModalOpen(false)}
@@ -1062,7 +1178,7 @@ function AppContent() {
         initialShopId={chatShopId}
       />
 
-      {/* 6. Review Modal */}
+      {/* 5. Review Modal */}
       {reviewTarget && (
         <ReviewModal
           isOpen={reviewModalOpen}
@@ -1081,7 +1197,7 @@ function AppContent() {
         />
       )}
 
-      {/* 7. Return Modal */}
+      {/* 6. Return Modal */}
       {returnOrder && (
         <ReturnModal
           isOpen={returnModalOpen}
@@ -1096,8 +1212,8 @@ function AppContent() {
         />
       )}
 
-      {/* 8. Footer */}
-      <Footer />
+      {/* 7. Footer */}
+      {view !== 'auth' && <Footer />}
     </div>
   );
 }

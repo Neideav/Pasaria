@@ -81,6 +81,7 @@ export interface Product {
   badge?: string;
   discount_percent?: number;
   is_wishlisted?: boolean;
+  is_active?: boolean;
   created_at?: string;
 }
 
@@ -350,3 +351,150 @@ export interface NotificationItem {
 }
 
 export * from "./toast";
+export type ValidationErrors = Record<string, string[]>;
+
+export interface OrderCalculationItemInput {
+  product_id: number;
+  variant_id?: number;
+  quantity: number;
+}
+
+export interface OrderCalculationRequest {
+  items: OrderCalculationItemInput[];
+  voucher_code?: string;
+  shipping_method?: string;
+}
+
+export interface OrderCalculationResult {
+  subtotal: number;
+  shipping_cost: number;
+  tax: number;
+  discount: number;
+  voucher_discount: number;
+  total: number;
+}
+
+export interface CheckoutOrderItemInput {
+  product_id: number;
+  variant_id?: number;
+  quantity: number;
+  color?: string;
+}
+
+export interface CheckoutOrderInput {
+  items: CheckoutOrderItemInput[];
+  recipient_name: string;
+  recipient_phone: string;
+  shipping_address: string;
+  payment_method: string;
+  shipping_method?: string;
+  voucher_code?: string;
+  idempotency_key?: string;
+}
+
+export interface CheckoutOrderResult {
+  success: boolean;
+  message?: string;
+  order_number: string;
+  order_id: number;
+  total: number;
+  tracking_number?: string;
+  shipment?: DeliveryShipment;
+  payment?: any;
+  idempotent?: boolean;
+}
+
+export interface SellerDashboardResult {
+  shop?: Shop;
+  stats?: {
+    total_revenue?: number;
+    total_orders?: number;
+    total_products?: number;
+    active_products?: number;
+    total_sales?: number;
+  };
+  recent_orders?: Order[];
+}
+
+export interface SellerWallet {
+  id?: number;
+  shop_id?: number;
+  balance: number;
+  reserved_balance: number;
+  pending_balance: number;
+  available_balance: number;
+  total_withdrawn: number;
+}
+
+export interface WalletTransactionItem {
+  id: number;
+  wallet_id: number;
+  type: 'credit' | 'debit';
+  amount: number;
+  balance_after: number;
+  reference_type?: string;
+  reference_id?: string;
+  description: string;
+  created_at: string;
+}
+
+export interface SellerPayoutItem {
+  id: number;
+  shop_id: number;
+  amount: number;
+  bank_name: string;
+  account_number: string;
+  account_holder: string;
+  status: 'pending' | 'processing' | 'completed' | 'rejected';
+  reference_id: string;
+  created_at: string;
+}
+
+export interface SellerFinancesResult {
+  wallet?: SellerWallet;
+  transactions?: WalletTransactionItem[];
+  payouts?: SellerPayoutItem[];
+}
+
+export interface SellerInventoryItem {
+  id: number;
+  product_id: number;
+  name: string;
+  sku?: string;
+  price: number;
+  stock: number;
+  is_active?: boolean;
+  product?: {
+    id: number;
+    name: string;
+    image?: string;
+  };
+}
+
+export interface AdminDashboardResult {
+  total_users?: number;
+  total_sellers?: number;
+  total_products?: number;
+  total_orders?: number;
+  gmv?: number;
+  pending_returns?: number;
+  pending_disputes?: number;
+  pending_reports?: number;
+  reported_reviews?: number;
+  recent_orders?: Order[];
+  recent_users?: User[];
+  metrics?: any;
+  [key: string]: any;
+}
+
+export interface AuditLogItem {
+  id: number;
+  user_id?: number;
+  action: string;
+  target_type?: string;
+  target_id?: number;
+  details_json?: any;
+  created_at: string;
+  user?: User;
+}
+

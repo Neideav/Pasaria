@@ -106,7 +106,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
           {items.map((prod) => {
             const isRemoving = removingId === prod.id;
             return (
@@ -114,7 +114,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
                 key={prod.id}
                 onClick={() => !isRemoving && onSelectProduct(prod)}
                 className={`group relative flex flex-col justify-between bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all cursor-pointer text-left ${
-                  isRemoving ? 'motion-wishlist-item-exit scale-95 opacity-0 pointer-events-none' : ''
+                  isRemoving ? "motion-wishlist-item-exit scale-95 opacity-0 pointer-events-none" : ""
                 }`}
               >
                 <div>
@@ -151,7 +151,6 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
                 </div>
 
                 <div className="pt-2">
-                  {/* Motion Point #54: Move to Cart Tactile Press */}
                   <button
                     onClick={(e) => handleMoveToCart(prod, e)}
                     className="w-full py-2.5 px-4 rounded-full text-xs font-semibold bg-[#003d29] hover:bg-[#064e3b] text-white transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer motion-press active:scale-[0.96]"

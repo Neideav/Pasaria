@@ -18,5 +18,17 @@ storage/framework/views/*
 Dockerfile
 docker-compose.yml
 Jenkinsfile
+docker-entrypoint.sh.bak
+
+server.ts
+
+tests
+phpunit.xml
+.phpunit.result.cache
 
 README.md
+*.md
+.vscode
+.idea
+.DS_Store
+Thumbs.db

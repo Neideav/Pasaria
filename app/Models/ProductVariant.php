@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductVariant extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'product_id',
@@ -16,6 +17,7 @@ class ProductVariant extends Model
         'attributes_json',
         'price',
         'stock',
+        'is_active',
         'weight_grams',
         'image',
     ];
@@ -24,6 +26,7 @@ class ProductVariant extends Model
         'attributes_json' => 'array',
         'price' => 'decimal:2',
         'stock' => 'integer',
+        'is_active' => 'boolean',
         'weight_grams' => 'integer',
         'product_id' => 'integer',
     ];

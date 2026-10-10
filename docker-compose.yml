@@ -15,8 +15,13 @@ services:
       - .env
 
     volumes:
+      # Persistent volume for application storage, cache, session data, and media uploads
       - pasaria-storage:/var/www/html/storage
       - ./.env:/var/www/html/.env
+      - type: bind
+          source: /var/www/pasaria/certs/ap-southeast-1-bundle.pem
+          target: /etc/ssl/rds/ap-southeast-1-bundle.pem
+          read_only: true
 
     networks:
       - pasaria-network
@@ -30,6 +35,9 @@ services:
 
 networks:
   pasaria-network:
+    driver: bridge
 
 volumes:
+  # Named volume preserves data across container updates and restarts
   pasaria-storage:
+    name: pasaria_storage_volume

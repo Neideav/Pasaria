@@ -13,19 +13,26 @@ class Payment extends Model
         'order_id',
         'user_id',
         'transaction_id',
+        'provider',
+        'provider_reference',
         'payment_method',
         'amount',
+        'currency',
         'status',
         'paid_at',
         'payload_json',
+        'refunded_amount',
+        'refund_status',
+        'refund_reference',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'paid_at' => 'datetime',
-        'payload_json' => 'array',
-        'order_id' => 'integer',
-        'user_id' => 'integer',
+        'amount'          => 'decimal:2',
+        'refunded_amount' => 'decimal:2',
+        'paid_at'         => 'datetime',
+        'payload_json'    => 'array',
+        'order_id'        => 'integer',
+        'user_id'         => 'integer',
     ];
 
     public function order()
@@ -36,5 +43,10 @@ class Payment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function refunds()
+    {
+        return $this->hasMany(Refund::class);
     }
 }

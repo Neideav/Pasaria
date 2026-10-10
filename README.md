@@ -76,12 +76,15 @@ Database development telah dilengkapi akun seeder siap pakai untuk setiap peran:
 
 | Peran | Email | Kata Sandi | Keterangan |
 | :--- | :--- | :--- | :--- |
-| **Customer** | `customer@pasaria.id` | `password` | Pembeli aktif dengan riwayat transaksi & alamat |
-| **Seller** | `seller@pasaria.id` | `password` | Pemilik toko resmi *PASARIA Audio Official* |
-| **Admin** | `admin@pasaria.id` | `password` | Akses penuh ke Portal Administrator |
-| **Support** | `support@pasaria.id` | `password` | Akses tim penanganan sengketa & moderasi |
+| **Customer** | `customer@pasaria.id` | `password123` | Pembeli aktif dengan email terverifikasi & buku alamat |
+| **Seller** | `seller@pasaria.id` | `password123` | Penjual resmi dengan toko disetujui (*approved*) |
+| **Admin** | `admin@pasaria.id` | `admin123` | Akses penuh ke Portal Administrator & Moderasi |
+| **Support** | `support@pasaria.id` | `support123` | Akses tim penanganan sengketa & moderasi |
 
-*Catatan Keamanan: Jangan gunakan kredensial demo ini di lingkungan server production!*
+*Catatan Keamanan:*
+1. Akun seeder di atas hanya untuk lingkungan lokal/pengujian (`local`/`testing`). Jangan pernah menjalankan seeder di server production.
+2. Pendaftaran akun baru melalui API/Web menghasilkan status `email_verified_at = null` (belum terverifikasi) dan memerlukan kode verifikasi 6-digit.
+3. Pengajuan toko baru berstatus `pending` dan memerlukan persetujuan Administrator sebelum toko dapat menjual produk atau menerima pesanan.
 
 ---
 

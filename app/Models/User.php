@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -76,6 +78,21 @@ class User extends Authenticatable
         return $this->hasOne(Wallet::class);
     }
 
+    public function cart()
+    {
+        return $this->hasOne(Cart::class);
+    }
+
+    public function refunds()
+    {
+        return $this->hasMany(Refund::class);
+    }
+
+    public function adminActions()
+    {
+        return $this->hasMany(AdminAction::class);
+    }
+
     public function isCustomer(): bool
     {
         return $this->role === 'customer';
@@ -94,5 +111,15 @@ class User extends Authenticatable
     public function isSupport(): bool
     {
         return $this->role === 'support' || $this->role === 'admin';
+    }
+
+    public function isSuspended(): bool
+    {
+        return in_array(strtolower($this->status ?? 'active'), ['suspended', 'banned', 'disabled'], true);
+    }
+
+    public function isActive(): bool
+    {
+        return !$this->isSuspended();
     }
 }

@@ -17,7 +17,7 @@ import {
 import { Order, OrderItemType } from '../types';
 import { ProductVisual } from './ProductVisual';
 import { formatRupiah, formatDateTime } from '../utils/formatters';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 interface OrdersViewProps {
@@ -119,7 +119,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       setConfirmCancelId(null);
       if (onRefreshOrders) onRefreshOrders();
     } catch (err: any) {
-      showToast(err.message || 'Gagal membatalkan pesanan.', 'error');
+      const msg =
+        (err instanceof ApiError && err.getFirstValidationError()) ||
+        err.message ||
+        'Gagal membatalkan pesanan.';
+      showToast(msg, 'error');
     } finally {
       setCancellingId(null);
     }

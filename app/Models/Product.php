@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -22,6 +23,7 @@ class Product extends Model
         'rating',
         'review_count',
         'stock',
+        'is_active',
         'colors',
         'specs',
         'shop_id',
@@ -39,6 +41,7 @@ class Product extends Model
         'rating' => 'float',
         'review_count' => 'integer',
         'stock' => 'integer',
+        'is_active' => 'boolean',
         'shop_id' => 'integer',
     ];
 

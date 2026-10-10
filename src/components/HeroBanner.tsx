@@ -1,3 +1,4 @@
+import { Language } from '../i18n/translations';
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 import heroImg1 from '../assets/images/hero_headphone_lifestyle_1790485238666.jpg';
@@ -5,7 +6,9 @@ import heroImg2 from '../assets/images/service_home_delivery_1790485280855.jpg';
 import heroImg3 from '../assets/images/service_online_payment_1790485268106.jpg';
 
 interface HeroBannerProps {
-  onBuyNow: () => void;
+  lang?: Language;
+  onBuyNow: (categoryOrSlug?: string) => void;
+  onContactUs?: () => void;
 }
 
 interface BannerSlide {
@@ -60,7 +63,7 @@ const SLIDES: BannerSlide[] = [
   },
 ];
 
-export const HeroBanner: React.FC<HeroBannerProps> = ({ onBuyNow }) => {
+export const HeroBanner: React.FC<HeroBannerProps> = ({ lang = "id", onBuyNow, onContactUs }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
@@ -156,7 +159,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ onBuyNow }) => {
                     {/* Motion Point #41: HeroBanner CTA Button Hover Lift & Tactile Press */}
                     <button
                       type="button"
-                      onClick={onBuyNow}
+                      onClick={() => onBuyNow()}
                       className="motion-press inline-flex items-center justify-center gap-2 px-7 sm:px-8 py-3.5 text-sm sm:text-base font-bold text-white bg-[#003d29] hover:bg-[#064e3b] hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] rounded-full shadow-md shadow-emerald-950/15 transition-[transform,box-shadow,background-color] duration-160 ease-[var(--ease-out)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
                     >
                       <span>{slide.ctaText}</span>

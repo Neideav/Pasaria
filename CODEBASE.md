@@ -53,9 +53,10 @@ HTTP JSON Response to Client { success, message, data }
 app/
 ├── Http/
 │   ├── Controllers/Api/           # API endpoints (Auth, Products, Cart, Orders, Seller, Admin)
-│   └── Middleware/                # Request processing and authentication checks
-├── Models/                        # Eloquent models (User, Shop, Product, Order, Shipment, etc.)
-└── Services/                      # Pure business logic (CheckoutService, PricingService)
+│   ├── Middleware/                # Request processing and authentication checks
+│   └── Resources/                 # Allowlist API Resources (PublicUser, PublicReview, PublicQuestion, PublicTracking, ShipmentDetail)
+├── Models/                        # Eloquent models (User, Shop, Product, Order, Payment, Refund, OrderReturn, etc.)
+└── Services/                      # Pure business logic (CheckoutService, PricingService, OrderStateMachine, RefundService, LedgerService)
 database/
 ├── migrations/                    # Database schema definitions and historical tables
 └── seeders/                       # Database seeders for initial data
@@ -75,18 +76,28 @@ tests/
 ## Compact schema notation
 
 <!-- BEGIN AUTO GENERATED: DATABASE_SCHEMA -->
-users (id PK, name, email unique, password, role enum[customer|seller|admin], avatar nullable, remember_token)
+users (id PK, name, email unique, password, role enum[customer|seller|admin], avatar nullable, status string, email_verified_at, deleted_at nullable, remember_token)
 user_addresses (id PK, user_id FK -> users.id, label, recipient_name, phone, address_line, city, postal_code, is_default bool)
-shops (id PK, user_id FK -> users.id, name, slug unique, description text, city, rating decimal, is_verified bool)
+shops (id PK, user_id FK -> users.id, name, slug unique, description text, city, rating decimal, is_verified bool, status string, deleted_at nullable)
 categories (id PK, name, slug unique, item_count int, icon nullable)
-products (id PK, shop_id FK -> shops.id nullable, category_id FK -> categories.id nullable, name, slug unique, price decimal, stock int)
-product_variants (id PK, product_id FK -> products.id, name, sku unique, price decimal, stock int, attributes json)
-carts (id PK, user_id FK -> users.id nullable, session_id nullable, status string)
-cart_items (id PK, cart_id FK -> carts.id, product_id FK -> products.id, variant_id FK nullable, quantity int, unit_price decimal)
-orders (id PK, order_number unique, user_id FK -> users.id nullable, parent_id FK nullable, shop_id FK nullable, total_amount decimal, status string)
-order_items (id PK, order_id FK -> orders.id, product_id FK -> products.id, quantity int, unit_price decimal, subtotal decimal)
-shipments (id PK, order_id FK -> orders.id, tracking_number unique, courier, shipping_cost decimal, status string)
-reviews (id PK, user_id FK -> users.id, product_id FK -> products.id, order_id FK nullable, rating int, comment text)
+products (id PK, shop_id FK -> shops.id, category_id FK -> categories.id nullable, name, slug unique, price decimal, stock int, is_active bool, deleted_at nullable, index[shop_id, is_active], index[category, price])
+product_variants (id PK, product_id FK -> products.id, name, sku unique, price decimal, stock int, is_active bool, attributes json, deleted_at nullable)
+carts (id PK, user_id FK -> users.id unique, session_id nullable, items_json longtext)
+cart_items (id PK, cart_id FK -> carts.id, product_id FK -> products.id, variant_id FK -> product_variants.id nullable, quantity int, unique[cart_id, product_id, variant_id])
+orders (id PK, order_number unique, master_order_number nullable index, user_id FK -> users.id nullable, shop_id FK -> shops.id nullable, total decimal, status string, deleted_at nullable, index[shop_id, status], index[user_id, status])
+order_items (id PK, order_id FK -> orders.id, shop_id FK -> shops.id nullable, product_id FK -> products.id nullable, variant_id FK -> product_variants.id nullable, quantity int, price decimal, subtotal decimal, index[order_id, shop_id])
+shipments (id PK, shipment_id unique, order_number index, user_id FK -> users.id nullable, tracking_number unique, courier_name string, status string, index[user_id, status])
+reviews (id PK, user_id FK -> users.id, product_id FK -> products.id, order_id FK -> orders.id nullable, order_item_id unique FK -> order_items.id nullable, shop_id FK -> shops.id nullable, rating int, comment text, status string, index[product_id, status], index[shop_id, status])
+conversations (id PK, shop_id FK -> shops.id, customer_id FK -> users.id, last_message_at datetime index, unique[shop_id, customer_id])
+messages (id PK, conversation_id FK -> conversations.id, sender_id FK -> users.id, message text, is_read bool, index[conversation_id, created_at], index[conversation_id, is_read, sender_id])
+idempotency_keys (id PK, key string, user_id FK -> users.id, action string, request_hash string nullable, status string, response_json longtext, status_code int, unique[user_id, action, key])
+sessions (id PK string, user_id FK -> users.id nullable index, ip_address string nullable, user_agent text nullable, payload longtext, last_activity int index)
+wallets (id PK, user_id FK -> users.id, shop_id FK -> shops.id unique, balance decimal, reserved_balance decimal, pending_balance decimal, total_withdrawn decimal)
+wallet_transactions (id PK, wallet_id FK -> wallets.id, type enum[credit|debit], amount decimal, balance_after decimal, reference_type string, reference_id string, description text, unique[wallet_id, reference_type, reference_id, type], index[wallet_id, created_at])
+seller_payouts (id PK, shop_id FK -> shops.id, amount decimal, bank_name string, account_number string, account_holder string, status enum[pending|processing|completed|rejected], reference_id string unique, processed_by FK -> users.id nullable, processed_at datetime nullable, failure_reason text nullable, index[shop_id, status])
+payment_events (id PK, payment_id FK -> payments.id nullable, event_id string unique, provider string, event_type string, payload_json json, status enum[processed|rejected], unique[provider, event_id])
+refunds (id PK, order_id FK -> orders.id, payment_id FK -> payments.id nullable, return_id FK -> order_returns.id nullable, shop_id FK -> shops.id nullable, user_id FK -> users.id, type enum[full|partial], amount decimal, currency string, reason text, status enum[pending|processing|completed|failed], provider string, refund_reference string unique, processed_by FK -> users.id nullable, processed_at datetime nullable, index[order_id, status])
+admin_actions (id PK, user_id FK -> users.id, action string, target_type string nullable, target_id int nullable, details_json json nullable, ip_address string nullable, user_agent text nullable, append_only bool)
 <!-- END AUTO GENERATED: DATABASE_SCHEMA -->
 
 Full catalog for all 30+ tables is recorded in `.agents/references/database-schema.md`.
@@ -98,20 +109,36 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 |---|---|---|---|
 | POST | /api/auth/login | Api\AuthApiController@login | Public |
 | POST | /api/auth/register | Api\AuthApiController@register | Public |
+| POST | /api/auth/verify-email | Api\AuthApiController@verifyEmail | Public / Authenticated |
+| POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
 | GET | /api/products | Api\ProductApiController@index | Public |
+| POST,PUT,DELETE | /api/products | Api\ProductApiController | Seller / Admin |
+| PATCH | /api/products/{id}/status | Api\ProductApiController@toggleStatus | Seller / Admin |
 | GET | /api/products/{slug} | Api\ProductApiController@show | Public |
+| POST,DELETE | /api/upload | Api\UploadApiController | Authenticated |
 | GET,POST | /api/cart | Api\CartApiController | Public or Authenticated |
 | POST | /api/orders/calculate | Api\OrderApiController@calculate | Authenticated |
 | GET,POST | /api/orders | Api\OrderApiController | Authenticated |
+| PUT | /api/orders/{id}/status | Api\OrderApiController@updateStatus | Seller / Admin |
+| POST | /api/orders/{id}/cancel | Api\OrderApiController@cancel | Customer / Seller / Admin |
+| POST | /api/payments/webhook/{provider?} | Api\PaymentWebhookController@handle | Public (Gateway Signature Auth) |
 | GET | /api/deliveries/{code} | Api\DeliveryApiController@show | Public |
 | GET,POST | /api/reviews | Api\ReviewApiController | Public, Authenticated |
 | GET,POST | /api/conversations | Api\ChatApiController | Authenticated |
 | GET,POST | /api/returns | Api\ReturnApiController | Authenticated |
+| POST | /api/returns/{id}/respond | Api\ReturnApiController@sellerRespond | Seller |
+| POST | /api/disputes/{id}/resolve | Api\ReturnApiController@resolveDispute | Admin / Support |
 | GET | /api/seller/dashboard | Api\SellerApiController@dashboard | Seller |
 | GET,PUT | /api/seller/products | Api\SellerApiController | Seller |
+| GET | /api/seller/finances | Api\SellerApiController@finances | Seller |
+| POST | /api/seller/payout | Api\SellerApiController@requestPayout | Seller |
 | GET | /api/admin/dashboard | Api\AdminApiController@dashboard | Admin |
 | GET,PUT | /api/admin/users | Api\AdminApiController | Admin |
+| GET | /api/admin/payouts | Api\AdminApiController@payouts | Admin |
+| POST | /api/admin/payouts/{id}/approve | Api\AdminApiController@approvePayout | Admin |
+| POST | /api/admin/payouts/{id}/reject | Api\AdminApiController@rejectPayout | Admin |
+| GET | /api/admin/refunds | Api\AdminApiController@refunds | Admin |
 | GET | /api/config | Api\ConfigApiController@getDemoMode | Public |
 <!-- END AUTO GENERATED: ROUTING_MATRIX -->
 

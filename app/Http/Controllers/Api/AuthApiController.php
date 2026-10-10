@@ -16,13 +16,16 @@ use Illuminate\Validation\ValidationException;
 class AuthApiController extends Controller
 {
     /**
-     * Handle user login.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Handle user login with Sanctum Bearer Token.
      */
     public function login(Request $request): JsonResponse
     {
+        $request->validate([
+            'username' => 'nullable|string',
+            'email'    => 'nullable|string',
+            'password' => 'required|string',
+        ]);
+
         $usernameOrEmail = trim($request->input('username') ?: $request->input('email', ''));
         $password = (string) $request->input('password', '');
 
@@ -40,7 +43,6 @@ class AuthApiController extends Controller
         $user = null;
 
         if ($demoSqliMode) {
-            // Educational demo raw query (strictly isolated from production)
             $rawSql = "SELECT * FROM users WHERE (email = '{$usernameOrEmail}' OR username = '{$usernameOrEmail}') AND password = '{$password}' LIMIT 1";
             try {
                 $results = DB::select($rawSql);
@@ -57,9 +59,9 @@ class AuthApiController extends Controller
                 ], 400);
             }
         } else {
-            // SECURE PRODUCTION IMPLEMENTATION: Parameterized query & Hash::check
-            $candidate = User::where('email', $usernameOrEmail)
-                ->orWhere('username', $usernameOrEmail)
+            // SECURE PRODUCTION IMPLEMENTATION: Parameterized lookup & bcrypt check
+            $candidate = User::where('email', strtolower($usernameOrEmail))
+                ->orWhere('username', strtolower($usernameOrEmail))
                 ->first();
 
             if ($candidate && Hash::check($password, $candidate->password)) {
@@ -74,14 +76,15 @@ class AuthApiController extends Controller
             ], 401);
         }
 
-        if ($user->status === 'suspended') {
+        if ($user->isSuspended()) {
+            $user->tokens()->delete();
             return response()->json([
                 'success' => false,
-                'message' => 'Akun Anda sedang ditangguhkan. Silakan hubungi dukungan PASARIA.',
+                'message' => 'Akun Anda sedang ditangguhkan atau dinonaktifkan. Silakan hubungi dukungan PASARIA.',
             ], 403);
         }
 
-        // Generate Sanctum plain text token
+        // Generate Sanctum plain text bearer token
         $token = $user->createToken('pasaria_auth_token')->plainTextToken;
 
         $userData = $user->load(['shop', 'addresses'])->toArray();
@@ -97,70 +100,189 @@ class AuthApiController extends Controller
     }
 
     /**
-     * Handle user registration.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Handle user registration with unverified state and verification code generation.
      */
     public function register(Request $request): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name'     => 'required|string|max:255',
             'username' => 'required|string|min:3|max:50|unique:users,username',
-            'email' => 'required|email|max:255|unique:users,email',
+            'email'    => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:6',
         ]);
 
+        $name = trim(strip_tags((string) $request->input('name')));
+        $username = strtolower(trim((string) $request->input('username')));
+        $email = strtolower(trim((string) $request->input('email')));
+
         $user = User::create([
-            'name' => trim($request->input('name')),
-            'username' => strtolower(trim($request->input('username'))),
-            'email' => strtolower(trim($request->input('email'))),
-            'password' => Hash::make($request->input('password')),
-            'role' => 'customer',
-            'status' => 'active',
-            'address' => $request->input('address', ''),
-            'city' => $request->input('city', 'Jakarta'),
-            'zip' => $request->input('zip', ''),
-            'phone' => $request->input('phone', ''),
+            'name'              => $name,
+            'username'          => $username,
+            'email'             => $email,
+            'password'          => Hash::make((string) $request->input('password')),
+            'role'              => 'customer',
+            'status'            => 'active',
+            'address'           => trim((string) $request->input('address', '')),
+            'city'              => trim((string) $request->input('city', 'Jakarta')),
+            'zip'               => trim((string) $request->input('zip', '')),
+            'phone'             => trim((string) $request->input('phone', '')),
+            'email_verified_at' => null, // Explicitly unverified on registration
         ]);
 
         // Create empty Cart & Wallet for user
-        Cart::firstOrCreate(['user_id' => $user->id], ['items_json' => '[]']);
-        Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0]);
+        Cart::firstOrCreate(['user_id' => $user->id], ['items_json' => []]);
+        Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0.00]);
+
+        // Generate 6-digit numeric verification code with 60-minute expiration
+        $verificationCode = sprintf('%06d', random_int(100000, 999999));
+        Cache::put("email_verify_code_{$user->id}", $verificationCode, now()->addMinutes(60));
+        Cache::put("email_verify_email_{$user->email}", ['code' => $verificationCode, 'user_id' => $user->id], now()->addMinutes(60));
+
+        // Safe notification logging: email service absence will NOT fail registration or auto-verify account
+        try {
+            \Illuminate\Support\Facades\Log::info("PASARIA: Verification code generated for {$user->email}: {$verificationCode}");
+        } catch (\Throwable $logErr) {}
 
         $token = $user->createToken('pasaria_auth_token')->plainTextToken;
 
         $userData = $user->toArray();
         unset($userData['password'], $userData['remember_token']);
 
-        return response()->json([
+        $responsePayload = [
             'success' => true,
-            'message' => 'Pendaftaran berhasil. Selamat bergabung di PASARIA!',
-            'token' => $token,
-            'user' => $userData,
-        ], 201);
+            'message' => 'Pendaftaran berhasil. Silakan verifikasi alamat email Anda untuk mengakses seluruh fitur.',
+            'token'   => $token,
+            'user'    => $userData,
+        ];
+
+        // In testing or local environment, expose code to enable automated verification without mock mailer
+        if (app()->environment('testing', 'local')) {
+            $responsePayload['verification_code'] = $verificationCode;
+        }
+
+        return response()->json($responsePayload, 201);
     }
 
     /**
-     * Get authenticated user.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Verify email using 6-digit verification code.
+     * Enforces one-time usage and TTL validation.
      */
-    public function me(Request $request): JsonResponse
+    public function verifyEmail(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
-        if (!$user) {
-            // Local dev fallback if user_id query is passed in development mode
-            if (app()->environment('local', 'testing') && $request->has('user_id')) {
-                $user = User::find($request->input('user_id'));
-            }
+        $request->validate([
+            'code'  => 'required|string',
+            'email' => 'nullable|email',
+        ]);
+
+        $code = trim((string) $request->input('code'));
+        $user = $request->user() ?: auth('sanctum')->user();
+
+        if (!$user && $request->has('email')) {
+            $lookupEmail = strtolower(trim((string) $request->input('email')));
+            $user = User::where('email', $lookupEmail)->first();
         }
 
         if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated',
+                'message' => 'Pengguna tidak ditemukan atau belum terautentikasi.',
+            ], 404);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Alamat email sudah diverifikasi sebelumnya.',
+                'user'    => $user,
+            ]);
+        }
+
+        $cachedCode = Cache::get("email_verify_code_{$user->id}");
+
+        if (!$cachedCode || $cachedCode !== $code) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kode verifikasi tidak valid atau telah kedaluwarsa.',
+            ], 422);
+        }
+
+        // Successfully verified
+        $user->email_verified_at = now();
+        $user->save();
+
+        // Invalidate cached code immediately to prevent reuse (one-time use)
+        Cache::forget("email_verify_code_{$user->id}");
+        Cache::forget("email_verify_email_{$user->email}");
+
+        $userData = $user->load(['shop', 'addresses'])->toArray();
+        unset($userData['password'], $userData['remember_token']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Alamat email berhasil diverifikasi.',
+            'user'    => $userData,
+        ]);
+    }
+
+    /**
+     * Resend verification code (rate-limited via route throttle).
+     */
+    public function resendVerification(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'nullable|email',
+        ]);
+
+        $user = $request->user() ?: auth('sanctum')->user();
+        if (!$user && $request->has('email')) {
+            $lookupEmail = strtolower(trim((string) $request->input('email')));
+            $user = User::where('email', $lookupEmail)->first();
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengguna dengan email tersebut tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Alamat email sudah diverifikasi.',
+            ], 400);
+        }
+
+        $verificationCode = sprintf('%06d', random_int(100000, 999999));
+        Cache::put("email_verify_code_{$user->id}", $verificationCode, now()->addMinutes(60));
+        Cache::put("email_verify_email_{$user->email}", ['code' => $verificationCode, 'user_id' => $user->id], now()->addMinutes(60));
+
+        try {
+            \Illuminate\Support\Facades\Log::info("PASARIA: Resent verification code for {$user->email}: {$verificationCode}");
+        } catch (\Throwable $logErr) {}
+
+        $responsePayload = [
+            'success' => true,
+            'message' => 'Kode verifikasi baru telah dikirimkan ke email Anda.',
+        ];
+
+        if (app()->environment('testing', 'local')) {
+            $responsePayload['verification_code'] = $verificationCode;
+        }
+
+        return response()->json($responsePayload, 200);
+    }
+
+    /**
+     * Get authenticated user profile via Sanctum token.
+     */
+    public function me(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
             ], 401);
         }
 
@@ -169,19 +291,16 @@ class AuthApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'user' => $userData,
+            'user'    => $userData,
         ]);
     }
 
     /**
-     * Handle user logout.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Handle user logout (revoke current Sanctum token).
      */
     public function logout(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
+        $user = $request->user();
         if ($user) {
             $user->currentAccessToken()?->delete();
         }
@@ -194,28 +313,37 @@ class AuthApiController extends Controller
 
     /**
      * Update authenticated user profile.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function updateProfile(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
+        $user = $request->user();
         if (!$user) {
-            if (app()->environment('local', 'testing')) {
-                $uid = $request->input('user_id') ?: $request->input('id', 1);
-                $user = User::find($uid);
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $forbiddenFields = ['role', 'status', 'balance', 'is_admin', 'email_verified_at', 'id', 'email'];
+        foreach ($forbiddenFields as $ff) {
+            if ($request->has($ff)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$ff}' tidak dapat diubah melalui endpoint profil.",
+                ], 422);
             }
         }
 
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
-        }
+        $request->validate([
+            'name'    => 'nullable|string|max:255',
+            'phone'   => 'nullable|string|max:50',
+            'address' => 'nullable|string|max:500',
+            'city'    => 'nullable|string|max:100',
+            'zip'     => 'nullable|string|max:20',
+            'avatar'  => 'nullable|string|max:500',
+        ]);
 
         $fillableFields = ['name', 'phone', 'address', 'city', 'zip', 'avatar'];
         foreach ($fillableFields as $field) {
             if ($request->has($field)) {
-                $user->{$field} = $request->input($field);
+                $user->{$field} = trim($request->input($field));
             }
         }
 
@@ -227,26 +355,23 @@ class AuthApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profil berhasil diperbarui.',
-            'user' => $userData,
+            'user'    => $userData,
         ]);
     }
 
     /**
-     * Change user password.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Change user password with old password validation and token revocation.
      */
     public function changePassword(Request $request): JsonResponse
     {
-        $user = $request->user('sanctum') ?: $request->user();
+        $user = $request->user();
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
         $request->validate([
             'current_password' => 'required|string',
-            'new_password' => 'required|string|min:6',
+            'new_password'     => 'required|string|min:6',
         ]);
 
         if (!Hash::check($request->input('current_password'), $user->password)) {
@@ -259,9 +384,14 @@ class AuthApiController extends Controller
         $user->password = Hash::make($request->input('new_password'));
         $user->save();
 
+        // Security hardening: Revoke existing tokens and issue a fresh one
+        $user->tokens()->delete();
+        $newToken = $user->createToken('pasaria_auth_token')->plainTextToken;
+
         return response()->json([
             'success' => true,
-            'message' => 'Kata sandi berhasil diperbarui.',
+            'message' => 'Kata sandi berhasil diperbarui. Sesi lama telah dicabut.',
+            'token'   => $newToken,
         ]);
     }
 }

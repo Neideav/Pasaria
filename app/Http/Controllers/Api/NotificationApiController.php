@@ -14,19 +14,28 @@ class NotificationApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        $notifications = Notification::where('user_id', $userId)
+        $perPage = min(50, max(5, (int) $request->input('per_page', 30)));
+        $paginated = Notification::where('user_id', $user->id)
             ->orderBy('id', 'desc')
-            ->take(30)
-            ->get();
+            ->paginate($perPage);
 
-        $unreadCount = Notification::where('user_id', $userId)->where('is_read', false)->count();
+        $unreadCount = Notification::where('user_id', $user->id)->where('is_read', false)->count();
 
         return response()->json([
-            'success' => true,
-            'data' => $notifications,
+            'success'      => true,
+            'data'         => $paginated->items(),
             'unread_count' => $unreadCount,
+            'pagination'   => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+            ],
         ]);
     }
 
@@ -35,9 +44,22 @@ class NotificationApiController extends Controller
      */
     public function markAsRead(Request $request, int $id): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        Notification::where('id', $id)->where('user_id', $userId)->update(['is_read' => true]);
+        $notification = Notification::find($id);
+        if (!$notification) {
+            return response()->json(['success' => false, 'message' => 'Notifikasi tidak ditemukan.'], 404);
+        }
+
+        if ($notification->user_id !== $user->id && !$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $notification->is_read = true;
+        $notification->save();
 
         return response()->json([
             'success' => true,
@@ -50,9 +72,12 @@ class NotificationApiController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        Notification::where('user_id', $userId)->update(['is_read' => true]);
+        Notification::where('user_id', $user->id)->update(['is_read' => true]);
 
         return response()->json([
             'success' => true,

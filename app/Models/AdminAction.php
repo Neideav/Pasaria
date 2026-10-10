@@ -29,4 +29,18 @@ class AdminAction extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Audit log records are strictly append-only and immutable.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function () {
+            throw new \RuntimeException('Audit log records are immutable and cannot be updated.');
+        });
+
+        static::deleting(function () {
+            throw new \RuntimeException('Audit log records are append-only and cannot be deleted.');
+        });
+    }
 }

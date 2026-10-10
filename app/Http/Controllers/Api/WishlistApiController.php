@@ -15,15 +15,18 @@ class WishlistApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         $wishlists = Wishlist::with('product')
-            ->where('user_id', $userId)
+            ->where('user_id', $user->id)
             ->orderBy('id', 'desc')
             ->get();
 
         $products = $wishlists->map(function ($w) {
-            if (!$w->product) return null;
+            if (!$w->product || (isset($w->product->is_active) && !$w->product->is_active)) return null;
             $arr = $w->product->toArray();
             $arr['price'] = (float) $w->product->price;
             $arr['is_wishlisted'] = true;
@@ -32,8 +35,8 @@ class WishlistApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $products,
-            'count' => count($products),
+            'data'    => $products,
+            'count'   => count($products),
         ]);
     }
 
@@ -42,23 +45,30 @@ class WishlistApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
-        $productId = (int) $request->input('product_id');
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $request->validate([
+            'product_id' => 'required|integer',
+        ]);
+
+        $productId = (int) $request->input('product_id');
         $product = Product::find($productId);
-        if (!$product) {
-            return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
+        if (!$product || (isset($product->is_active) && !$product->is_active)) {
+            return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan atau sedang tidak aktif.'], 404);
         }
 
         $wishlist = Wishlist::firstOrCreate([
-            'user_id' => $userId,
+            'user_id'    => $user->id,
             'product_id' => $productId,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Produk berhasil ditambahkan ke Wishlist Anda.',
-            'data' => $wishlist,
+            'data'    => $wishlist,
         ], 201);
     }
 
@@ -67,9 +77,12 @@ class WishlistApiController extends Controller
      */
     public function destroy(Request $request, int $productId): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        Wishlist::where('user_id', $userId)->where('product_id', $productId)->delete();
+        Wishlist::where('user_id', $user->id)->where('product_id', $productId)->delete();
 
         return response()->json([
             'success' => true,

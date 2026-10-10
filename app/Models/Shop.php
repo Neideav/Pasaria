@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Shop extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -67,5 +68,15 @@ class Shop extends Model
     public function wallet()
     {
         return $this->hasOne(Wallet::class);
+    }
+
+    public function payouts()
+    {
+        return $this->hasMany(SellerPayout::class);
+    }
+
+    public function orderReturns()
+    {
+        return $this->hasMany(OrderReturn::class);
     }
 }

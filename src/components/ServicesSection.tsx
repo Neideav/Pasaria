@@ -3,12 +3,16 @@ import { Truck, ShieldCheck, CreditCard, Headphones, ArrowRight } from 'lucide-r
 import faqImg from '../assets/images/service_faq_family_1790485254074.jpg';
 import paymentImg from '../assets/images/service_online_payment_1790485268106.jpg';
 import deliveryImg from '../assets/images/service_home_delivery_1790485280855.jpg';
+import { Language } from '../i18n/translations';
 
 interface ServicesSectionProps {
+  lang?: Language;
   onLearnMore?: (serviceName: string) => void;
 }
 
-export const ServicesSection: React.FC<ServicesSectionProps> = ({ onLearnMore }) => {
+export const ServicesSection: React.FC<ServicesSectionProps> = ({ lang = 'id', onLearnMore }) => {
+  const isId = lang === 'id';
+
   const services = [
     {
       title: 'Pengiriman Aman & Cepat',
@@ -130,3 +134,5 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ onLearnMore })
     </section>
   );
 };
+
+

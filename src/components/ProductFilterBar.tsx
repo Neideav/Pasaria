@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, SlidersHorizontal, Check, X, Sparkles } from 'lucide-react';
 import { formatRupiah } from '../utils/formatters';
 
-interface FilterState {
+export interface FilterState {
   category: string;
   minPrice: number;
   maxPrice: number;

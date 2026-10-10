@@ -17,6 +17,7 @@ class Voucher extends Model
         'min_purchase',
         'max_discount',
         'usage_limit',
+        'usage_per_user',
         'usage_count',
         'start_at',
         'end_at',
@@ -29,6 +30,7 @@ class Voucher extends Model
         'min_purchase' => 'decimal:2',
         'max_discount' => 'decimal:2',
         'usage_limit' => 'integer',
+        'usage_per_user' => 'integer',
         'usage_count' => 'integer',
         'is_active' => 'boolean',
         'start_at' => 'datetime',
@@ -46,19 +48,36 @@ class Voucher extends Model
         return $this->hasMany(VoucherRedemption::class);
     }
 
-    public function isValidForAmount(float $subtotal): bool
+    public function isValidForAmount(float $subtotal, ?int $userId = null, ?int $shopId = null): bool
     {
         if (!$this->is_active) return false;
         if ($this->usage_count >= $this->usage_limit) return false;
         if ($this->start_at && now()->lt($this->start_at)) return false;
         if ($this->end_at && now()->gt($this->end_at)) return false;
         if ($subtotal < $this->min_purchase) return false;
+
+        // Shop scope validation: if voucher belongs to a specific shop, ensure matching shop
+        if ($this->shop_id !== null && $shopId !== null && (int) $this->shop_id !== (int) $shopId) {
+            return false;
+        }
+
+        // Per-user usage limit check
+        if ($userId !== null && !empty($this->usage_per_user) && $this->usage_per_user > 0) {
+            $userUsage = VoucherRedemption::where('voucher_id', $this->id)
+                ->where('user_id', $userId)
+                ->where('status', '!=', 'rolled_back')
+                ->count();
+            if ($userUsage >= $this->usage_per_user) {
+                return false;
+            }
+        }
+
         return true;
     }
 
-    public function calculateDiscount(float $subtotal, float $shippingCost = 0): float
+    public function calculateDiscount(float $subtotal, float $shippingCost = 0, ?int $userId = null, ?int $shopId = null): float
     {
-        if (!$this->isValidForAmount($subtotal)) return 0;
+        if (!$this->isValidForAmount($subtotal, $userId, $shopId)) return 0;
 
         if ($this->type === 'free_shipping') {
             return $shippingCost;

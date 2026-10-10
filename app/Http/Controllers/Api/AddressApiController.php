@@ -14,78 +14,121 @@ class AddressApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: ($request->input('user_id') ?: 1);
-        $addresses = UserAddress::where('user_id', $userId)
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $addresses = UserAddress::where('user_id', $user->id)
             ->orderBy('is_default', 'desc')
             ->orderBy('id', 'desc')
             ->get();
 
         return response()->json([
             'success' => true,
-            'data' => $addresses,
+            'data'    => $addresses,
         ]);
     }
 
     /**
-     * Store a new address.
+     * Store a new address for authenticated user.
      */
     public function store(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        if ($request->has('user_id') && (int) $request->input('user_id') !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak diizinkan mengubah kepemilikan alamat.',
+            ], 403);
+        }
 
         $request->validate([
-            'recipient_name' => 'required|string',
-            'phone' => 'required|string',
-            'address_line' => 'required|string',
-            'city' => 'required|string',
-            'postal_code' => 'required|string',
+            'recipient_name' => 'required|string|max:100',
+            'phone'          => 'required|string|max:30',
+            'address_line'   => 'required|string|max:500',
+            'city'           => 'required|string|max:100',
+            'province'       => 'nullable|string|max:100',
+            'postal_code'    => 'required|string|max:20',
+            'is_default'     => 'nullable|boolean',
         ]);
 
         $isDefault = $request->boolean('is_default', false);
-        if ($isDefault || UserAddress::where('user_id', $userId)->count() === 0) {
-            UserAddress::where('user_id', $userId)->update(['is_default' => false]);
+        if ($isDefault || UserAddress::where('user_id', $user->id)->count() === 0) {
+            UserAddress::where('user_id', $user->id)->update(['is_default' => false]);
             $isDefault = true;
         }
 
         $address = UserAddress::create([
-            'user_id' => $userId,
-            'recipient_name' => $request->input('recipient_name'),
-            'phone' => $request->input('phone'),
-            'address_line' => $request->input('address_line'),
-            'city' => $request->input('city'),
-            'province' => $request->input('province', 'DKI Jakarta'),
-            'postal_code' => $request->input('postal_code'),
-            'is_default' => $isDefault,
+            'user_id'        => $user->id,
+            'recipient_name' => trim($request->input('recipient_name')),
+            'phone'          => trim($request->input('phone')),
+            'address_line'   => trim($request->input('address_line')),
+            'city'           => trim($request->input('city')),
+            'province'       => trim($request->input('province', 'DKI Jakarta')),
+            'postal_code'    => trim($request->input('postal_code')),
+            'is_default'     => $isDefault,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Alamat pengiriman berhasil ditambahkan.',
-            'data' => $address,
+            'data'    => $address,
         ], 201);
     }
 
     /**
-     * Update an existing address with IDOR ownership protection.
+     * Update an existing address with strict IDOR ownership protection.
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $userId = $request->user()?->id ?: ($request->input('user_id') ?: 1);
-        $address = UserAddress::where('id', $id)->where('user_id', $userId)->first();
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $address = UserAddress::find($id);
         if (!$address) {
             return response()->json([
                 'success' => false,
-                'message' => 'Alamat tidak ditemukan atau Anda tidak memiliki akses.',
+                'message' => 'Alamat tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($address->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak akses ke alamat ini.',
             ], 403);
         }
+
+        if ($request->has('user_id') && (int) $request->input('user_id') !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak diizinkan mengubah kepemilikan alamat.',
+            ], 403);
+        }
+
+        $request->validate([
+            'recipient_name' => 'nullable|string|max:100',
+            'phone'          => 'nullable|string|max:30',
+            'address_line'   => 'nullable|string|max:500',
+            'city'           => 'nullable|string|max:100',
+            'province'       => 'nullable|string|max:100',
+            'postal_code'    => 'nullable|string|max:20',
+            'is_default'     => 'nullable|boolean',
+        ]);
 
         $address->update($request->only([
             'recipient_name', 'phone', 'address_line', 'city', 'province', 'postal_code',
         ]));
 
         if ($request->has('is_default') && $request->boolean('is_default')) {
-            UserAddress::where('user_id', $userId)->where('id', '!=', $id)->update(['is_default' => false]);
+            UserAddress::where('user_id', $user->id)->where('id', '!=', $id)->update(['is_default' => false]);
             $address->is_default = true;
             $address->save();
         }
@@ -93,22 +136,32 @@ class AddressApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Alamat berhasil diperbarui.',
-            'data' => $address,
+            'data'    => $address,
         ]);
     }
 
     /**
-     * Delete an address with IDOR protection.
+     * Delete an address with strict IDOR protection.
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $userId = $request->user()?->id ?: ($request->input('user_id') ?: 1);
-        $address = UserAddress::where('id', $id)->where('user_id', $userId)->first();
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $address = UserAddress::find($id);
         if (!$address) {
             return response()->json([
                 'success' => false,
-                'message' => 'Alamat tidak ditemukan atau Anda tidak memiliki akses.',
+                'message' => 'Alamat tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($address->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak akses ke alamat ini.',
             ], 403);
         }
 
@@ -125,24 +178,34 @@ class AddressApiController extends Controller
      */
     public function setDefault(Request $request, int $id): JsonResponse
     {
-        $userId = $request->user()?->id ?: ($request->input('user_id') ?: 1);
-        $address = UserAddress::where('id', $id)->where('user_id', $userId)->first();
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $address = UserAddress::find($id);
         if (!$address) {
             return response()->json([
                 'success' => false,
-                'message' => 'Alamat tidak ditemukan atau Anda tidak memiliki akses.',
+                'message' => 'Alamat tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($address->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak akses ke alamat ini.',
             ], 403);
         }
 
-        UserAddress::where('user_id', $userId)->update(['is_default' => false]);
+        UserAddress::where('user_id', $user->id)->update(['is_default' => false]);
         $address->is_default = true;
         $address->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Alamat utama berhasil diatur.',
-            'data' => $address,
+            'data'    => $address,
         ]);
     }
 }

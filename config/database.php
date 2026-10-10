@@ -64,7 +64,6 @@ return [
                 $options = [
                     PDO::ATTR_TIMEOUT => (int) env('DB_TIMEOUT', 5),
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                 ];
 
                 $ca = env('MYSQL_ATTR_SSL_CA');
@@ -78,6 +77,9 @@ return [
 
                 if ($ca) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
+                    if (env('DB_SSL_VERIFY_CERT', true)) {
+                        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+                    }
                 }
 
                 return $options;
@@ -103,7 +105,6 @@ return [
                 $options = [
                     PDO::ATTR_TIMEOUT => (int) env('DB_TIMEOUT', 5),
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                 ];
 
                 $ca = env('MYSQL_ATTR_SSL_CA');
@@ -117,6 +118,9 @@ return [
 
                 if ($ca) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
+                    if (env('DB_SSL_VERIFY_CERT', true)) {
+                        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+                    }
                 }
 
                 return $options;

@@ -356,6 +356,219 @@ const ProductVisualComponent: React.FC<ProductVisualProps> = ({
     );
   }
 
+  if (imageKey === 'sneakers-urban-pro') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="190" rx="100" ry="50" fill="#ecfdf5" />
+          {/* Sneaker Sole */}
+          <path d="M 50 185 Q 160 195 265 175 C 275 175 280 185 270 195 C 250 215 70 215 50 195 Z" fill="#003d29" />
+          {/* Upper Body */}
+          <path d="M 60 185 C 65 150 90 120 120 120 C 145 120 170 145 205 150 C 240 155 260 165 265 175 Z" fill="#10b981" />
+          {/* Ankle Collar */}
+          <path d="M 100 135 C 105 110 130 105 145 115 C 150 125 140 145 130 150 Z" fill="#047857" />
+          {/* Laces & Accents */}
+          <line x1="140" y1="130" x2="165" y2="150" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+          <line x1="150" y1="125" x2="180" y2="145" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="85" cy="175" r="8" fill="#ffffff" opacity="0.8" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'mechanical-keyboard-rgb') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="180" rx="100" ry="50" fill="#f8fafc" />
+          {/* Keyboard Case */}
+          <rect x="50" y="100" width="220" height="100" rx="10" fill="#1e293b" stroke="#334155" strokeWidth="2" />
+          {/* Key Rows */}
+          <rect x="62" y="112" width="26" height="18" rx="3" fill="#0ea5e9" opacity="0.9" />
+          <rect x="94" y="112" width="26" height="18" rx="3" fill="#6366f1" opacity="0.9" />
+          <rect x="126" y="112" width="26" height="18" rx="3" fill="#8b5cf6" opacity="0.9" />
+          <rect x="158" y="112" width="26" height="18" rx="3" fill="#ec4899" opacity="0.9" />
+          <rect x="190" y="112" width="26" height="18" rx="3" fill="#f43f5e" opacity="0.9" />
+          <rect x="222" y="112" width="36" height="18" rx="3" fill="#0284c7" />
+
+          <rect x="62" y="136" width="32" height="18" rx="3" fill="#334155" />
+          <rect x="100" y="136" width="26" height="18" rx="3" fill="#475569" />
+          <rect x="132" y="136" width="26" height="18" rx="3" fill="#475569" />
+          <rect x="164" y="136" width="26" height="18" rx="3" fill="#475569" />
+          <rect x="196" y="136" width="26" height="18" rx="3" fill="#475569" />
+          <rect x="228" y="136" width="30" height="18" rx="3" fill="#334155" />
+
+          {/* Spacebar Row */}
+          <rect x="62" y="160" width="40" height="18" rx="3" fill="#334155" />
+          <rect x="108" y="160" width="104" height="18" rx="4" fill="#06b6d4" />
+          <rect x="218" y="160" width="40" height="18" rx="3" fill="#334155" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'nordic-ergonomic-chair') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="230" rx="70" ry="25" fill="#f1f5f9" />
+          {/* Headrest */}
+          <rect x="130" y="55" width="60" height="24" rx="8" fill="#0f172a" />
+          {/* Spine & Back Mesh */}
+          <rect x="110" y="85" width="100" height="95" rx="14" fill="#334155" />
+          <path d="M 120 95 L 200 95 M 120 115 L 200 115 M 120 135 L 200 135 M 120 155 L 200 155" stroke="#64748b" strokeWidth="2" strokeDasharray="4 3" />
+          {/* Seat Cushion */}
+          <rect x="100" y="175" width="120" height="20" rx="8" fill="#003d29" />
+          {/* Gas Lift Stem & Star Base */}
+          <rect x="155" y="195" width="10" height="30" fill="#64748b" />
+          <path d="M 160 225 L 110 240 M 160 225 L 210 240 M 160 225 L 160 245" stroke="#334155" strokeWidth="6" strokeLinecap="round" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'leather-slim-wallet') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="190" rx="85" ry="45" fill="#fef3c7" />
+          {/* Leather Wallet Body */}
+          <rect x="90" y="90" width="140" height="100" rx="12" fill="#78350f" stroke="#92400e" strokeWidth="2" />
+          {/* Card Slot Inset */}
+          <path d="M 90 120 Q 160 140 230 120" stroke="#b45309" strokeWidth="3" fill="none" />
+          <path d="M 90 145 Q 160 165 230 145" stroke="#b45309" strokeWidth="3" fill="none" />
+          {/* Credit Card Peek */}
+          <rect x="110" y="70" width="100" height="50" rx="6" fill="#1e293b" />
+          <rect x="120" y="82" width="20" height="14" rx="2" fill="#eab308" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'smart-led-desk-lamp') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="225" rx="70" ry="30" fill="#fef9c3" opacity="0.6" />
+          {/* Base */}
+          <circle cx="160" cy="215" r="38" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="2" />
+          {/* Stem */}
+          <path d="M 160 215 L 160 100 Q 160 80 180 80 L 230 80" stroke="#94a3b8" strokeWidth="8" strokeLinecap="round" fill="none" />
+          {/* Lamp Head & Light Glow */}
+          <rect x="200" y="74" width="60" height="12" rx="6" fill="#0f172a" />
+          <polygon points="205,86 255,86 280,180 180,180" fill="#fef08a" opacity="0.25" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'running-trail-sneakers') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="190" rx="100" ry="50" fill="#f0fdfa" />
+          {/* Sole */}
+          <path d="M 50 180 Q 160 195 265 170 C 275 170 280 180 270 190 C 245 210 75 210 50 190 Z" fill="#0d9488" />
+          {/* Upper Body */}
+          <path d="M 60 180 C 65 145 90 115 120 115 C 145 115 170 140 205 145 C 240 150 260 160 265 170 Z" fill="#042f2e" />
+          {/* Laces */}
+          <line x1="135" y1="125" x2="160" y2="145" stroke="#2dd4bf" strokeWidth="3" strokeLinecap="round" />
+          <line x1="145" y1="120" x2="175" y2="140" stroke="#2dd4bf" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'sony-wh1000xm5') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="170" rx="90" ry="70" fill="#fafaf9" />
+          {/* Thin Minimal Headband */}
+          <path d="M 85 160 C 85 65, 235 65, 235 160" stroke="#292524" strokeWidth="16" strokeLinecap="round" />
+          {/* Left Silky Cup */}
+          <g transform="translate(62, 140)">
+            <rect x="0" y="0" width="45" height="75" rx="22" fill="#1c1917" />
+            <text x="22" y="42" fill="#a8a29e" fontSize="9" fontWeight="bold" textAnchor="middle">SONY</text>
+          </g>
+          {/* Right Silky Cup */}
+          <g transform="translate(213, 140)">
+            <rect x="0" y="0" width="45" height="75" rx="22" fill="#1c1917" />
+            <text x="22" y="42" fill="#a8a29e" fontSize="9" fontWeight="bold" textAnchor="middle">SONY</text>
+          </g>
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'waterproof-travel-backpack') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="205" rx="80" ry="40" fill="#f1f5f9" />
+          {/* Main Body */}
+          <rect x="95" y="70" width="130" height="150" rx="28" fill="#1e293b" />
+          {/* Top Carry Handle */}
+          <path d="M 135 70 C 135 50, 185 50, 185 70" stroke="#0f172a" strokeWidth="8" strokeLinecap="round" fill="none" />
+          {/* Front Pocket */}
+          <rect x="110" y="130" width="100" height="70" rx="14" fill="#334155" />
+          <line x1="125" y1="150" x2="195" y2="150" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'smart-fitness-band') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="180" rx="80" ry="50" fill="#ecfdf5" />
+          {/* Strap Band */}
+          <rect x="142" y="60" width="36" height="160" rx="18" fill="#047857" />
+          {/* Capsule Screen */}
+          <rect x="136" y="100" width="48" height="80" rx="16" fill="#022c22" stroke="#10b981" strokeWidth="2" />
+          {/* Digital Clock display */}
+          <text x="160" y="135" fill="#34d399" fontSize="13" fontWeight="bold" textAnchor="middle" fontFamily="monospace">10:45</text>
+          <text x="160" y="152" fill="#ffffff" fontSize="9" textAnchor="middle">7,850 BPM</text>
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'logitech-mx-master-3s') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="180" rx="85" ry="55" fill="#f8fafc" />
+          {/* Ergonomic Mouse Body */}
+          <path d="M 110 130 C 110 80, 200 80, 205 130 C 210 180, 190 220, 150 220 C 115 220, 105 180, 110 130 Z" fill="#334155" />
+          {/* Thumb Rest Wing */}
+          <path d="M 110 130 C 85 150, 85 180, 115 190" fill="#1e293b" />
+          {/* Metal MagSpeed Scroll Wheel */}
+          <rect x="152" y="95" width="12" height="30" rx="6" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageKey === 'buku-atomic-habits') {
+    return (
+      <div className={`relative flex items-center justify-center ${heightMap[size]} ${className}`}>
+        <svg viewBox="0 0 320 280" className="w-full h-full max-h-full drop-shadow-sm select-none" fill="none">
+          <ellipse cx="160" cy="205" rx="80" ry="40" fill="#fffbeb" />
+          {/* Book Cover */}
+          <rect x="100" y="65" width="120" height="160" rx="8" fill="#ffffff" stroke="#f59e0b" strokeWidth="3" />
+          <rect x="95" y="65" width="12" height="160" rx="4" fill="#d97706" />
+          {/* Title and Atomic dot ring */}
+          <circle cx="160" cy="120" r="22" fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="3 3" />
+          <circle cx="160" cy="120" r="6" fill="#d97706" />
+          <text x="160" y="165" fill="#1e293b" fontSize="10" fontWeight="extrabold" textAnchor="middle">ATOMIC HABITS</text>
+          <text x="160" y="180" fill="#64748b" fontSize="8" textAnchor="middle">James Clear</text>
+        </svg>
+      </div>
+    );
+  }
+
   // Custom uploaded image or external image URL
   if (imageKey && (imageKey.startsWith('data:') || imageKey.startsWith('http') || imageKey.startsWith('/') || imageKey.startsWith('blob:'))) {
     return (

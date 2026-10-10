@@ -23,12 +23,17 @@ import {
   Clock,
   AlertTriangle,
   Wallet,
+  Edit3,
+  Upload,
+  Image as ImageIcon,
+  Eye,
+  EyeOff,
   X
 } from 'lucide-react';
 import { User, Shop, Product, Order, Review } from '../types';
 import { ProductVisual } from './ProductVisual';
-import { api } from '../services/api';
-import { useToast } from '../context/ToastContext';
+import { api, ApiError } from "../services/api";
+import { useToast } from "../context/ToastContext";
 import { formatRupiah, formatDateTime } from '../utils/formatters';
 
 interface ShopDashboardViewProps {
@@ -36,6 +41,7 @@ interface ShopDashboardViewProps {
   products: Product[];
   onUpdateUser: (user: User) => void;
   onAddProduct: (newProduct: Product) => void;
+  onUpdateProduct?: (updatedProduct: Product) => void;
   onDeleteProduct?: (productId: number) => void;
   onNavigateHome: () => void;
   onViewShopPublic: (shop: Shop) => void;
@@ -47,6 +53,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   products,
   onUpdateUser,
   onAddProduct,
+  onUpdateProduct,
   onDeleteProduct,
   onNavigateHome,
   onViewShopPublic,
@@ -63,6 +70,8 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   const [shopPhone, setShopPhone] = useState(user?.phone || '+62 812-3456-7890');
   const [isRegistering, setIsRegistering] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
+  const [updatingVariantId, setUpdatingVariantId] = useState<number | null>(null);
+  const [fulfillingOrderId, setFulfillingOrderId] = useState<number | null>(null);
 
   // Seller Data from API
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -80,6 +89,20 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   const [prodVariantName, setProdVariantName] = useState('Standard');
   const [prodSku, setProdSku] = useState('');
   const [prodCreating, setProdCreating] = useState(false);
+  const [prodImage, setProdImage] = useState('airpods-max');
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Edit Product Modal State
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('Headphones');
+  const [editPrice, setEditPrice] = useState('');
+  const [editStock, setEditStock] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editImage, setEditImage] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editUploadingImage, setEditUploadingImage] = useState(false);
 
   // Payout request modal/form
   const [showPayoutModal, setShowPayoutModal] = useState(false);
@@ -176,6 +199,103 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
     }
   };
 
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (isEdit) {
+      setEditUploadingImage(true);
+    } else {
+      setUploadingImage(true);
+    }
+
+    try {
+      const res = await api.uploadImage(file);
+      if (res.url) {
+        if (isEdit) {
+          setEditImage(res.url);
+        } else {
+          setProdImage(res.url);
+        }
+        setActionSuccess('Foto produk berhasil diunggah.');
+        setTimeout(() => setActionSuccess(''), 3000);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengunggah foto produk');
+    } finally {
+      if (isEdit) {
+        setEditUploadingImage(false);
+      } else {
+        setUploadingImage(false);
+      }
+    }
+  };
+
+  const handleToggleProductStatus = async (p: Product) => {
+    try {
+      const res = await api.toggleProductStatus(p.id);
+      const updated = { ...p, is_active: res.is_active };
+      if (onUpdateProduct) onUpdateProduct(updated);
+      setActionSuccess(`Status produk '${p.name}' berhasil ${res.is_active ? 'diaktifkan' : 'dinonaktifkan'}.`);
+      loadSellerData();
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengubah status produk');
+    }
+  };
+
+  const handleOpenEdit = (p: Product) => {
+    setEditingProduct(p);
+    setEditName(p.name);
+    setEditCategory(p.category);
+    setEditPrice(String(p.price));
+    setEditStock(String(p.stock));
+    setEditDesc(p.description || '');
+    setEditImage(p.image || '');
+    setEditIsActive(p.is_active !== undefined ? p.is_active : true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    setEditSaving(true);
+    try {
+      const priceNum = parseFloat(editPrice) || editingProduct.price;
+      const stockNum = parseInt(editStock, 10);
+      const res = await api.updateProduct(editingProduct.id, {
+        name: editName.trim(),
+        category: editCategory,
+        price: priceNum,
+        stock: isNaN(stockNum) ? editingProduct.stock : stockNum,
+        description: editDesc,
+        image: editImage,
+        is_active: editIsActive,
+      });
+
+      const updated = res.product || {
+        ...editingProduct,
+        name: editName.trim(),
+        category: editCategory,
+        price: priceNum,
+        stock: isNaN(stockNum) ? editingProduct.stock : stockNum,
+        description: editDesc,
+        image: editImage,
+        is_active: editIsActive,
+      };
+
+      if (onUpdateProduct) onUpdateProduct(updated);
+      setEditingProduct(null);
+      setActionSuccess('Produk berhasil diperbarui.');
+      loadSellerData();
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal memperbarui produk');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prodName.trim() || !prodPrice) return;
@@ -190,8 +310,9 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
         category: prodCategory,
         price: priceNum,
         stock: stockNum,
-        description: prodDesc.trim() || 'Produk resmi dengan garansi kualitas terjamin.',
-        variant_name: prodVariantName.trim() || 'Standard',
+        description: prodDesc.trim() || `${prodName} original dari ${currentShop?.name}.`,
+        image: prodImage || "airpods-max",
+        variant_name: prodVariantName.trim() || "Standard",
         sku: prodSku.trim() || `SKU-${Date.now().toString().slice(-6)}`,
       });
 
@@ -203,7 +324,8 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       setProdPrice('');
       setProdDesc('');
       setProdSku('');
-      setActiveTab('products');
+      setProdImage("airpods-max");
+      setActiveTab("products");
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 4000);
     } catch (err: any) {
@@ -213,33 +335,40 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
     }
   };
 
-  const handleUpdateStock = async (inventoryId: number, currentStock: number, delta: number) => {
-    const newStock = Math.max(0, currentStock + delta);
+  const handleUpdateStock = async (variantId: number, currentStock: number, delta: number) => {
+    if (updatingVariantId !== null) return;
+    const next = Math.max(0, currentStock + delta);
+    setUpdatingVariantId(variantId);
     try {
-      await api.updateSellerStock(inventoryId, newStock);
+      await api.updateSellerStock(variantId, next);
       setInventoryList((prev) =>
-        prev.map((item) => (item.id === inventoryId ? { ...item, stock: newStock } : item))
+        prev.map((item) => (item.id === variantId ? { ...item, stock: next } : item))
       );
-      showToast(`Stok berhasil diperbarui: ${newStock} unit.`, 'success');
+      showToast(`Stok berhasil diperbarui: ${next} unit.`, "success");
     } catch (err: any) {
-      showToast(err.message || 'Gagal memperbarui stok', 'error');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || "Gagal memperbarui stok";
+      showToast(msg, "error");
+    } finally {
+      setUpdatingVariantId(null);
     }
   };
 
-  const handleFulfillOrder = async (orderId: number, status: string) => {
+  const handleFulfillOrder = async (orderId: number, nextStatus: string) => {
+    if (fulfillingOrderId !== null) return;
+    setFulfillingOrderId(orderId);
     try {
-      const trackingNumber = `PASARIA-EXP-${Date.now().toString().slice(-8)}`;
-      await api.updateOrderStatus(orderId, status, trackingNumber);
-      setSellerOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: 'shipped', tracking_number: trackingNumber } : o))
-      );
-      const msg = `Pesanan #${orderId} dikirim dengan nomor resi ${trackingNumber}.`;
+      const trk = `PSR-EXP-${Math.floor(10000000 + Math.random() * 90000000)}`;
+      await api.updateOrderStatus(orderId, nextStatus, trk, "PASARIA Express Priority");
+      const msg = `Pesanan #${orderId} berhasil diproses ke status: ${nextStatus} (Resi: ${trk})`;
       setActionSuccess(msg);
-      showToast(msg, 'success');
-      loadSellerData();
-      setTimeout(() => setActionSuccess(''), 4000);
+      showToast(msg, "success");
+      await loadSellerData();
+      setTimeout(() => setActionSuccess(""), 3000);
     } catch (err: any) {
-      showToast(err.message || 'Gagal memproses pesanan', 'error');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || "Gagal memperbarui status pesanan";
+      showToast(msg, "error");
+    } finally {
+      setFulfillingOrderId(null);
     }
   };
 
@@ -251,10 +380,11 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       await api.replyReview(reviewId, text.trim());
       showToast('Balasan ulasan berhasil dikirim ke pembeli.', 'success');
       setReplyTextMap((prev) => ({ ...prev, [reviewId]: '' }));
-      loadSellerData();
+      await loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
-      showToast(err.message || 'Gagal membalas ulasan', 'error');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || "Gagal membalas ulasan";
+      showToast(msg, "error");
     }
   };
 
@@ -299,8 +429,9 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
   const handleRequestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (payoutLoading) return;
     if (!validatePayout()) {
-      showToast('Periksa kembali data formulir penarikan dana.', 'error');
+      showToast("Periksa kembali data formulir penarikan dana.", "error");
       return;
     }
 
@@ -320,10 +451,11 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       setPayoutAmount('');
       setPayoutErrors({});
       setShowPayoutModal(false);
-      loadSellerData();
-      setTimeout(() => setActionSuccess(''), 3000);
+      await loadSellerData();
+      setTimeout(() => setActionSuccess(""), 3000);
     } catch (err: any) {
-      showToast(err.message || 'Gagal mengajukan penarikan saldo', 'error');
+      const msg = (err instanceof ApiError && err.getFirstValidationError()) || err.message || "Gagal mengajukan penarikan saldo";
+      showToast(msg, "error");
     } finally {
       setPayoutLoading(false);
     }
@@ -591,37 +723,215 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {myProducts.map((p) => (
-              <div
-                key={p.id}
-                className="p-4 rounded-2xl border border-slate-100 hover:border-slate-200 bg-white flex items-center justify-between gap-3 text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1 shrink-0">
-                    <ProductVisual imageKey={p.image} name={p.name} size="sm" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 line-clamp-1">{p.name}</h4>
-                    <p className="text-slate-400 text-[11px]">{p.category}</p>
-                    <div className="font-extrabold text-[#003d29] tabular-nums mt-1">
-                      {formatRupiah(p.price)}
+            {myProducts.map((p) => {
+              const isActive = p.is_active !== undefined ? p.is_active : true;
+              return (
+                <div
+                  key={p.id}
+                  className={`p-4 rounded-2xl border transition-all bg-white flex flex-col justify-between gap-3 text-xs ${
+                    isActive ? 'border-slate-100 hover:border-slate-200 shadow-2xs' : 'border-dashed border-slate-300 opacity-70 bg-slate-50/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                      <ProductVisual imageKey={p.image} name={p.name} size="sm" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                          isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {isActive ? 'Aktif' : 'Nonaktif'}
+                        </span>
+                        <span className="text-slate-400 text-[10px] truncate">{p.category}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 truncate" title={p.name}>{p.name}</h4>
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="font-extrabold text-[#003d29]">{formatRupiah(p.price)}</div>
+                        <div className="text-slate-400 text-[11px]">Stok: {p.stock}</div>
+                      </div>
                     </div>
                   </div>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleProductStatus(p)}
+                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all cursor-pointer motion-press active:scale-[0.96] flex items-center gap-1 ${
+                        isActive
+                          ? "bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700"
+                          : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800"
+                      }`}
+                      title={isActive ? "Nonaktifkan produk dari katalog" : "Aktifkan produk ke katalog"}
+                    >
+                      {isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span>{isActive ? "Nonaktifkan" : "Aktifkan"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(p)}
+                      className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                      title="Edit Produk"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+
+                    {onDeleteProduct && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Hapus produk '${p.name}' dari etalase toko?`)) {
+                            onDeleteProduct(p.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                        title="Hapus Produk"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Edit Product Modal */}
+          {editingProduct && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 border border-slate-200 shadow-2xl space-y-5 text-xs max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-sm">Edit Produk: {editingProduct.name}</h3>
+                    <p className="text-slate-400 text-xs mt-0.5">Perbarui informasi harga, stok, atau spesifikasi produk.</p>
+                  </div>
+                  <button
+                    onClick={() => setEditingProduct(null)}
+                    className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {onDeleteProduct && (
-                  <button
-                    onClick={() => onDeleteProduct(p.id)}
-                    aria-label={`Hapus produk ${p.name}`}
-                    className="min-w-[40px] min-h-[40px] rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-500 motion-press active:scale-[0.96]"
-                    title="Hapus Produk"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Produk</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kategori</label>
+                      <select
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white"
+                      >
+                        <option value="Headphones">Headphones</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Shoes">Shoes</option>
+                        <option value="Bags">Bags</option>
+                        <option value="Books">Books</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Harga Jual (Rp)</label>
+                      <input
+                        type="number"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Stok Tersedia</label>
+                      <input
+                        type="number"
+                        value={editStock}
+                        onChange={(e) => setEditStock(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-bold tabular-nums"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Status Visibilitas</label>
+                      <button
+                        type="button"
+                        onClick={() => setEditIsActive(!editIsActive)}
+                        className={`w-full py-2.5 px-3 rounded-xl border font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                          editIsActive ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {editIsActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        <span>{editIsActive ? 'Produk Aktif' : 'Produk Nonaktif'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Foto / Gambar Produk</label>
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                        <ProductVisual imageKey={editImage} name={editName} size="sm" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{editUploadingImage ? 'Mengunggah...' : 'Unggah Foto Baru'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={editUploadingImage}
+                            onChange={(e) => handleUploadImage(e, true)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Lengkap Produk</label>
+                    <textarea
+                      rows={3}
+                      value={editDesc}
+                      onChange={(e) => setEditDesc(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingProduct(null)}
+                      className="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold cursor-pointer hover:bg-slate-50"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={editSaving}
+                      className="px-5 py-2.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold cursor-pointer disabled:opacity-40 shadow-2xs"
+                    >
+                      {editSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                    </button>
+                  </div>
+                </form>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -673,23 +983,29 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                     <td className="py-3 px-4 text-right">
                       <div className="inline-flex items-center gap-1.5">
                         <button
+                          type="button"
+                          disabled={updatingVariantId === inv.id}
                           onClick={() => handleUpdateStock(inv.id, inv.stock, -1)}
-                          aria-label={`Kurangi 1 unit stok ${inv.name || 'produk'}`}
-                          className="min-w-[40px] min-h-[40px] rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400 motion-press active:scale-[0.96]"
+                          aria-label={`Kurangi 1 unit stok ${inv.name || "produk"}`}
+                          className="min-w-[36px] min-h-[36px] rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400 motion-press active:scale-[0.96] disabled:opacity-40"
                         >
                           -
                         </button>
                         <button
+                          type="button"
+                          disabled={updatingVariantId === inv.id}
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 5)}
-                          aria-label={`Tambah 5 unit stok ${inv.name || 'produk'}`}
-                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
+                          aria-label={`Tambah 5 unit stok ${inv.name || "produk"}`}
+                          className="min-h-[36px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96] disabled:opacity-40"
                         >
                           +5
                         </button>
                         <button
+                          type="button"
+                          disabled={updatingVariantId === inv.id}
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 20)}
-                          aria-label={`Tambah 20 unit stok ${inv.name || 'produk'}`}
-                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
+                          aria-label={`Tambah 20 unit stok ${inv.name || "produk"}`}
+                          className="min-h-[36px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96] disabled:opacity-40"
                         >
                           +20
                         </button>
@@ -753,11 +1069,13 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
+                        disabled={fulfillingOrderId === ord.id}
                         onClick={() => handleFulfillOrder(ord.id, 'shipped')}
                         aria-label={`Kirim pesanan nomor ${ord.order_number} dan terbitkan nomor resi`}
-                        className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
+                        className="min-h-[40px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96] disabled:opacity-50"
                       >
-                        Kirim Barang (Generate Resi)
+                        {fulfillingOrderId === ord.id ? 'Memproses Resi...' : 'Kirim Barang (Generate Resi)'}
                       </button>
                     </div>
                   </div>
@@ -1350,6 +1668,25 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
             </div>
 
             <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Foto / Gambar Produk</label>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                  <ProductVisual imageKey={prodImage} name={prodName || "Produk Baru"} size="sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer motion-press active:scale-[0.97]">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{uploadingImage ? "Mengunggah..." : "Pilih Foto Produk"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingImage}
+                      onChange={(e) => handleUploadImage(e, false)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
               <label htmlFor="prod-desc" className="block text-[11px] font-semibold text-slate-700 mb-1">Deskripsi Lengkap Produk</label>
               <textarea
                 id="prod-desc"

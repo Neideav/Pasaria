@@ -16,7 +16,7 @@ class ShopApiController extends Controller
     /**
      * Get shop profile with products and statistics.
      */
-    public function show(string $slugOrId): JsonResponse
+    public function show(Request $request, string $slugOrId): JsonResponse
     {
         $shop = Shop::withCount(['followers', 'products'])
             ->where('slug', $slugOrId)
@@ -27,14 +27,16 @@ class ShopApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan di PASARIA.'], 404);
         }
 
-        $products = Product::where('shop_id', $shop->id)
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $productsPaginated = Product::where('shop_id', $shop->id)
             ->orderBy('id', 'desc')
-            ->get()
-            ->map(function ($p) {
-                $arr = $p->toArray();
-                $arr['price'] = (float) $p->price;
-                return $arr;
-            });
+            ->paginate($perPage);
+
+        $products = collect($productsPaginated->items())->map(function ($p) {
+            $arr = $p->toArray();
+            $arr['price'] = (float) $p->price;
+            return $arr;
+        });
 
         $shopData = $shop->toArray();
         $shopData['rating'] = (float) $shop->rating;
@@ -42,9 +44,15 @@ class ShopApiController extends Controller
         $shopData['products_count'] = $shop->products_count;
 
         return response()->json([
-            'success' => true,
-            'data' => $shopData,
-            'products' => $products,
+            'success'    => true,
+            'data'       => $shopData,
+            'products'   => $products,
+            'pagination' => [
+                'current_page' => $productsPaginated->currentPage(),
+                'last_page'    => $productsPaginated->lastPage(),
+                'per_page'     => $productsPaginated->perPage(),
+                'total'        => $productsPaginated->total(),
+            ],
         ]);
     }
 
@@ -53,13 +61,27 @@ class ShopApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $user = $request->user();
-        if (!$user && app()->environment('local', 'testing')) {
-            $user = User::find($request->input('user_id') ?: 1);
+        $user = $request->user()?->fresh() ?? $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        // Email verification requirement for seller registration
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Silakan verifikasi email Anda terlebih dahulu sebelum mendaftar sebagai penjual.',
+            ], 403);
+        }
+
+        $protectedFields = ['status', 'verified', 'rating', 'user_id'];
+        foreach ($protectedFields as $pf) {
+            if ($request->has($pf) && !$user->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$pf}' tidak dapat ditentukan saat pendaftaran toko.",
+                ], 422);
+            }
         }
 
         $request->validate([
@@ -74,31 +96,30 @@ class ShopApiController extends Controller
             $slug = $baseSlug . '-' . $counter++;
         }
 
+        // Shop is registered in 'pending' status awaiting administrator approval
         $shop = Shop::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'name' => $name,
-                'slug' => $slug,
-                'slogan' => $request->input('slogan', 'Toko Resmi PASARIA'),
+                'name'        => $name,
+                'slug'        => $slug,
+                'slogan'      => $request->input('slogan', 'Toko Resmi PASARIA'),
                 'description' => $request->input('description', ''),
-                'city' => $request->input('city', 'Jakarta'),
-                'phone' => $request->input('phone', $user->phone),
-                'logo' => $request->input('logo'),
-                'banner' => $request->input('banner'),
-                'status' => 'approved',
-                'verified' => true,
+                'city'        => $request->input('city', 'Jakarta'),
+                'phone'       => $request->input('phone', $user->phone),
+                'logo'        => $request->input('logo'),
+                'banner'      => $request->input('banner'),
+                'status'      => 'pending',
+                'verified'    => false,
             ]
         );
 
-        // Update user role to seller
-        $user->role = 'seller';
-        $user->save();
+        // Security rule: Do NOT automatically promote role to seller until admin approves the shop.
 
         return response()->json([
             'success' => true,
-            'message' => 'Selamat! Toko Anda di PASARIA berhasil didaftarkan.',
-            'shop' => $shop,
-            'data' => $shop,
+            'message' => 'Pendaftaran toko berhasil diajukan dan sedang menunggu persetujuan administrator PASARIA.',
+            'shop'    => $shop,
+            'data'    => $shop,
         ], 201);
     }
 
@@ -108,14 +129,27 @@ class ShopApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        $shop = Shop::find($id);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $shop = Shop::find($id);
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
         }
 
-        if ($user && !$user->isAdmin() && $shop->user_id !== $user->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        if (!$user->isAdmin() && $shop->user_id !== $user->id) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $protectedFields = ['verified', 'status', 'rating', 'user_id', 'total_sales'];
+        foreach ($protectedFields as $pf) {
+            if ($request->has($pf) && !$user->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Field '{$pf}' hanya dapat diubah oleh administrator PASARIA.",
+                ], 422);
+            }
         }
 
         $shop->update($request->only([
@@ -125,7 +159,7 @@ class ShopApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profil toko berhasil diperbarui.',
-            'data' => $shop,
+            'data'    => $shop,
         ]);
     }
 
@@ -134,15 +168,18 @@ class ShopApiController extends Controller
      */
     public function follow(Request $request, int $shopId): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
-        $shop = Shop::find($shopId);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $shop = Shop::find($shopId);
         if (!$shop) {
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan.'], 404);
         }
 
         DB::table('shop_followers')->updateOrInsert(
-            ['user_id' => $userId, 'shop_id' => $shopId],
+            ['user_id' => $user->id, 'shop_id' => $shopId],
             ['created_at' => now(), 'updated_at' => now()]
         );
 
@@ -157,10 +194,13 @@ class ShopApiController extends Controller
      */
     public function unfollow(Request $request, int $shopId): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         DB::table('shop_followers')
-            ->where('user_id', $userId)
+            ->where('user_id', $user->id)
             ->where('shop_id', $shopId)
             ->delete();
 
@@ -171,19 +211,23 @@ class ShopApiController extends Controller
     }
 
     /**
-     * Get shops followed by user.
+     * Get shops followed by authenticated user.
      */
     public function following(Request $request): JsonResponse
     {
-        $userId = $request->user()?->id ?: (int) ($request->input('user_id') ?: 1);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $userId = $user->id;
         $shops = Shop::whereIn('id', function ($query) use ($userId) {
             $query->select('shop_id')->from('shop_followers')->where('user_id', $userId);
         })->withCount('products')->get();
 
         return response()->json([
             'success' => true,
-            'data' => $shops,
+            'data'    => $shops,
         ]);
     }
 }

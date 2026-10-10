@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PublicQuestionResource;
 use App\Models\Product;
 use App\Models\ProductQuestion;
 use App\Models\ProductAnswer;
@@ -12,29 +13,38 @@ use Illuminate\Http\Request;
 class QuestionApiController extends Controller
 {
     /**
-     * Get list of questions and answers for a product.
+     * Get list of questions and answers for a product with pagination.
      */
-    public function index(int $productId): JsonResponse
+    public function index(Request $request, int $productId): JsonResponse
     {
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+
         $questions = ProductQuestion::with(['user', 'answers.shop'])
             ->where('product_id', $productId)
             ->where('status', 'approved')
             ->orderBy('id', 'desc')
-            ->get();
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $questions,
+            'data' => PublicQuestionResource::collection($questions->items())->resolve(),
+            'pagination' => [
+                'current_page' => $questions->currentPage(),
+                'last_page'    => $questions->lastPage(),
+                'total'        => $questions->total(),
+            ],
         ]);
     }
 
     /**
-     * Buyer asks a question about a product.
+     * Buyer asks a question about a product with spam prevention.
      */
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        $userId = $user ? $user->id : (int) ($request->input('user_id') ?: 1);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
         $request->validate([
             'product_id' => 'required|integer',
@@ -47,10 +57,26 @@ class QuestionApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan.'], 404);
         }
 
+        $cleanedQuestion = trim($request->input('question'));
+
+        // Spam prevention: prevent identical question within last 10 minutes
+        $duplicate = ProductQuestion::where('product_id', $productId)
+            ->where('user_id', $user->id)
+            ->where('question', $cleanedQuestion)
+            ->where('created_at', '>=', now()->subMinutes(10))
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda sudah mengajukan pertanyaan yang sama baru-baru ini. Mohon tunggu tanggapan penjual.',
+            ], 429);
+        }
+
         $question = ProductQuestion::create([
             'product_id' => $productId,
-            'user_id' => $userId,
-            'question' => trim($request->input('question')),
+            'user_id' => $user->id,
+            'question' => $cleanedQuestion,
             'is_public' => true,
             'status' => 'approved',
         ]);
@@ -58,7 +84,7 @@ class QuestionApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pertanyaan Anda telah diajukan kepada penjual.',
-            'data' => $question->load('user'),
+            'data' => (new PublicQuestionResource($question->load('user')))->resolve(),
         ], 201);
     }
 
@@ -68,14 +94,17 @@ class QuestionApiController extends Controller
     public function answer(Request $request, int $questionId): JsonResponse
     {
         $user = $request->user();
-        $question = ProductQuestion::with('product')->find($questionId);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
+        $question = ProductQuestion::with('product')->find($questionId);
         if (!$question) {
             return response()->json(['success' => false, 'message' => 'Pertanyaan tidak ditemukan.'], 404);
         }
 
         // Ownership check: seller must own product's shop, or be admin
-        if ($user && !$user->isAdmin()) {
+        if (!$user->isAdmin()) {
             if (!$user->shop || $user->shop->id !== $question->product->shop_id) {
                 return response()->json([
                     'success' => false,
@@ -88,11 +117,11 @@ class QuestionApiController extends Controller
             'answer' => 'required|string|min:2|max:1000',
         ]);
 
-        $shopId = $user?->shop?->id ?: ($question->product->shop_id ?: 1);
+        $shopId = $user->shop ? $user->shop->id : $question->product->shop_id;
 
         $answer = ProductAnswer::create([
             'question_id' => $questionId,
-            'user_id' => $user?->id ?: 1,
+            'user_id' => $user->id,
             'shop_id' => $shopId,
             'answer' => trim($request->input('answer')),
             'status' => 'approved',

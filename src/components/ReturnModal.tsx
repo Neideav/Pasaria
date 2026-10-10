@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Order } from '../types';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import { formatRupiah } from '../utils/formatters';
 
 interface ReturnModalProps {
@@ -19,7 +19,17 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
 }) => {
   const [reason, setReason] = useState('Barang Rusak / Cacat Pabrik');
   const [description, setDescription] = useState('');
-  const [refundAmount, setRefundAmount] = useState(order ? String(order.total) : '0');
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(() => {
+    return order?.items && order.items.length > 0 ? order.items[0].id : null;
+  });
+  const [returnQuantity, setReturnQuantity] = useState<number>(1);
+  const [refundAmount, setRefundAmount] = useState(() => {
+    if (!order) return '0';
+    if (order.items && order.items.length > 0) {
+      return String(order.items[0].price);
+    }
+    return String(order.total);
+  });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState(false);
@@ -34,8 +44,29 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
     'Paket Tidak Pernah Sampai',
   ];
 
+  const handleItemChange = (itemId: number) => {
+    setSelectedItemId(itemId);
+    const itm = order.items?.find((i) => i.id === itemId);
+    if (itm) {
+      setReturnQuantity(1);
+      setRefundAmount(String(itm.price * 1));
+    }
+  };
+
+  const handleQuantityChange = (qty: number) => {
+    const selectedItem = order.items?.find((i) => i.id === selectedItemId);
+    const maxQty = selectedItem?.quantity || 1;
+    const clamped = Math.max(1, Math.min(qty, maxQty));
+    setReturnQuantity(clamped);
+    if (selectedItem) {
+      setRefundAmount(String(selectedItem.price * clamped));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+
     if (!description.trim()) {
       setErrorMsg('Mohon jelaskan secara rinci alasan pengajuan komplain Anda.');
       return;
@@ -45,9 +76,12 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
     setErrorMsg('');
 
     try {
+      const selectedItem = order.items?.find((i) => i.id === selectedItemId);
       await api.createReturn({
         order_id: order.id,
-        shop_id: order.shop_id || 1,
+        shop_id: order.shop_id || selectedItem?.shop_id || 1,
+        order_item_id: selectedItemId || undefined,
+        quantity: selectedItemId ? returnQuantity : undefined,
         reason,
         description: description.trim(),
         requested_amount: parseFloat(refundAmount) || order.total,
@@ -60,11 +94,17 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
         if (onReturnSubmitted) onReturnSubmitted();
       }, 1500);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Gagal mengajukan pengembalian.');
+      const msg =
+        (err instanceof ApiError && err.getFirstValidationError()) ||
+        err.message ||
+        'Gagal mengajukan pengembalian. Silakan periksa data pengajuan.';
+      setErrorMsg(msg);
     } finally {
       setSubmitting(false);
     }
   };
+
+  const currentSelectedItem = order.items?.find((i) => i.id === selectedItemId);
 
   return (
     <div
@@ -113,6 +153,45 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
               <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {order.items && order.items.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Pilih Produk yang Diretur:
+                </label>
+                <select
+                  value={selectedItemId || ''}
+                  onChange={(e) => handleItemChange(Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] text-xs bg-white"
+                >
+                  {order.items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.product_name} ({item.quantity} unit dibeli) — {formatRupiah(item.price)}/unit
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {currentSelectedItem && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Jumlah Kuantitas yang Diretur:
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={currentSelectedItem.quantity}
+                  value={returnQuantity}
+                  onChange={(e) => handleQuantityChange(parseInt(e.target.value, 10) || 1)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29] text-xs font-bold"
+                  required
+                />
+                <span className="text-[11px] text-slate-400 mt-0.5 block">
+                  Maksimal {currentSelectedItem.quantity} unit sesuai kuantitas pembelian.
+                </span>
               </div>
             )}
 

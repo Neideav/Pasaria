@@ -63,4 +63,5 @@ seller_payouts (id PK, shop_id FK -> shops.id, amount decimal, bank_account, sta
 notifications (id PK, user_id FK -> users.id, title, message text, type string, is_read bool)
 reports (id PK, reporter_id FK -> users.id, target_type string, target_id bigint, reason text, status enum[pending|reviewed|dismissed])
 admin_actions (id PK, admin_id FK -> users.id, action string, target_type string, target_id bigint, details text nullable)
+sessions (id PK string, user_id FK -> users.id nullable index, ip_address string nullable, user_agent text nullable, payload longtext, last_activity int index)
 demo_records (id PK, title, payload text, flag_revealed bool)
