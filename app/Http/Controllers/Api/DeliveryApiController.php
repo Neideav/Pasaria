@@ -38,12 +38,19 @@ class DeliveryApiController extends Controller
                 $query->where('user_id', $user->id);
             }
 
-            $shipments = $query->get();
-            $data = ShipmentDetailResource::collection($shipments)->resolve();
+            $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+            $shipments = $query->paginate($perPage);
+            $data = ShipmentDetailResource::collection($shipments->items())->resolve();
 
             return response()->json([
-                'success' => true,
-                'data'    => $data,
+                'success'    => true,
+                'data'       => $data,
+                'pagination' => [
+                    'current_page' => $shipments->currentPage(),
+                    'last_page'    => $shipments->lastPage(),
+                    'per_page'     => $shipments->perPage(),
+                    'total'        => $shipments->total(),
+                ],
             ]);
         } catch (\Throwable $e) {
             return response()->json([

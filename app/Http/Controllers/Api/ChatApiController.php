@@ -24,7 +24,7 @@ class ChatApiController extends Controller
 
         $userId = $user->id;
 
-        $query = Conversation::with(['shop', 'customer'])
+        $query = Conversation::with(['shop', 'customer', 'latestMessage'])
             ->withCount(['messages as unread_count' => function ($q) use ($userId) {
                 $q->where('is_read', false)->where('sender_id', '!=', $userId);
             }])
@@ -36,8 +36,11 @@ class ChatApiController extends Controller
             $query->where('customer_id', $userId);
         }
 
-        $conversations = $query->get()->map(function ($c) {
-            $lastMsg = $c->messages()->latest()->first();
+        $perPage = min(50, max(5, (int) $request->input('per_page', 30)));
+        $paginated = $query->paginate($perPage);
+
+        $conversations = collect($paginated->items())->map(function ($c) {
+            $lastMsg = $c->latestMessage;
             $arr = $c->toArray();
             $arr['last_message'] = $lastMsg ? $lastMsg->message : 'Belum ada pesan';
             if ($c->customer) {
@@ -47,8 +50,14 @@ class ChatApiController extends Controller
         });
 
         return response()->json([
-            'success' => true,
-            'data'    => $conversations,
+            'success'    => true,
+            'data'       => $conversations,
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+            ],
         ]);
     }
 
@@ -81,9 +90,10 @@ class ChatApiController extends Controller
             ->where('sender_id', '!=', $user->id)
             ->update(['is_read' => true]);
 
+        $perPage = min(100, max(10, (int) $request->input('per_page', 50)));
         $messages = Message::where('conversation_id', $conversationId)
             ->orderBy('created_at', 'asc')
-            ->get();
+            ->paginate($perPage);
 
         $convArr = $conversation->toArray();
         if ($conversation->customer) {
@@ -93,7 +103,13 @@ class ChatApiController extends Controller
         return response()->json([
             'success'      => true,
             'conversation' => $convArr,
-            'data'         => $messages,
+            'data'         => $messages->items(),
+            'pagination'   => [
+                'current_page' => $messages->currentPage(),
+                'last_page'    => $messages->lastPage(),
+                'per_page'     => $messages->perPage(),
+                'total'        => $messages->total(),
+            ],
         ]);
     }
 

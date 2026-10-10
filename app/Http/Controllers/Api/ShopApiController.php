@@ -16,7 +16,7 @@ class ShopApiController extends Controller
     /**
      * Get shop profile with products and statistics.
      */
-    public function show(string $slugOrId): JsonResponse
+    public function show(Request $request, string $slugOrId): JsonResponse
     {
         $shop = Shop::withCount(['followers', 'products'])
             ->where('slug', $slugOrId)
@@ -27,14 +27,16 @@ class ShopApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Toko tidak ditemukan di PASARIA.'], 404);
         }
 
-        $products = Product::where('shop_id', $shop->id)
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $productsPaginated = Product::where('shop_id', $shop->id)
             ->orderBy('id', 'desc')
-            ->get()
-            ->map(function ($p) {
-                $arr = $p->toArray();
-                $arr['price'] = (float) $p->price;
-                return $arr;
-            });
+            ->paginate($perPage);
+
+        $products = collect($productsPaginated->items())->map(function ($p) {
+            $arr = $p->toArray();
+            $arr['price'] = (float) $p->price;
+            return $arr;
+        });
 
         $shopData = $shop->toArray();
         $shopData['rating'] = (float) $shop->rating;
@@ -42,9 +44,15 @@ class ShopApiController extends Controller
         $shopData['products_count'] = $shop->products_count;
 
         return response()->json([
-            'success'  => true,
-            'data'     => $shopData,
-            'products' => $products,
+            'success'    => true,
+            'data'       => $shopData,
+            'products'   => $products,
+            'pagination' => [
+                'current_page' => $productsPaginated->currentPage(),
+                'last_page'    => $productsPaginated->lastPage(),
+                'per_page'     => $productsPaginated->perPage(),
+                'total'        => $productsPaginated->total(),
+            ],
         ]);
     }
 

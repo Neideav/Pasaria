@@ -159,7 +159,17 @@ class ProductApiController extends Controller
     public function show(string $slug): JsonResponse
     {
         try {
-            $product = Product::with(['variants', 'images', 'shop', 'reviews.user', 'reviews.media', 'questions.user', 'questions.answers.shop'])
+            $product = Product::with([
+                'variants',
+                'images',
+                'shop',
+                'reviews' => function ($q) {
+                    $q->where('status', 'approved')->with(['user', 'media'])->latest()->take(20);
+                },
+                'questions' => function ($q) {
+                    $q->where('status', 'approved')->with(['user', 'answers.shop'])->latest()->take(20);
+                },
+            ])
                 ->where('slug', $slug)
                 ->orWhere('id', is_numeric($slug) ? (int)$slug : 0)
                 ->first();

@@ -46,9 +46,18 @@ class ReturnApiController extends Controller
             $query->where('user_id', $user->id);
         }
 
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $paginated = $query->paginate($perPage);
+
         return response()->json([
-            'success' => true,
-            'data'    => $query->get(),
+            'success'    => true,
+            'data'       => $paginated->items(),
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+            ],
         ]);
     }
 

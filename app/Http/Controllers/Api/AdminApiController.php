@@ -244,11 +244,15 @@ class AdminApiController extends Controller
         $review->status = $status;
         $review->save();
 
-        // Recalculate product rating
+        // Recalculate product rating using database aggregation
         if ($review->product) {
-            $approvedReviews = Review::where('product_id', $review->product_id)->where('status', 'approved')->get();
-            $reviewCount = count($approvedReviews);
-            $avg = $reviewCount > 0 ? round($approvedReviews->avg('rating'), 1) : 5.0;
+            $agg = Review::where('product_id', $review->product_id)
+                ->where('status', 'approved')
+                ->selectRaw('COUNT(*) as total_count, AVG(rating) as avg_rating')
+                ->first();
+
+            $reviewCount = (int) ($agg->total_count ?? 0);
+            $avg = $reviewCount > 0 ? round((float) $agg->avg_rating, 1) : 5.0;
             $review->product->rating = $avg;
             $review->product->review_count = $reviewCount;
             $review->product->save();

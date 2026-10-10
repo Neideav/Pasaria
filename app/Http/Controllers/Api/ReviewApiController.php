@@ -28,17 +28,23 @@ class ReviewApiController extends Controller
             ->orderBy('id', 'desc')
             ->paginate($perPage);
 
-        // Calculate breakdown from approved reviews
-        $allReviews = Review::where('product_id', $productId)->where('status', 'approved')->get();
+        // Calculate rating breakdown and summary using database aggregation
+        $stats = Review::where('product_id', $productId)
+            ->where('status', 'approved')
+            ->selectRaw('rating, COUNT(*) as count')
+            ->groupBy('rating')
+            ->pluck('count', 'rating');
+
         $breakdown = [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0];
+        $totalReviews = 0;
         $totalRating = 0;
-        foreach ($allReviews as $rev) {
-            $star = max(1, min(5, (int) $rev->rating));
-            $breakdown[$star]++;
-            $totalRating += $star;
+        foreach ($stats as $starRating => $count) {
+            $star = max(1, min(5, (int) $starRating));
+            $breakdown[$star] = ($breakdown[$star] ?? 0) + (int) $count;
+            $totalReviews += (int) $count;
+            $totalRating += $star * (int) $count;
         }
 
-        $totalReviews = count($allReviews);
         $averageRating = $totalReviews > 0 ? round($totalRating / $totalReviews, 1) : 5.0;
 
         return response()->json([
@@ -149,10 +155,14 @@ class ReviewApiController extends Controller
                 }
             }
 
-            // Recalculate product rating & review_count
-            $allProductReviews = Review::where('product_id', $productId)->where('status', 'approved')->get();
-            $newCount = count($allProductReviews);
-            $newAvg = $newCount > 0 ? round($allProductReviews->avg('rating'), 1) : 5.0;
+            // Recalculate product rating & review_count using database aggregation
+            $agg = Review::where('product_id', $productId)
+                ->where('status', 'approved')
+                ->selectRaw('COUNT(*) as total_count, AVG(rating) as avg_rating')
+                ->first();
+
+            $newCount = (int) ($agg->total_count ?? 0);
+            $newAvg = $newCount > 0 ? round((float) $agg->avg_rating, 1) : 5.0;
 
             $product->rating = $newAvg;
             $product->review_count = $newCount;

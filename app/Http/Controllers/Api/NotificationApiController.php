@@ -19,17 +19,23 @@ class NotificationApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        $notifications = Notification::where('user_id', $user->id)
+        $perPage = min(50, max(5, (int) $request->input('per_page', 30)));
+        $paginated = Notification::where('user_id', $user->id)
             ->orderBy('id', 'desc')
-            ->take(30)
-            ->get();
+            ->paginate($perPage);
 
         $unreadCount = Notification::where('user_id', $user->id)->where('is_read', false)->count();
 
         return response()->json([
             'success'      => true,
-            'data'         => $notifications,
+            'data'         => $paginated->items(),
             'unread_count' => $unreadCount,
+            'pagination'   => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+            ],
         ]);
     }
 
