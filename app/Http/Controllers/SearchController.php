@@ -18,7 +18,7 @@ class SearchController extends Controller
     {
         $keyword = $request->input('q', '');
 
-        // Execute search through query service (switches dynamically based on DEMO_SQLI_MODE)
+        // Execute search through query service using parameterized queries
         $products = $this->queryService->searchProducts($keyword, [
             'category' => $request->input('category'),
             'sort'     => $request->input('sort', 'popular'),

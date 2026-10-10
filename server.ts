@@ -20,7 +20,6 @@ import path from 'path';
 import initSqlJs, { Database } from 'sql.js';
 
 let db: Database;
-let demoSqliMode = process.env.DEMO_SQLI_MODE === 'true'; // Strictly default to false unless explicitly set to true
 
 // Initial Seed Data
 const initialCategories = [
@@ -469,19 +468,6 @@ const initialUsers = [
   }
 ];
 
-const initialDemoRecords = [
-  { record_name: 'Server Room A', record_value: 'Jakarta Branch Office' },
-  { record_name: 'Warehouse 02', record_value: 'Bekasi Distribution Hub' },
-  { record_name: 'Inventory System', record_value: 'ERP v3.1 - Operational' },
-  { record_name: 'Demo Record 01', record_value: 'Asset ID: BR-001' },
-  { record_name: 'Demo Record 02', record_value: 'Asset ID: BR-002' },
-  { record_name: 'Demo Record 03', record_value: 'Asset ID: BR-003' },
-  { record_name: 'Office Network', record_value: 'VLAN 10 - Internal' },
-  { record_name: 'Branch: Surabaya', record_value: 'Floor 3, Tower B' },
-  { record_name: 'Branch: Bandung', record_value: 'Floor 7, Menara Hijau' },
-  { record_name: 'Maintenance Window', record_value: 'Sunday 00:00 - 04:00 WIB' },
-];
-
 
 // Initialize database
 async function initDatabase() {
@@ -616,14 +602,6 @@ async function initDatabase() {
       checkpoints_json TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
-
-    CREATE TABLE IF NOT EXISTS demo_records (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      record_name TEXT NOT NULL,
-      record_value TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
   `);
 
   // Seed categories
@@ -653,14 +631,6 @@ async function initDatabase() {
       `INSERT INTO users (name, username, email, password, address, city, zip, phone, role)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [u.name, u.username, u.email, u.password, u.address, u.city, u.zip, u.phone, u.role]
-    );
-  }
-
-  // Seed demo records for UNION data extraction
-  for (const dr of initialDemoRecords) {
-    db.run(
-      `INSERT INTO demo_records (record_name, record_value) VALUES (?, ?)`,
-      [dr.record_name, dr.record_value]
     );
   }
 
@@ -726,13 +696,6 @@ async function startServer() {
 
   // ---------------------------------------------------------------------------
   // API: Get Products (List & Search)
-  //
-  // NOTE FOR EVALUATION / DEMONSTRATION:
-  // When DEMO_SQLI_MODE=true:
-  // Uses raw string concatenation for the search query to demonstrate SQLi.
-  //
-  // When DEMO_SQLI_MODE=false:
-  // Uses safe parameterized query binding.
   // ---------------------------------------------------------------------------
   app.get('/api/products', (req: Request, res: Response) => {
     try {
@@ -752,52 +715,18 @@ async function startServer() {
       let products: any[] = [];
 
       if (q) {
-        if (demoSqliMode) {
-          // ===================================================================
-          // // INTENTIONALLY VULNERABLE FOR LOCAL EDUCATIONAL DEMONSTRATION
-          // ===================================================================
-          // Query directly concatenates user input $q into the SQL statement
-          const rawSql = `SELECT * FROM products WHERE (name LIKE '%${q}%' OR description LIKE '%${q}%' OR short_desc LIKE '%${q}%' OR category LIKE '%${q}%') AND price >= ${minPrice} AND price <= ${maxPrice} AND rating >= ${minRating} ORDER BY ${orderByClause}`;
-          
-          try {
-            const results = db.exec(rawSql);
-            if (results.length > 0 && results[0].values) {
-              const columns = results[0].columns;
-              products = results[0].values.map(row => {
-                const item: any = {};
-                columns.forEach((col, idx) => {
-                  item[col] = row[idx];
-                });
-                return item;
-              });
-            }
-          } catch (sqlErr: any) {
-            // In SQL injection demonstration, syntax errors from injection are returned naturally
-            return res.status(200).json({
-              success: true,
-              data: [],
-              count: 0,
-              sqli_mode: true,
-              sql_error: sqlErr.message
-            });
-          }
-        } else {
-          // ===================================================================
-          // // SECURE IMPLEMENTATION USING PARAMETERIZED QUERY
-          // ===================================================================
-          const secureSql = `SELECT * FROM products WHERE (name LIKE :term OR description LIKE :term OR short_desc LIKE :term OR category LIKE :term) AND price >= :minPrice AND price <= :maxPrice AND rating >= :minRating ORDER BY ${orderByClause}`;
-          const stmt = db.prepare(secureSql);
-          stmt.bind({
-            ':term': `%${q}%`,
-            ':minPrice': minPrice,
-            ':maxPrice': maxPrice,
-            ':minRating': minRating
-          });
-          while (stmt.step()) {
-            products.push(stmt.getAsObject());
-          }
-          stmt.free();
+        const secureSql = `SELECT * FROM products WHERE (name LIKE :term OR description LIKE :term OR short_desc LIKE :term OR category LIKE :term) AND price >= :minPrice AND price <= :maxPrice AND rating >= :minRating ORDER BY ${orderByClause}`;
+        const stmt = db.prepare(secureSql);
+        stmt.bind({
+          ':term': `%${q}%`,
+          ':minPrice': minPrice,
+          ':maxPrice': maxPrice,
+          ':minRating': minRating
+        });
+        while (stmt.step()) {
+          products.push(stmt.getAsObject());
         }
+        stmt.free();
       } else {
         // Standard listing
         let sql = 'SELECT * FROM products WHERE 1=1';
@@ -833,7 +762,6 @@ async function startServer() {
         stmt.free();
       }
 
-      // Parse JSON fields safely (handle injected UNION results that might contain non-JSON text)
       const parseJsonSafe = (val: any) => {
         if (typeof val !== 'string') return val;
         try {
@@ -853,7 +781,6 @@ async function startServer() {
         success: true,
         count: formattedProducts.length,
         data: formattedProducts,
-        sqli_mode: demoSqliMode
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -907,14 +834,6 @@ async function startServer() {
 
   // ---------------------------------------------------------------------------
   // API: Authentication - Login
-  //
-  // NOTE FOR EVALUATION / DEMONSTRATION:
-  // When DEMO_SQLI_MODE=true:
-  // Directly builds raw SQL with user input string concatenation.
-  // E.g. username: admin@shopcart.com' --
-  //
-  // When DEMO_SQLI_MODE=false:
-  // Parameterized query looking up user, then validating password.
   // ---------------------------------------------------------------------------
   app.post('/api/auth/login', (req: Request, res: Response) => {
     try {
@@ -926,47 +845,17 @@ async function startServer() {
 
       let user: any = null;
 
-      if (demoSqliMode) {
-        // =====================================================================
-        // // INTENTIONALLY VULNERABLE FOR LOCAL EDUCATIONAL DEMONSTRATION
-        // =====================================================================
-        // Directly concatenating $username and $password into raw SQL
-        const rawSql = `SELECT * FROM users WHERE (email = '${username}' OR username = '${username}') AND password = '${password}' LIMIT 1`;
+      const stmt = db.prepare('SELECT * FROM users WHERE (email = :identifier OR username = :identifier) LIMIT 1');
+      stmt.bind({ ':identifier': username });
 
-        try {
-          const results = db.exec(rawSql);
-          if (results.length > 0 && results[0].values.length > 0) {
-            const columns = results[0].columns;
-            const row = results[0].values[0];
-            user = {};
-            columns.forEach((col, idx) => {
-              user[col] = row[idx];
-            });
-          }
-        } catch (sqlErr: any) {
-          return res.status(200).json({
-            success: false,
-            message: 'Invalid credentials or database query syntax error',
-            sqli_mode: true,
-            sql_error: sqlErr.message
-          });
-        }
-      } else {
-        // =====================================================================
-        // // SECURE IMPLEMENTATION USING PARAMETERIZED QUERY
-        // =====================================================================
-        const stmt = db.prepare('SELECT * FROM users WHERE (email = :identifier OR username = :identifier) LIMIT 1');
-        stmt.bind({ ':identifier': username });
+      let candidateUser: any = null;
+      if (stmt.step()) {
+        candidateUser = stmt.getAsObject();
+      }
+      stmt.free();
 
-        let candidateUser: any = null;
-        if (stmt.step()) {
-          candidateUser = stmt.getAsObject();
-        }
-        stmt.free();
-
-        if (candidateUser && candidateUser.password === password) {
-          user = candidateUser;
-        }
+      if (candidateUser && candidateUser.password === password) {
+        user = candidateUser;
       }
 
       if (!user) {
@@ -983,7 +872,6 @@ async function startServer() {
         success: true,
         message: 'Sign in successful',
         user: safeUser,
-        sqli_mode: demoSqliMode
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -1422,53 +1310,11 @@ async function startServer() {
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // Backend Environment Toggle: DEMO_SQLI_MODE
-  // Allows testing both modes during local demonstration without modifying frontend
-  // ---------------------------------------------------------------------------
-  app.get('/api/config/demo-mode', (req: Request, res: Response) => {
-    res.json({
-      demo_sqli_mode: demoSqliMode,
-      description: demoSqliMode
-        ? 'MODE A: Intentionally vulnerable raw queries for local education demonstration'
-        : 'MODE B: Secure parameterized implementation'
-    });
-  });
-
-  app.post('/api/config/demo-mode', (req: Request, res: Response) => {
-    const { enabled } = req.body;
-    demoSqliMode = Boolean(enabled);
-    res.json({
-      success: true,
-      demo_sqli_mode: demoSqliMode,
-      description: demoSqliMode
-        ? 'Switched to MODE A: Intentionally vulnerable raw SQL queries'
-        : 'Switched to MODE B: Secure parameterized queries'
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Mount Vite Middleware for Dev or Static files in Prod
-  // ---------------------------------------------------------------------------
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    app.use(express.static('dist'));
-    app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
-    });
-  }
-
   const PORT = Number(process.env.PORT) || 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n========================================`);
     console.log(`🛒 Shopcart E-Commerce Store is running`);
     console.log(`   URL: http://localhost:${PORT}`);
-    console.log(`   Backend SQLi Demo Mode: ${demoSqliMode ? 'MODE A (Vulnerable Demo)' : 'MODE B (Secure)'}`);
     console.log(`========================================\n`);
   });
 }

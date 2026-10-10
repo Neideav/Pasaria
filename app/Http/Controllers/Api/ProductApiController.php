@@ -35,84 +35,51 @@ class ProductApiController extends Controller
             $shopId = $request->input('shop_id');
             $perPage = min(100, max(6, (int) $request->input('per_page', 24)));
 
-            $isLocal = app()->environment('local', 'testing');
-            $demoSqliMode = $isLocal && (bool) Cache::get('demo_sqli_mode', config('pasaria.demo_sqli_mode', env('DEMO_SQLI_MODE', false)));
+            $formattedProducts = [];
 
-            $orderByClause = match ($sort) {
-                'price-asc'  => 'price ASC',
-                'price-desc' => 'price DESC',
-                'rating'     => 'rating DESC',
-                'newest'     => 'id DESC',
-                default      => 'id ASC',
+            // Parameterized Eloquent Query
+            $query = Product::with(['variants', 'shop']);
+
+            if (!empty($q)) {
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('name', 'LIKE', "%{$q}%")
+                        ->orWhere('description', 'LIKE', "%{$q}%")
+                        ->orWhere('short_desc', 'LIKE', "%{$q}%")
+                        ->orWhere('category', 'LIKE', "%{$q}%");
+                });
+            }
+
+            if (!empty($category) && strtolower($category) !== 'all') {
+                $query->whereRaw('LOWER(category) = ?', [strtolower($category)]);
+            }
+
+            if ($minPrice > 0) {
+                $query->where('price', '>=', $minPrice);
+            }
+
+            if ($maxPrice < 999999999) {
+                $query->where('price', '<=', $maxPrice);
+            }
+
+            if ($minRating > 0) {
+                $query->where('rating', '>=', $minRating);
+            }
+
+            if (!empty($shopId)) {
+                $query->where('shop_id', (int) $shopId);
+            }
+
+            match ($sort) {
+                'price-asc'  => $query->orderBy('price', 'asc'),
+                'price-desc' => $query->orderBy('price', 'desc'),
+                'rating'     => $query->orderBy('rating', 'desc'),
+                'newest'     => $query->orderBy('id', 'desc'),
+                default      => $query->orderBy('id', 'asc'),
             };
 
-            $formattedProducts = [];
-            $totalCount = 0;
-
-            if (!empty($q) && $demoSqliMode) {
-                // Isolated Educational Demo Mode (Local dev only)
-                $rawSql = "SELECT * FROM products WHERE (name LIKE '%{$q}%' OR description LIKE '%{$q}%' OR short_desc LIKE '%{$q}%' OR category LIKE '%{$q}%') AND price >= {$minPrice} AND price <= {$maxPrice} AND rating >= {$minRating} ORDER BY {$orderByClause}";
-
-                try {
-                    $results = DB::select($rawSql);
-                    $products = array_map(function ($item) {
-                        return (array) $item;
-                    }, $results);
-                    $totalCount = count($products);
-                } catch (\Throwable $sqlErr) {
-                    return response()->json([
-                        'success'   => true,
-                        'data'      => [],
-                        'count'     => 0,
-                        'sqli_mode' => true,
-                        'sql_error' => $sqlErr->getMessage(),
-                    ]);
-                }
-            } else {
-                // SECURE PRODUCTION IMPLEMENTATION: Parameterized Eloquent Query
-                $query = Product::with(['variants', 'shop']);
-
-                if (!empty($q)) {
-                    $query->where(function ($sub) use ($q) {
-                        $sub->where('name', 'LIKE', "%{$q}%")
-                            ->orWhere('description', 'LIKE', "%{$q}%")
-                            ->orWhere('short_desc', 'LIKE', "%{$q}%")
-                            ->orWhere('category', 'LIKE', "%{$q}%");
-                    });
-                }
-
-                if (!empty($category) && strtolower($category) !== 'all') {
-                    $query->whereRaw('LOWER(category) = ?', [strtolower($category)]);
-                }
-
-                if ($minPrice > 0) {
-                    $query->where('price', '>=', $minPrice);
-                }
-
-                if ($maxPrice < 999999999) {
-                    $query->where('price', '<=', $maxPrice);
-                }
-
-                if ($minRating > 0) {
-                    $query->where('rating', '>=', $minRating);
-                }
-
-                if (!empty($shopId)) {
-                    $query->where('shop_id', (int) $shopId);
-                }
-
-                match ($sort) {
-                    'price-asc'  => $query->orderBy('price', 'asc'),
-                    'price-desc' => $query->orderBy('price', 'desc'),
-                    'rating'     => $query->orderBy('rating', 'desc'),
-                    'newest'     => $query->orderBy('id', 'desc'),
-                    default      => $query->orderBy('id', 'asc'),
-                };
-
-                $paginated = $query->paginate($perPage);
-                $products = $paginated->items();
-                $totalCount = $paginated->total();
-            }
+            $paginated = $query->paginate($perPage);
+            $products = $paginated->items();
+            $totalCount = $paginated->total();
 
             // Normalization
             foreach ($products as $p) {
@@ -143,7 +110,6 @@ class ProductApiController extends Controller
                 'success'   => true,
                 'count'     => $totalCount,
                 'data'      => $formattedProducts,
-                'sqli_mode' => (bool) $demoSqliMode,
             ]);
         } catch (\Throwable $e) {
             return response()->json([

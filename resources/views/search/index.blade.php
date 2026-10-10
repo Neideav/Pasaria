@@ -28,15 +28,6 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             @foreach($products as $product)
                 @php
-                    /*
-                        Safely resolve fields that may come from either the products table
-                        or from a UNION-injected subquery result (e.g. demo_records, users).
-                        In normal operation, all fields resolve from products.
-                        When a UNION payload is active, non-product rows are mapped into
-                        the same product columns (name, category, price, short_desc, etc.)
-                        and rendered naturally by the existing product card template.
-                        No special UI is needed — the card template handles both cases.
-                    */
                     $productName     = $product->name     ?? '—';
                     $productCategory = $product->category ?? '—';
                     $productPrice    = is_numeric($product->price ?? null) ? $product->price : 0;

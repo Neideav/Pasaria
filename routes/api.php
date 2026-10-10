@@ -18,7 +18,6 @@ use App\Http\Controllers\Api\SellerApiController;
 use App\Http\Controllers\Api\AdminApiController;
 use App\Http\Controllers\Api\ReturnApiController;
 use App\Http\Controllers\Api\NotificationApiController;
-use App\Http\Controllers\Api\ConfigApiController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\UploadApiController;
 
@@ -50,11 +49,6 @@ Route::get('/shops/{slugOrId}', [ShopApiController::class, 'show']);
 Route::get('/vouchers', [VoucherApiController::class, 'index']);
 Route::post('/vouchers/validate', [VoucherApiController::class, 'validateCode']);
 Route::get('/deliveries/{code}', [DeliveryApiController::class, 'show']); // Public tracking lookup by tracking number
-
-// Local/Demo Configuration
-Route::get('/config', [ConfigApiController::class, 'getDemoMode']);
-Route::get('/config/demo-mode', [ConfigApiController::class, 'getDemoMode']);
-Route::post('/config/demo-mode', [ConfigApiController::class, 'toggleDemoMode']);
 
 // Guest Order Preview Calculation (does not create orders or deduct stock)
 Route::post('/orders/calculate', [OrderApiController::class, 'calculate']);
@@ -198,3 +192,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'role:admin'])->group(funct
     // Customer Refunds Review
     Route::get('/admin/refunds', [AdminApiController::class, 'refunds']);
 });
+
+Route::any('{any}', function () {
+    return response()->json(['message' => 'API endpoint not found.'], 404);
+})->where('any', '.*');

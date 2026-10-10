@@ -24,26 +24,16 @@ class FoundationAndEnvironmentHardeningTest extends TestCase
     }
 
     /**
-     * Test that production environment strictly disables demonstration SQLi mode.
+     * Test that CTF / demo SQLi endpoints and configurations are completely eliminated.
      */
-    public function test_demo_mode_is_strictly_disabled_in_production(): void
+    public function test_demo_mode_endpoints_and_configs_are_removed(): void
     {
-        $this->app->detectEnvironment(fn () => 'production');
-        Config::set('app.env', 'production');
-        Config::set('shopcart.demo_sqli_mode', false);
-        Config::set('pasaria.demo_sqli_mode', false);
+        $this->assertNull(config('shopcart.demo_sqli_mode'));
+        $this->assertNull(config('pasaria.demo_sqli_mode'));
 
-        // Verification of config values
-        $this->assertFalse(config('shopcart.demo_sqli_mode'));
-        $this->assertFalse(config('pasaria.demo_sqli_mode'));
-
-        // Toggle demo mode endpoint must strictly reject in non-local environments
+        // Demo configuration route must be completely non-existent (404)
         $response = $this->postJson('/api/config/demo-mode', ['enabled' => true]);
-        $response->assertStatus(403);
-        $this->assertFalse($response->json('success'));
-        $this->assertFalse($response->json('demo_sqli_mode'));
-
-        \Illuminate\Support\Facades\Cache::forget('demo_sqli_mode');
+        $response->assertStatus(404);
     }
 
     /**

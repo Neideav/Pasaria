@@ -49,7 +49,6 @@ if [ -f "$APP_DIR/.env" ]; then
     echo "   DB_CONN     : $(grep '^DB_CONNECTION=' "$APP_DIR/.env" | cut -d= -f2 || true)"
     echo "   DB_HOST     : $(grep '^DB_HOST=' "$APP_DIR/.env" | cut -d= -f2 || true)"
     echo "   DB_DATABASE : $(grep '^DB_DATABASE=' "$APP_DIR/.env" | cut -d= -f2 || true)"
-    echo "   SQLI_MODE   : $(grep '^DEMO_SQLI_MODE=' "$APP_DIR/.env" | cut -d= -f2 || true)"
 else
     echo "❌ .env NOT FOUND — laravel tidak bisa jalan!"
 fi

@@ -29,10 +29,10 @@ Route::get('/', function () {
 Route::get('/products/{slug}', [ProductController::class, 'show'])->name('products.show');
 Route::get('/category/{slug}', [HomeController::class, 'category'])->name('category.show');
 
-// Search Route (supports DEMO_SQLI_MODE internally on backend)
+// Search Route
 Route::get('/search', [SearchController::class, 'index'])->name('search');
 
-// Authentication Routes (supports DEMO_SQLI_MODE internally on backend)
+// Authentication Routes
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');

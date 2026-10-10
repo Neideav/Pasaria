@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Enforce trusted proxies for container / load balancer setups
         $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
 
+        // Exempt stateless API endpoints from CSRF verification (Sanctum uses Bearer tokens)
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+        ]);
+
         // Enable stateful Sanctum frontend SPA integration
         $middleware->statefulApi();
 
@@ -72,15 +77,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 throw new \RuntimeException('CRITICAL SECURITY: APP_KEY is missing or ungenerated in production environment.');
             }
 
-            // Force strict disabling of debug and demonstration flags in production
+            // Force strict disabling of debug in production
             if (config('app.debug')) {
                 config(['app.debug' => false]);
             }
-
-            config([
-                'shopcart.demo_sqli_mode' => false,
-                'pasaria.demo_sqli_mode' => false,
-            ]);
         }
     })
     ->create();

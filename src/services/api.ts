@@ -143,7 +143,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const message =
       json?.message ||
       json?.error ||
-      json?.sql_error ||
       (text ? text.slice(0, 160) : `Permintaan gagal dengan status ${res.status}.`);
 
     throw new ApiError(message, res.status, json?.errors, json?.code);
@@ -152,7 +151,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // Business error envelope verification (e.g. { success: false })
   if (json && typeof json === 'object' && json.success === false) {
     throw new ApiError(
-      json.message || json.sql_error || 'Operasi gagal diproses oleh server.',
+      json.message || 'Operasi gagal diproses oleh server.',
       res.status,
       json.errors
     );
@@ -199,7 +198,7 @@ export const api = {
     maxPrice?: number;
     minRating?: number;
     shop_id?: number;
-  }): Promise<{ products: Product[]; sqli_mode?: boolean; sql_error?: string }> {
+  }): Promise<{ products: Product[] }> {
     const query = new URLSearchParams();
     if (params?.q) query.set('q', params.q);
     if (params?.category) query.set('category', params.category);
@@ -210,14 +209,12 @@ export const api = {
     if (params?.shop_id !== undefined) query.set('shop_id', String(params.shop_id));
 
     const qs = query.toString();
-    const json = await request<{ data: Product[]; sqli_mode?: boolean; sql_error?: string }>(
+    const json = await request<{ data: Product[] }>(
       qs ? `/api/products?${qs}` : '/api/products'
     );
 
     return {
       products: json.data || [],
-      sqli_mode: json.sqli_mode,
-      sql_error: json.sql_error,
     };
   },
 
@@ -279,8 +276,8 @@ export const api = {
   },
 
   // ── 3. Authentication ─────────────────────────────────────────────────────
-  async login(username: string, password: string): Promise<{ user: User; token: string; sqli_mode?: boolean }> {
-    const json = await request<{ success: boolean; user: User; token: string; sqli_mode?: boolean }>(
+  async login(username: string, password: string): Promise<{ user: User; token: string }> {
+    const json = await request<{ success: boolean; user: User; token: string }>(
       '/api/auth/login',
       {
         method: 'POST',
@@ -291,7 +288,7 @@ export const api = {
     if (json.token) {
       this.setToken(json.token);
     }
-    return { user: json.user, token: json.token, sqli_mode: json.sqli_mode };
+    return { user: json.user, token: json.token };
   },
 
   async register(data: { name: string; username: string; email: string; password: string }): Promise<{ user: User; token: string }> {
@@ -947,21 +944,5 @@ export const api = {
   async getAdminReports(): Promise<any[]> {
     const json = await request<{ success: boolean; data: any[] }>('/api/admin/reports');
     return json.data || [];
-  },
-
-  // ── 18. Local Educational Demo Mode ───────────────────────────────────────
-  async getDemoMode(): Promise<{ demo_sqli_mode: boolean; description: string }> {
-    return request<{ demo_sqli_mode: boolean; description: string }>('/api/config/demo-mode');
-  },
-
-  async toggleDemoMode(enabled: boolean): Promise<boolean> {
-    const json = await request<{ success: boolean; demo_sqli_mode: boolean }>(
-      '/api/config/demo-mode',
-      {
-        method: 'POST',
-        body: JSON.stringify({ enabled }),
-      }
-    );
-    return json.demo_sqli_mode;
   },
 };

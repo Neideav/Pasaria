@@ -36,37 +36,15 @@ class AuthApiController extends Controller
             ], 422);
         }
 
-        // Isolated Educational Demo Mode (Only active in local dev when explicitly enabled)
-        $isLocal = app()->environment('local', 'testing');
-        $demoSqliMode = $isLocal && (bool) Cache::get('demo_sqli_mode', config('pasaria.demo_sqli_mode', env('DEMO_SQLI_MODE', false)));
-
         $user = null;
 
-        if ($demoSqliMode) {
-            $rawSql = "SELECT * FROM users WHERE (email = '{$usernameOrEmail}' OR username = '{$usernameOrEmail}') AND password = '{$password}' LIMIT 1";
-            try {
-                $results = DB::select($rawSql);
-                if (!empty($results)) {
-                    $found = (array) $results[0];
-                    $user = User::find($found['id']);
-                }
-            } catch (\Throwable $sqlErr) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Kesalahan sintaks query database demo.',
-                    'sqli_mode' => true,
-                    'sql_error' => $sqlErr->getMessage(),
-                ], 400);
-            }
-        } else {
-            // SECURE PRODUCTION IMPLEMENTATION: Parameterized lookup & bcrypt check
-            $candidate = User::where('email', strtolower($usernameOrEmail))
-                ->orWhere('username', strtolower($usernameOrEmail))
-                ->first();
+        // Parameterized lookup & bcrypt check
+        $candidate = User::where('email', strtolower($usernameOrEmail))
+            ->orWhere('username', strtolower($usernameOrEmail))
+            ->first();
 
-            if ($candidate && Hash::check($password, $candidate->password)) {
-                $user = $candidate;
-            }
+        if ($candidate && Hash::check($password, $candidate->password)) {
+            $user = $candidate;
         }
 
         if (!$user) {
@@ -95,7 +73,6 @@ class AuthApiController extends Controller
             'message' => 'Selamat datang di PASARIA!',
             'token' => $token,
             'user' => $userData,
-            'sqli_mode' => (bool) $demoSqliMode,
         ]);
     }
 

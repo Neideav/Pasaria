@@ -32,7 +32,7 @@ class AuthController extends Controller
         $identifier = $request->input('username');
         $password = $request->input('password');
 
-        // Authentication query routed through store service supporting DEMO_SQLI_MODE
+        // Authentication query routed through store service using parameterized queries
         $user = $this->queryService->authenticateUser($identifier, $password);
 
         if ($user) {
