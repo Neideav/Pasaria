@@ -22,7 +22,8 @@ import {
   MessageCircle,
   Clock,
   AlertTriangle,
-  Wallet
+  Wallet,
+  X
 } from 'lucide-react';
 import { User, Shop, Product, Order, Review } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -81,6 +82,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
   const [prodCreating, setProdCreating] = useState(false);
 
   // Payout request modal/form
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutBank, setPayoutBank] = useState('BCA');
   const [payoutAccountNo, setPayoutAccountNo] = useState('');
@@ -205,36 +207,39 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 4000);
     } catch (err: any) {
-      showToast(err.message || 'Gagal menambahkan produk baru.', 'error');
+      showToast(err.message || 'Gagal menambahkan produk.', 'error');
     } finally {
       setProdCreating(false);
     }
   };
 
-  const handleUpdateStock = async (variantId: number, currentStock: number, delta: number) => {
-    const next = Math.max(0, currentStock + delta);
+  const handleUpdateStock = async (inventoryId: number, currentStock: number, delta: number) => {
+    const newStock = Math.max(0, currentStock + delta);
     try {
-      await api.updateSellerStock(variantId, next);
+      await api.updateSellerStock(inventoryId, newStock);
       setInventoryList((prev) =>
-        prev.map((i) => (i.id === variantId ? { ...i, stock: next } : i))
+        prev.map((item) => (item.id === inventoryId ? { ...item, stock: newStock } : item))
       );
-      showToast('Stok produk berhasil diperbarui.', 'success');
+      showToast(`Stok berhasil diperbarui: ${newStock} unit.`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Gagal memperbarui stok', 'error');
     }
   };
 
-  const handleFulfillOrder = async (orderId: number, nextStatus: string) => {
+  const handleFulfillOrder = async (orderId: number, status: string) => {
     try {
-      const trk = `PSR-EXP-${Math.floor(10000000 + Math.random() * 90000000)}`;
-      await api.updateOrderStatus(orderId, nextStatus, trk, 'PASARIA Express Priority');
-      const msg = `Pesanan #${orderId} berhasil diproses ke status: ${nextStatus}`;
+      const trackingNumber = `PASARIA-EXP-${Date.now().toString().slice(-8)}`;
+      await api.updateOrderStatus(orderId, status, trackingNumber);
+      setSellerOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: 'shipped', tracking_number: trackingNumber } : o))
+      );
+      const msg = `Pesanan #${orderId} dikirim dengan nomor resi ${trackingNumber}.`;
       setActionSuccess(msg);
       showToast(msg, 'success');
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 4000);
     } catch (err: any) {
-      showToast(err.message || 'Gagal memperbarui status pesanan', 'error');
+      showToast(err.message || 'Gagal memproses pesanan', 'error');
     }
   };
 
@@ -244,9 +249,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
 
     try {
       await api.replyReview(reviewId, text.trim());
-      const msg = 'Balasan ulasan berhasil dipublikasikan!';
-      setActionSuccess(msg);
-      showToast(msg, 'success');
+      showToast('Balasan ulasan berhasil dikirim ke pembeli.', 'success');
       setReplyTextMap((prev) => ({ ...prev, [reviewId]: '' }));
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
@@ -316,6 +319,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
       showToast(msg, 'success');
       setPayoutAmount('');
       setPayoutErrors({});
+      setShowPayoutModal(false);
       loadSellerData();
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err: any) {
@@ -356,7 +360,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
             <button
               onClick={() => onViewShopPublic(currentShop)}
               aria-label="Lihat profil publik toko di katalog marketplace"
-              className="min-h-[44px] px-4 py-2 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+              className="min-h-[44px] px-4 py-2 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>Lihat Toko Publik</span>
@@ -365,7 +369,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           <button
             onClick={onNavigateHome}
             aria-label="Kembali ke Beranda PASARIA"
-            className="min-h-[44px] inline-flex items-center gap-1 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+            className="min-h-[44px] inline-flex items-center gap-1 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Kembali ke Beranda</span>
@@ -380,7 +384,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Tabs for Seller Center */}
+      {/* Tabs for Seller Center (Motion Point #48) */}
       {currentShop && (
         <div
           role="tablist"
@@ -407,7 +411,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                 aria-controls={`shop-panel-${tab.id}`}
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[#003d29] ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96] ${
                   isActive
                     ? 'bg-[#003d29] text-white shadow-xs'
                     : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200/80'
@@ -428,7 +432,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-register"
           tabIndex={0}
-          className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 focus:outline-none"
+          className="motion-tab-pane max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 focus:outline-none"
         >
           <div className="text-center space-y-2">
             <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-[#003d29] flex items-center justify-center mx-auto font-black text-xl">
@@ -505,7 +509,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
               <button
                 type="submit"
                 disabled={isRegistering}
-                className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
               >
                 {isRegistering ? 'Mendaftarkan Toko...' : 'Buka Toko Sekarang'}
               </button>
@@ -521,7 +525,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-overview"
           tabIndex={0}
-          className="space-y-8 focus:outline-none"
+          className="motion-tab-pane space-y-8 focus:outline-none"
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
@@ -567,7 +571,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-products"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
@@ -579,7 +583,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
             <button
               onClick={() => setActiveTab('add_product')}
               aria-label="Tambah produk baru ke etalase"
-              className="min-h-[44px] px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+              className="min-h-[44px] px-4 py-2 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Tambah Produk</span>
@@ -598,17 +602,18 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 line-clamp-1">{p.name}</h4>
-                    <div className="text-slate-400 text-[11px]">
-                      {p.category} · Stok: <span className="tabular-nums font-semibold text-slate-700">{p.stock}</span>
+                    <p className="text-slate-400 text-[11px]">{p.category}</p>
+                    <div className="font-extrabold text-[#003d29] tabular-nums mt-1">
+                      {formatRupiah(p.price)}
                     </div>
-                    <div className="font-extrabold text-[#003d29] mt-0.5 tabular-nums">{formatRupiah(p.price)}</div>
                   </div>
                 </div>
+
                 {onDeleteProduct && (
                   <button
                     onClick={() => onDeleteProduct(p.id)}
                     aria-label={`Hapus produk ${p.name}`}
-                    className="min-w-[40px] min-h-[40px] rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    className="min-w-[40px] min-h-[40px] rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-500 motion-press active:scale-[0.96]"
                     title="Hapus Produk"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -627,7 +632,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-inventory"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
@@ -650,12 +655,17 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {inventoryList.map((inv) => (
                   <tr key={inv.id} className="hover:bg-slate-50/50">
-                    <td className="py-3 px-4 font-bold text-slate-900">{inv.name || 'Produk Standar'}</td>
-                    <td className="py-3 px-4 font-mono text-slate-500 text-[11px] tabular-nums">{inv.sku || 'SKU-001'}</td>
-                    <td className="py-3 px-4 font-bold text-[#003d29] tabular-nums">{formatRupiah(inv.price)}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      <div>{inv.product?.name || inv.name || 'Produk Seller'}</div>
+                      <div className="text-[11px] text-slate-400 font-normal">{inv.variant_name || 'Standard'}</div>
+                    </td>
+                    <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">{inv.sku || `SKU-${inv.id}`}</td>
+                    <td className="py-3 px-4 font-extrabold text-[#003d29] tabular-nums">
+                      {formatRupiah(inv.product?.price || 150000)}
+                    </td>
                     <td className="py-3 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
-                        inv.stock < 5 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-800'
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
+                        inv.stock < 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
                       }`}>
                         {inv.stock} Unit
                       </span>
@@ -665,21 +675,21 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                         <button
                           onClick={() => handleUpdateStock(inv.id, inv.stock, -1)}
                           aria-label={`Kurangi 1 unit stok ${inv.name || 'produk'}`}
-                          className="min-w-[40px] min-h-[40px] rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400"
+                          className="min-w-[40px] min-h-[40px] rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400 motion-press active:scale-[0.96]"
                         >
                           -
                         </button>
                         <button
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 5)}
                           aria-label={`Tambah 5 unit stok ${inv.name || 'produk'}`}
-                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
                         >
                           +5
                         </button>
                         <button
                           onClick={() => handleUpdateStock(inv.id, inv.stock, 20)}
                           aria-label={`Tambah 20 unit stok ${inv.name || 'produk'}`}
-                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                          className="min-h-[40px] px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#003d29] font-bold text-[11px] tabular-nums cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
                         >
                           +20
                         </button>
@@ -700,7 +710,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-orders"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
@@ -745,7 +755,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                       <button
                         onClick={() => handleFulfillOrder(ord.id, 'shipped')}
                         aria-label={`Kirim pesanan nomor ${ord.order_number} dan terbitkan nomor resi`}
-                        className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                        className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs cursor-pointer shadow-2xs inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
                       >
                         Kirim Barang (Generate Resi)
                       </button>
@@ -765,7 +775,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-reviews"
           tabIndex={0}
-          className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
+          className="motion-tab-pane bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-4 focus:outline-none"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
@@ -796,7 +806,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                 <button
                   onClick={() => handleReplyReview(1)}
                   aria-label="Kirim balasan untuk ulasan pembeli"
-                  className="min-h-[44px] px-5 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                  className="min-h-[44px] px-5 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-bold cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
                 >
                   Balas
                 </button>
@@ -813,15 +823,25 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-finances"
           tabIndex={0}
-          className="space-y-6 focus:outline-none"
+          className="motion-tab-pane space-y-6 focus:outline-none"
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
-              <div className="text-slate-400 text-xs font-semibold mb-1">Saldo Tersedia untuk Ditarik</div>
-              <div className="text-2xl font-black text-[#003d29] tabular-nums">
-                {formatRupiah(availableBalance)}
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="text-slate-400 text-xs font-semibold mb-1">Saldo Tersedia untuk Ditarik</div>
+                <div className="text-2xl font-black text-[#003d29] tabular-nums">
+                  {formatRupiah(availableBalance)}
+                </div>
+                <div className="text-[11px] text-emerald-700 font-medium mt-1">Siap Masuk Rekening</div>
               </div>
-              <div className="text-[11px] text-emerald-700 font-medium mt-1">Siap Masuk Rekening</div>
+              <button
+                type="button"
+                onClick={() => setShowPayoutModal(true)}
+                className="mt-4 w-full min-h-[40px] px-4 py-2 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white text-xs font-bold transition-all cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                <span>Tarik Saldo Toko</span>
+              </button>
             </div>
 
             <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs">
@@ -841,22 +861,22 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Request Payout Form */}
+          {/* Request Payout Form (Inline Card) */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-4 max-w-xl text-xs">
             <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
               <Wallet className="w-4 h-4 text-[#003d29]" />
               Ajukan Penarikan Dana (Payout)
             </h3>
 
-            {/* Quick Amount Presets */}
+            {/* Quick Amount Presets (Motion Point #50) */}
             <div className="space-y-1.5">
               <span className="text-[11px] font-semibold text-slate-600">Pilih Cepat Nominal:</span>
               <div className="flex flex-wrap gap-2">
                 {[
+                  { label: 'Rp 100rb', value: '100000' },
+                  { label: 'Rp 500rb', value: '500000' },
+                  { label: 'Rp 1jt', value: '1000000' },
                   { label: 'Tarik Semua', value: String(availableBalance) },
-                  { label: 'Rp 500.000', value: '500000' },
-                  { label: 'Rp 1.000.000', value: '1000000' },
-                  { label: 'Rp 5.000.000', value: '5000000' },
                 ].map((preset) => (
                   <button
                     key={preset.label}
@@ -867,7 +887,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                         setPayoutErrors((prev) => ({ ...prev, amount: undefined }));
                       }
                     }}
-                    className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 hover:border-[#003d29] hover:bg-emerald-50 text-slate-700 transition-colors tabular-nums cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                    className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 hover:border-[#003d29] hover:bg-emerald-50 text-slate-700 transition-colors tabular-nums cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96] transition-transform duration-120"
                   >
                     {preset.label}
                   </button>
@@ -1014,9 +1034,229 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                   type="submit"
                   disabled={payoutLoading}
                   aria-label="Kirim pengajuan penarikan dana saldo toko"
-                  className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                  className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
                 >
                   {payoutLoading ? 'Memproses Pengajuan...' : 'Kirim Pengajuan Penarikan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Motion Point #49: Payout Modal Centered Scale Entrance */}
+      {showPayoutModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payout-modal-title"
+          className="motion-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPayoutModal(false);
+          }}
+        >
+          <div className="motion-modal bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 text-left relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <h3 id="payout-modal-title" className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-[#003d29]" />
+                <span>Tarik Saldo Toko (Payout)</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowPayoutModal(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                aria-label="Tutup formulir penarikan dana"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100 mb-5 flex items-center justify-between text-xs">
+              <div>
+                <div className="text-[11px] text-slate-500 font-semibold">Saldo Tersedia:</div>
+                <div className="font-black text-[#003d29] text-base tabular-nums">{formatRupiah(availableBalance)}</div>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-800 bg-white/80 px-2.5 py-1 rounded-full border border-emerald-200">
+                Siap Cair
+              </span>
+            </div>
+
+            {/* Quick Amount Presets (Motion Point #50) */}
+            <div className="space-y-1.5 mb-4 text-xs">
+              <span className="text-[11px] font-semibold text-slate-600">Pilih Cepat Nominal:</span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Rp 100rb', value: '100000' },
+                  { label: 'Rp 500rb', value: '500000' },
+                  { label: 'Rp 1jt', value: '1000000' },
+                  { label: 'Tarik Semua', value: String(availableBalance) },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setPayoutAmount(preset.value);
+                      if (payoutErrors.amount) {
+                        setPayoutErrors((prev) => ({ ...prev, amount: undefined }));
+                      }
+                    }}
+                    className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 hover:border-[#003d29] hover:bg-emerald-50 text-slate-700 transition-colors tabular-nums cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96] transition-transform duration-120"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleRequestPayout} className="space-y-4 text-xs" noValidate>
+              <div>
+                <label htmlFor="modal-payout-amount" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Nominal Penarikan (Rp) *
+                </label>
+                <input
+                  id="modal-payout-amount"
+                  type="number"
+                  min="10000"
+                  max={availableBalance}
+                  value={payoutAmount}
+                  onChange={(e) => {
+                    setPayoutAmount(e.target.value);
+                    if (payoutErrors.amount) {
+                      setPayoutErrors((prev) => ({ ...prev, amount: undefined }));
+                    }
+                  }}
+                  placeholder="Contoh: 1000000"
+                  aria-invalid={!!payoutErrors.amount}
+                  aria-describedby={payoutErrors.amount ? 'modal-payout-amount-error' : undefined}
+                  className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border font-bold tabular-nums focus:outline-none focus:ring-2 ${
+                    payoutErrors.amount
+                      ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                      : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                  }`}
+                  required
+                />
+                {payoutErrors.amount && (
+                  <p id="modal-payout-amount-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                    {payoutErrors.amount}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="modal-payout-bank" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Bank Tujuan *
+                  </label>
+                  <select
+                    id="modal-payout-bank"
+                    value={payoutBank}
+                    onChange={(e) => {
+                      setPayoutBank(e.target.value);
+                      if (payoutErrors.bank) {
+                        setPayoutErrors((prev) => ({ ...prev, bank: undefined }));
+                      }
+                    }}
+                    aria-invalid={!!payoutErrors.bank}
+                    aria-describedby={payoutErrors.bank ? 'modal-payout-bank-error' : undefined}
+                    className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border bg-white focus:outline-none focus:ring-2 ${
+                      payoutErrors.bank
+                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                        : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                    }`}
+                  >
+                    <option value="BCA">Bank BCA</option>
+                    <option value="Mandiri">Bank Mandiri</option>
+                    <option value="BRI">Bank BRI</option>
+                    <option value="BNI">Bank BNI</option>
+                    <option value="BSI">Bank Syariah Indonesia (BSI)</option>
+                    <option value="CIMB">CIMB Niaga</option>
+                  </select>
+                  {payoutErrors.bank && (
+                    <p id="modal-payout-bank-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                      {payoutErrors.bank}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="modal-payout-account-no" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Nomor Rekening *
+                  </label>
+                  <input
+                    id="modal-payout-account-no"
+                    type="text"
+                    inputMode="numeric"
+                    value={payoutAccountNo}
+                    onChange={(e) => {
+                      setPayoutAccountNo(e.target.value);
+                      if (payoutErrors.accountNo) {
+                        setPayoutErrors((prev) => ({ ...prev, accountNo: undefined }));
+                      }
+                    }}
+                    placeholder="Contoh: 8830192841"
+                    aria-invalid={!!payoutErrors.accountNo}
+                    aria-describedby={payoutErrors.accountNo ? 'modal-payout-account-no-error' : undefined}
+                    className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border font-mono tabular-nums focus:outline-none focus:ring-2 ${
+                      payoutErrors.accountNo
+                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                        : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                    }`}
+                    required
+                  />
+                  {payoutErrors.accountNo && (
+                    <p id="modal-payout-account-no-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                      {payoutErrors.accountNo}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="modal-payout-holder" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Nama Pemilik Rekening *
+                </label>
+                <input
+                  id="modal-payout-holder"
+                  type="text"
+                  value={payoutHolder}
+                  onChange={(e) => {
+                    setPayoutHolder(e.target.value);
+                    if (payoutErrors.accountHolder) {
+                      setPayoutErrors((prev) => ({ ...prev, accountHolder: undefined }));
+                    }
+                  }}
+                  placeholder="Nama sesuai buku tabungan"
+                  aria-invalid={!!payoutErrors.accountHolder}
+                  aria-describedby={payoutErrors.accountHolder ? 'modal-payout-holder-error' : undefined}
+                  className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                    payoutErrors.accountHolder
+                      ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                      : 'border-slate-200 focus:border-[#003d29] focus:ring-[#003d29]/20'
+                  }`}
+                  required
+                />
+                {payoutErrors.accountHolder && (
+                  <p id="modal-payout-holder-error" role="alert" className="mt-1 text-[11px] text-rose-600 font-semibold">
+                    {payoutErrors.accountHolder}
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPayoutModal(false)}
+                  className="min-h-[44px] px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 font-semibold cursor-pointer motion-press active:scale-[0.96]"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={payoutLoading}
+                  aria-label="Kirim pengajuan penarikan dana saldo toko"
+                  className="min-h-[44px] px-6 py-2.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
+                >
+                  {payoutLoading ? 'Memproses...' : 'Kirim Pengajuan'}
                 </button>
               </div>
             </form>
@@ -1031,7 +1271,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
           role="tabpanel"
           aria-labelledby="shop-tab-add_product"
           tabIndex={0}
-          className="max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 text-xs focus:outline-none"
+          className="motion-tab-pane max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6 text-xs focus:outline-none"
         >
           <div>
             <h3 className="font-extrabold text-slate-900 text-sm">Tambah Produk Baru ke Etalase</h3>
@@ -1126,7 +1366,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
                 type="submit"
                 disabled={prodCreating}
                 aria-label="Publikasikan produk baru ke katalog toko"
-                className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                className="w-full min-h-[44px] py-3.5 rounded-full bg-[#003d29] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-md cursor-pointer disabled:opacity-40 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#003d29] motion-press active:scale-[0.96]"
               >
                 {prodCreating ? 'Menyimpan Produk...' : 'Publikasikan Produk'}
               </button>
