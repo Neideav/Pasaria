@@ -18,6 +18,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
 }) => {
   const [items, setItems] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<number | null>(null);
 
   useEffect(() => {
     loadWishlist();
@@ -37,11 +38,18 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
 
   const handleRemove = async (productId: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (removingId !== null) return;
+    setRemovingId(productId);
+
     try {
       await api.removeFromWishlist(productId);
-      setItems((prev) => prev.filter((p) => p.id !== productId));
     } catch (e) {
       console.warn('Remove wishlist error:', e);
+    } finally {
+      setTimeout(() => {
+        setItems((prev) => prev.filter((p) => p.id !== productId));
+        setRemovingId(null);
+      }, 200);
     }
   };
 
@@ -68,7 +76,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
 
         <button
           onClick={onNavigateHome}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#003d29] hover:underline cursor-pointer motion-press active:scale-[0.96]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali Belanja</span>
@@ -92,63 +100,69 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
           </p>
           <button
             onClick={onNavigateHome}
-            className="px-6 py-2.5 rounded-full text-xs font-bold text-white bg-[#003d29] hover:bg-[#064e3b] transition-all cursor-pointer"
+            className="px-6 py-2.5 rounded-full text-xs font-bold text-white bg-[#003d29] hover:bg-[#064e3b] transition-all cursor-pointer motion-press active:scale-[0.96]"
           >
             Eksplor Produk Sekarang
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {items.map((prod) => (
-            <div
-              key={prod.id}
-              onClick={() => onSelectProduct(prod)}
-              className="group relative flex flex-col justify-between bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all cursor-pointer text-left"
-            >
-              <div>
-                <div className="flex justify-end mb-2">
+          {items.map((prod) => {
+            const isRemoving = removingId === prod.id;
+            return (
+              <div
+                key={prod.id}
+                onClick={() => !isRemoving && onSelectProduct(prod)}
+                className={`group relative flex flex-col justify-between bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all cursor-pointer text-left ${
+                  isRemoving ? 'motion-wishlist-item-exit scale-95 opacity-0 pointer-events-none' : ''
+                }`}
+              >
+                <div>
+                  <div className="flex justify-end mb-2">
+                    <button
+                      onClick={(e) => handleRemove(prod.id, e)}
+                      className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-500 transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                      title="Hapus dari wishlist"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="relative w-full h-44 rounded-xl bg-[#f8f9fa] flex items-center justify-center p-3 mb-4 overflow-hidden group-hover:bg-[#f3f4f6] transition-colors">
+                    <ProductVisual
+                      imageKey={prod.image}
+                      name={prod.name}
+                      size="md"
+                      className="transform transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 mb-1">
+                    {prod.shop_name || 'PASARIA Merchant'}
+                  </div>
+
+                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#003d29] transition-colors line-clamp-1 mb-1">
+                    {prod.name}
+                  </h3>
+
+                  <div className="text-base font-extrabold text-[#003d29] tabular-nums mb-3">
+                    {formatRupiah(prod.price)}
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  {/* Motion Point #54: Move to Cart Tactile Press */}
                   <button
-                    onClick={(e) => handleRemove(prod.id, e)}
-                    className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-500 transition-colors"
-                    title="Hapus dari wishlist"
+                    onClick={(e) => handleMoveToCart(prod, e)}
+                    className="w-full py-2.5 px-4 rounded-full text-xs font-semibold bg-[#003d29] hover:bg-[#064e3b] text-white transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer motion-press active:scale-[0.96]"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    <span>Pindahkan ke Keranjang</span>
                   </button>
                 </div>
-
-                <div className="relative w-full h-44 rounded-xl bg-[#f8f9fa] flex items-center justify-center p-3 mb-4 overflow-hidden group-hover:bg-[#f3f4f6] transition-colors">
-                  <ProductVisual
-                    imageKey={prod.image}
-                    name={prod.name}
-                    size="md"
-                    className="transform transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-
-                <div className="text-[11px] text-slate-400 mb-1">
-                  {prod.shop_name || 'PASARIA Merchant'}
-                </div>
-
-                <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#003d29] transition-colors line-clamp-1 mb-1">
-                  {prod.name}
-                </h3>
-
-                <div className="text-base font-extrabold text-[#003d29] tabular-nums mb-3">
-                  {formatRupiah(prod.price)}
-                </div>
               </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={(e) => handleMoveToCart(prod, e)}
-                  className="w-full py-2.5 px-4 rounded-full text-xs font-semibold bg-[#003d29] hover:bg-[#064e3b] text-white transition-all flex items-center justify-center gap-1.5 shadow-2xs"
-                >
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                  <span>Pindahkan ke Keranjang</span>
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
