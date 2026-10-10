@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Shopcart — Deployment Diagnostics Script
+# PASARIA Marketplace — Deployment Diagnostics Script
 # Jalankan di EC2 server: sudo bash diagnose.sh
 # =============================================================================
 
-APP_DIR="/var/www/shopcart"
+APP_DIR="${APP_DIR:-/var/www/pasaria}"
 WEB_USER="www-data"
 PHP_VER="8.2"
 
 echo "========================================================"
-echo "🔍 Shopcart Deployment Diagnostics (React + Laravel + RDS)"
+echo "🔍 PASARIA Deployment Diagnostics (React + Laravel + RDS)"
 echo "========================================================"
 echo ""
 

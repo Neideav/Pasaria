@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Shopcart — AWS EC2 (Ubuntu + Apache2) + RDS MariaDB Deployment Script
+# PASARIA Marketplace — AWS EC2 Bare-Metal (Ubuntu + Apache2) Rollout Script
 # =============================================================================
-# Cara penggunaan:
-#   1. Upload/git clone repo ke /var/www/shopcart
-#   2. Salin .env.example ke .env dan isi variabel DB_HOST, DB_PASSWORD, dll.
-#   3. Jalankan: bash deploy-aws.sh
+# Gunakan script ini untuk deployment langsung pada host Ubuntu tanpa Docker.
+# (Untuk deployment berbasis kontainer, gunakan auto-deploy.sh).
+#
+# Prasyarat:
+#   1. setup-server.sh sudah dijalankan
+#   2. Repository berada di /var/www/pasaria
+#   3. .env sudah dikonfigurasi dengan kredensial produksi yang valid
 # =============================================================================
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_USER="www-data"
 
-echo "🚀 Shopcart — AWS EC2 Deployment"
+echo "========================================================"
+echo "🚀 PASARIA Marketplace — Bare-Metal Rollout: $(date)"
 echo "📂 App directory: $APP_DIR"
+echo "========================================================"
 
 # ---------------------------------------------------------------------------
 # 1. Pastikan .env ada
 # ---------------------------------------------------------------------------
 if [ ! -f "$APP_DIR/.env" ]; then
-    echo "⚠️  .env tidak ditemukan — menyalin dari .env.example..."
-    cp "$APP_DIR/.env.example" "$APP_DIR/.env"
-    echo "   ✏️  PENTING: Edit .env dan isi DB_HOST, DB_PASSWORD, APP_KEY, dll."
-    echo "   Lalu jalankan: php artisan key:generate"
+    echo "❌ ERROR: .env tidak ditemukan di $APP_DIR!"
+    echo "   Salin .env.example ke .env dan isi kredensial produksi."
     exit 1
 fi
 
@@ -31,7 +34,7 @@ fi
 # ---------------------------------------------------------------------------
 if grep -q 'APP_KEY=$\|APP_KEY=base64:yourGenerated' "$APP_DIR/.env"; then
     echo "🔑 Generating application key..."
-    php artisan key:generate --force
+    php "$APP_DIR/artisan" key:generate --force
 fi
 
 # ---------------------------------------------------------------------------
@@ -42,6 +45,7 @@ mkdir -p \
     "$APP_DIR/storage/framework/sessions" \
     "$APP_DIR/storage/framework/views" \
     "$APP_DIR/storage/framework/cache/data" \
+    "$APP_DIR/storage/app/public" \
     "$APP_DIR/storage/logs" \
     "$APP_DIR/bootstrap/cache"
 
@@ -54,9 +58,10 @@ if command -v composer &>/dev/null; then
         --no-dev \
         --optimize-autoloader \
         --no-interaction \
+        --prefer-dist \
         --working-dir="$APP_DIR"
 else
-    echo "❌ ERROR: composer tidak ditemukan. Install dulu: https://getcomposer.org"
+    echo "❌ ERROR: composer tidak ditemukan."
     exit 1
 fi
 
@@ -64,33 +69,34 @@ fi
 # 5. Build React Frontend (Vite)
 # ---------------------------------------------------------------------------
 if command -v npm &>/dev/null; then
-    echo "⚛️  Building React + Vite frontend..."
+    echo "⚛️  Building React 19 + Vite frontend..."
     cd "$APP_DIR"
     
-    # Hapus dist lama jika ada
     rm -rf dist
-
-    # Install npm packages
-    echo "   📦 Menginstall npm packages..."
-    npm install --no-audit --no-fund
-
-    # Build bundle produksi
-    echo "   🔨 Running npm run build..."
+    npm ci --legacy-peer-deps || npm install --no-audit --no-fund
     npm run build
 
     # Salin seluruh hasil build React ke public/ agar disajikan oleh Apache2
     if [ -d "$APP_DIR/dist" ]; then
-        echo "   📋 Menyalin aset React build ke $APP_DIR/public/..."
+        echo "📋 Menyalin aset React build ke $APP_DIR/public/..."
         cp -rf "$APP_DIR/dist/"* "$APP_DIR/public/"
-        chmod -R 755 "$APP_DIR/public"
-        echo "   ✅ React SPA & assets berhasil disalin ke public/"
+        echo "✅ React SPA & assets berhasil disalin ke public/"
     fi
 else
-    echo "⚠️  WARNING: npm / nodejs tidak ditemukan! Jalankan setup-server.sh terlebih dahulu untuk menginstall Node.js."
+    echo "❌ ERROR: Node.js / npm tidak ditemukan."
+    exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Jalankan migrasi ke AWS RDS MariaDB
+# 6. Storage Symlink
+# ---------------------------------------------------------------------------
+if [ ! -L "$APP_DIR/public/storage" ]; then
+    echo "🔗 Membuat storage link..."
+    php "$APP_DIR/artisan" storage:link --quiet || true
+fi
+
+# ---------------------------------------------------------------------------
+# 7. Jalankan database migrations
 # ---------------------------------------------------------------------------
 echo "🗄️  Menjalankan database migrations..."
 php "$APP_DIR/artisan" migrate --force
@@ -98,12 +104,10 @@ php "$APP_DIR/artisan" migrate --force
 if [ "${RUN_SEEDERS:-false}" = "true" ]; then
     echo "🌱 Menjalankan database seeders (RUN_SEEDERS=true)..."
     php "$APP_DIR/artisan" db:seed --force
-else
-    echo "ℹ️  Melewati database seeders untuk menjaga data produksi (Set RUN_SEEDERS=true untuk menjalankan)."
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Set permission untuk Apache2 (www-data)
+# 8. Set permission untuk Apache2 (www-data)
 # ---------------------------------------------------------------------------
 echo "🔒 Mengatur file permissions untuk $WEB_USER..."
 sudo chown -R "$WEB_USER:$WEB_USER" \
@@ -113,58 +117,58 @@ sudo chown -R "$WEB_USER:$WEB_USER" \
 sudo chmod -R 775 \
     "$APP_DIR/storage" \
     "$APP_DIR/bootstrap/cache"
-# Owner file PHP boleh dimiliki current user, tapi readable oleh www-data
-sudo find "$APP_DIR" -type f -name "*.php" -exec chmod 644 {} \;
-sudo find "$APP_DIR" -type d -exec chmod 755 {} \;
-# Restore akses storage & cache ke 775 setelah find
-sudo chmod -R 775 "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
 
 # ---------------------------------------------------------------------------
-# 8. Optimize Laravel untuk production
+# 9. Optimize Laravel untuk production
 # ---------------------------------------------------------------------------
-echo "⚡ Optimizing Laravel untuk production..."
+echo "⚡ Optimizing Laravel caches untuk production..."
+php "$APP_DIR/artisan" optimize:clear
 php "$APP_DIR/artisan" config:cache
 php "$APP_DIR/artisan" route:cache
 php "$APP_DIR/artisan" view:cache
 
 # ---------------------------------------------------------------------------
-# 9. Konfigurasi Apache2 Virtual Host
+# 10. Konfigurasi Apache2 Virtual Host
 # ---------------------------------------------------------------------------
 if command -v a2enmod &>/dev/null; then
-    echo "🌐 Mengaktifkan modul Apache2 & PHP handler..."
-    sudo a2dismod mpm_event mpm_worker 2>/dev/null || true
-    sudo a2enmod mpm_prefork php8.2 rewrite headers 2>/dev/null || sudo a2enmod rewrite headers
-
-    VHOST_SRC="$APP_DIR/apache/shopcart.conf"
-    VHOST_DEST="/etc/apache2/sites-available/shopcart.conf"
+    VHOST_SRC="$APP_DIR/apache/pasaria.conf"
+    VHOST_DEST="/etc/apache2/sites-available/pasaria.conf"
 
     if [ -f "$VHOST_SRC" ]; then
-        echo "📋 Menyalin Apache vhost config..."
+        echo "📋 Mengonfigurasi Apache vhost..."
         sudo cp "$VHOST_SRC" "$VHOST_DEST"
-        sudo a2ensite shopcart.conf
+        sudo a2ensite pasaria.conf
         sudo a2dissite 000-default.conf 2>/dev/null || true
-
-        echo "🔍 Verifikasi konfigurasi Apache..."
         sudo apache2ctl configtest
         sudo systemctl reload apache2
         echo "✅ Apache2 dikonfigurasi dan di-reload."
-    else
-        echo "⚠️  File $VHOST_SRC tidak ditemukan, skip konfigurasi Apache."
     fi
 fi
 
 # ---------------------------------------------------------------------------
-# 10. Tampilkan ringkasan
+# 11. Health Check Verification
 # ---------------------------------------------------------------------------
+echo "🔍 Memverifikasi endpoint health check (/up)..."
+HEALTH_OK=false
+for i in {1..5}; do
+    if curl -sf http://127.0.0.1/up > /dev/null 2>&1; then
+        echo "✅ Health check passed pada percobaan $i."
+        HEALTH_OK=true
+        break
+    fi
+    sleep 2
+done
+
+if [ "$HEALTH_OK" = false ]; then
+    echo "⚠️  PERINGATAN: Health check lokal belum merespons status 200 pada http://127.0.0.1/up."
+    echo "   Periksa error log di $APP_DIR/storage/logs/laravel.log dan /var/log/apache2/pasaria_error.log."
+fi
+
 echo ""
 echo "========================================================"
-echo "✅ Deployment Shopcart SELESAI!"
+echo "✅ Rollout PASARIA Selesai!"
 echo "========================================================"
 echo "   App URL : $(grep '^APP_URL=' "$APP_DIR/.env" | cut -d= -f2 || echo 'http://localhost')"
 echo "   DB Host : $(grep '^DB_HOST=' "$APP_DIR/.env" | cut -d= -f2 || echo '127.0.0.1')"
-echo "   DB Name : $(grep '^DB_DATABASE=' "$APP_DIR/.env" | cut -d= -f2 || echo 'shopcart')"
-echo ""
-echo "   Frontend: React SPA (dist/ -> public/)"
-echo "   Backend : Laravel 11 REST API (/api/* -> MariaDB)"
-echo "   Akses website melalui Apache2 di port 80."
+echo "   DB Name : $(grep '^DB_DATABASE=' "$APP_DIR/.env" | cut -d= -f2 || echo 'pasaria')"
 echo "========================================================"

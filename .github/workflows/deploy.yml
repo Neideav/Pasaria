@@ -1,0 +1,64 @@
+name: PASARIA CD (Continuous Deployment)
+
+on:
+  push:
+    branches:
+      - production
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Branch to deploy to production'
+        required: true
+        default: 'production'
+      skip_backup:
+        description: 'Skip pre-deployment database backup (NOT recommended)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: cd-production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  production-deployment:
+    name: Production Release Deployment
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://pasaria.id
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Deployment Target
+        run: |
+          REF_NAME="${{ github.ref_name }}"
+          echo "Initiating production release deployment for ref: ${REF_NAME}"
+          if [[ "${REF_NAME}" == "testing" ]]; then
+            echo "::error::Direct continuous deployment from 'testing' branch is strictly forbidden. Merge into 'production' first."
+            exit 1
+          fi
+
+      - name: Execute Remote SSH Deployment
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          envs: GITHUB_SHA,GITHUB_REF_NAME
+          script: |
+            echo "Starting PASARIA Production Rollout..."
+            if [ -f /var/www/pasaria/auto-deploy.sh ]; then
+              DEPLOY_BRANCH="${GITHUB_REF_NAME}" bash /var/www/pasaria/auto-deploy.sh
+            else
+              echo "CRITICAL: Deployment script /var/www/pasaria/auto-deploy.sh not found!"
+              exit 1
+            fi

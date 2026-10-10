@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Shopcart — AWS EC2 Ubuntu Fresh Server Setup Script
+# PASARIA Marketplace — AWS EC2 Ubuntu Fresh Host Setup Script
 # =============================================================================
 # Jalankan SEKALI saat pertama kali setup server EC2 Ubuntu baru.
-# Setelah ini, gunakan deploy-aws.sh untuk update deployment.
+# Setelah setup ini selesai, gunakan auto-deploy.sh (Docker) atau deploy-aws.sh.
 #
-# Cara penggunaan (sebagai ubuntu user):
+# Cara penggunaan (sebagai ubuntu/root user):
 #   chmod +x setup-server.sh
 #   sudo bash setup-server.sh
 # =============================================================================
 set -euo pipefail
 
 PHP_VERSION="8.2"
-APP_DIR="/var/www/shopcart"
+APP_DIR="/var/www/pasaria"
 
-echo "🔧 Shopcart — AWS EC2 Server Setup"
+echo "🔧 PASARIA — AWS EC2 Server Setup"
 echo "   PHP Version: $PHP_VERSION"
 echo "   App Dir    : $APP_DIR"
 echo ""
@@ -30,7 +30,8 @@ apt-get install -y \
     software-properties-common \
     unzip \
     curl \
-    git
+    git \
+    ca-certificates
 
 # ---------------------------------------------------------------------------
 # 2. Install PHP 8.2 + extensions yang dibutuhkan Laravel + MariaDB
@@ -62,11 +63,11 @@ if ! command -v composer &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Install Node.js (v20 LTS) & npm untuk build React SPA
+# 4. Install Node.js (v22 LTS) & npm untuk build React SPA
 # ---------------------------------------------------------------------------
 if ! command -v node &>/dev/null; then
-    echo "🟢 Menginstall Node.js 20.x & npm..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    echo "🟢 Menginstall Node.js 22.x & npm..."
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
 fi
 
@@ -85,9 +86,6 @@ echo "📁 Menyiapkan direktori aplikasi..."
 mkdir -p "$APP_DIR"
 chown -R www-data:www-data "$APP_DIR"
 
-# ---------------------------------------------------------------------------
-# 6. Catatan: Clone/upload code setelah setup ini
-# ---------------------------------------------------------------------------
 echo ""
 echo "========================================================"
 echo "✅ Server setup selesai!"
@@ -98,10 +96,8 @@ echo "  1. Clone repository ke $APP_DIR:"
 echo "     git clone <your-repo-url> $APP_DIR"
 echo ""
 echo "  2. Salin dan edit .env:"
-echo "     cd $APP_DIR"
-echo "     cp .env.example .env"
-echo "     nano .env  # isi DB_HOST (RDS endpoint), DB_PASSWORD, APP_URL"
+echo "     cp $APP_DIR/.env.example $APP_DIR/.env"
+echo "     nano $APP_DIR/.env"
 echo ""
-echo "  3. Jalankan deployment:"
-echo "     bash $APP_DIR/deploy-aws.sh"
+echo "  3. Jalankan auto-deploy.sh (Docker) atau deploy-aws.sh (Bare Metal)"
 echo "========================================================"

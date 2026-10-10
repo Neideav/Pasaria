@@ -143,7 +143,6 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | POST | /api/admin/payouts/{id}/approve | Api\AdminApiController@approvePayout | Admin |
 | POST | /api/admin/payouts/{id}/reject | Api\AdminApiController@rejectPayout | Admin |
 | GET | /api/admin/refunds | Api\AdminApiController@refunds | Admin |
-| GET | /api/config | Api\ConfigApiController@getDemoMode | Public |
 <!-- END AUTO GENERATED: ROUTING_MATRIX -->
 
 Complete routing matrix for all 89 endpoints is recorded in `.agents/references/routes.md`.

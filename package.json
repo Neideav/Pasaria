@@ -10,7 +10,8 @@
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "start": "vite",
-    "dev:mock-express": "tsx server.ts"
+    "dev:mock-express": "tsx server.ts",
+    "quality-gate": "bash scripts/quality-gate.sh"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
