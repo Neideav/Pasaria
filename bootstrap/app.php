@@ -85,6 +85,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->booted(function (Application $app) {
         // Production Hardening: Fail safely if critical configuration is missing
         if ($app->environment('production')) {
+            // Allow key generation command to bootstrap even when key is missing
+            if ($app->runningInConsole()) {
+                $argv = $_SERVER['argv'] ?? [];
+                $cmd = implode(' ', $argv);
+                if (str_contains($cmd, 'key:generate')) {
+                    return;
+                }
+            }
+
             $key = config('app.key');
             if (empty($key) || str_starts_with($key, 'base64:yourGenerated')) {
                 throw new \RuntimeException('CRITICAL SECURITY: APP_KEY is missing or ungenerated in production environment.');
