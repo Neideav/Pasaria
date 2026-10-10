@@ -145,7 +145,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <button
           type="button"
           onClick={onNavigateHome}
-          className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 text-xs font-semibold text-[#003d29] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg cursor-pointer"
+          className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 text-xs font-semibold text-[#003d29] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg cursor-pointer motion-press active:scale-[0.96]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali ke Beranda</span>
@@ -165,7 +165,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-full font-bold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] ${
+              className={`flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-full font-bold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] motion-press active:scale-[0.96] ${
                 isActive
                   ? 'bg-[#003d29] text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
@@ -180,7 +180,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Security Tab: Real Password Change */}
       {activeTab === 'security' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
+        <div className="motion-tab-pane bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
           <div>
             <h2 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-[#003d29]" />
@@ -225,7 +225,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="button"
                   onClick={() => setShowCurrentPassword((prev) => !prev)}
                   aria-label={showCurrentPassword ? 'Sembunyikan kata sandi saat ini' : 'Tampilkan kata sandi saat ini'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer motion-press active:scale-[0.96]"
                 >
                   {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -251,13 +251,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="button"
                   onClick={() => setShowNewPassword((prev) => !prev)}
                   aria-label={showNewPassword ? 'Sembunyikan kata sandi baru' : 'Tampilkan kata sandi baru'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer motion-press active:scale-[0.96]"
                 >
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
 
-              {/* Dynamic Password Strength Indicator */}
+              {/* Dynamic Password Strength Indicator (Motion Point #46) */}
               {newPassword.length > 0 && (
                 <div className="space-y-1.5 pt-2" aria-live="polite">
                   <div className="flex items-center justify-between text-[11px]">
@@ -266,11 +266,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       {passwordStrength.label}
                     </span>
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5 h-1.5">
-                    <div className={`h-full rounded-full transition-all duration-300 ${passwordStrength.score >= 1 ? passwordStrength.barColor : 'bg-slate-200'}`} />
-                    <div className={`h-full rounded-full transition-all duration-300 ${passwordStrength.score >= 2 ? passwordStrength.barColor : 'bg-slate-200'}`} />
-                    <div className={`h-full rounded-full transition-all duration-300 ${passwordStrength.score >= 3 ? passwordStrength.barColor : 'bg-slate-200'}`} />
-                    <div className={`h-full rounded-full transition-all duration-300 ${passwordStrength.score >= 4 ? passwordStrength.barColor : 'bg-slate-200'}`} />
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-[width,background-color] duration-250 ease-[var(--ease-out)] ${passwordStrength.barColor}`}
+                      style={{ width: `${Math.max(10, (passwordStrength.score / 4) * 100)}%` }}
+                    />
                   </div>
                   <p className="text-[10px] text-slate-400">
                     Kombinasikan huruf besar, huruf kecil, angka, dan simbol untuk keamanan maksimal.
@@ -298,7 +298,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="button"
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
                   aria-label={showConfirmPassword ? 'Sembunyikan konfirmasi kata sandi baru' : 'Tampilkan konfirmasi kata sandi baru'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded p-1.5 transition-colors cursor-pointer motion-press active:scale-[0.96]"
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -309,7 +309,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <button
                 type="submit"
                 disabled={passwordSaving}
-                className="min-h-[44px] px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-2xs disabled:opacity-40"
+                className="min-h-[44px] px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-2xs disabled:opacity-40 motion-press active:scale-[0.96]"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>{passwordSaving ? 'Memproses...' : 'Perbarui Kata Sandi'}</span>
@@ -321,7 +321,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Notifications Tab */}
       {activeTab === 'notifications' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
+        <div className="motion-tab-pane bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
           <div>
             <h2 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
               <Bell className="w-4 h-4 text-[#003d29]" />
@@ -333,34 +333,61 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
 
           <form onSubmit={handleSaveNotifications} className="space-y-4 text-xs">
+            {/* Toggle 1: Email Orders (Motion Point #47) */}
             <label htmlFor="notif-orders" className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer min-h-[48px]">
               <div>
                 <div className="font-bold text-slate-900">Pembaruan Pesanan & Pengiriman</div>
-                <div className="text-[11px] text-slate-500">Notifikasi status resi, transit kurir, dan konfirmasi barang tiba.</div>
+                <div className="text-[11px] text-slate-500">Notifikasi status resi, transit kurir, dan konfirmasi barang tiba via Email.</div>
               </div>
               <input
                 id="notif-orders"
                 type="checkbox"
                 checked={emailNotif}
                 onChange={(e) => setEmailNotif(e.target.checked)}
-                className="w-5 h-5 text-[#003d29] accent-[#003d29] rounded focus:ring-2 focus:ring-[#003d29] cursor-pointer ml-3 shrink-0"
+                className="sr-only"
               />
+              <div
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-[var(--ease-out)] ml-3 ${
+                  emailNotif ? 'bg-[#003d29]' : 'bg-slate-200'
+                }`}
+                aria-hidden="true"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ease-[var(--ease-out)] active:scale-95 ${
+                    emailNotif ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
             </label>
 
+            {/* Toggle 2: WhatsApp / Chat (Motion Point #47) */}
             <label htmlFor="notif-chat" className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer min-h-[48px]">
               <div>
-                <div className="font-bold text-slate-900">Pesan Chat Penjual</div>
-                <div className="text-[11px] text-slate-500">Notifikasi saat penjual membalas pertanyaan atau ulasan produk.</div>
+                <div className="font-bold text-slate-900">Pesan Chat & WhatsApp Penjual</div>
+                <div className="text-[11px] text-slate-500">Notifikasi saat penjual membalas pertanyaan atau ulasan produk via WhatsApp.</div>
               </div>
               <input
                 id="notif-chat"
                 type="checkbox"
                 checked={smsNotif}
                 onChange={(e) => setSmsNotif(e.target.checked)}
-                className="w-5 h-5 text-[#003d29] accent-[#003d29] rounded focus:ring-2 focus:ring-[#003d29] cursor-pointer ml-3 shrink-0"
+                className="sr-only"
               />
+              <div
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-[var(--ease-out)] ml-3 ${
+                  smsNotif ? 'bg-[#003d29]' : 'bg-slate-200'
+                }`}
+                aria-hidden="true"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ease-[var(--ease-out)] active:scale-95 ${
+                    smsNotif ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
             </label>
 
+            {/* Toggle 3: Push Promo (Motion Point #47) */}
             <label htmlFor="notif-promo" className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer min-h-[48px]">
               <div>
                 <div className="font-bold text-slate-900">Promo & Voucher Spesial</div>
@@ -371,8 +398,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="checkbox"
                 checked={promoNotif}
                 onChange={(e) => setPromoNotif(e.target.checked)}
-                className="w-5 h-5 text-[#003d29] accent-[#003d29] rounded focus:ring-2 focus:ring-[#003d29] cursor-pointer ml-3 shrink-0"
+                className="sr-only"
               />
+              <div
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-[var(--ease-out)] ml-3 ${
+                  promoNotif ? 'bg-[#003d29]' : 'bg-slate-200'
+                }`}
+                aria-hidden="true"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ease-[var(--ease-out)] active:scale-95 ${
+                    promoNotif ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
             </label>
 
             <div className="pt-2 flex items-center justify-between">
@@ -381,7 +420,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               )}
               <button
                 type="submit"
-                className="ml-auto min-h-[44px] px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all cursor-pointer shadow-2xs"
+                className="ml-auto min-h-[44px] px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#003d29] hover:bg-[#064e3b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-all cursor-pointer shadow-2xs motion-press active:scale-[0.96]"
               >
                 Simpan Preferensi
               </button>
