@@ -23,6 +23,12 @@ import {
   SellerInventoryItem,
   AdminDashboardResult,
   AuditLogItem,
+  UserNotificationPreferences,
+  UserPrivacyPreferences,
+  UserSession,
+  TwoFactorStatus,
+  TwoFactorSetupResult,
+  UserDataExport,
 } from '../types';
 
 const TOKEN_KEY = 'pasaria_token';
@@ -361,16 +367,148 @@ export const api = {
   async changePassword(
     arg1: string | { current_password: string; new_password: string; new_password_confirmation?: string },
     newPassword?: string
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; message?: string; token?: string }> {
     const body =
       typeof arg1 === 'object'
         ? arg1
         : { current_password: arg1, new_password: newPassword, new_password_confirmation: newPassword };
 
-    return request<{ success: boolean }>('/api/user/password', {
+    const res = await request<{ success: boolean; message?: string; token?: string }>('/api/user/password', {
       method: 'PUT',
       body: JSON.stringify(body),
     });
+
+    if (res.token) {
+      this.setToken(res.token);
+    }
+
+    return res;
+  },
+
+  async requestEmailChange(new_email: string): Promise<{ success: boolean; message: string; new_email?: string; verification_code?: string }> {
+    return request<{ success: boolean; message: string; new_email?: string; verification_code?: string }>(
+      '/api/user/email/request-change',
+      {
+        method: 'POST',
+        body: JSON.stringify({ new_email }),
+      }
+    );
+  },
+
+  async verifyEmailChange(code: string): Promise<{ success: boolean; message: string; user?: User }> {
+    return request<{ success: boolean; message: string; user?: User }>(
+      '/api/user/email/verify-change',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      }
+    );
+  },
+
+  // ── 3b. Active Sessions & Two-Factor Authentication ───────────────────────
+  async getActiveSessions(): Promise<UserSession[]> {
+    const json = await request<{ success: boolean; data: UserSession[] }>('/api/user/sessions');
+    return json.data || [];
+  },
+
+  async revokeSession(id: number): Promise<{ success: boolean; message: string; is_current?: boolean }> {
+    return request<{ success: boolean; message: string; is_current?: boolean }>(
+      `/api/user/sessions/${id}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  async revokeOtherSessions(): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/user/sessions-others', {
+      method: 'DELETE',
+    });
+  },
+
+  async getTwoFactorStatus(): Promise<TwoFactorStatus> {
+    const json = await request<{ success: boolean; enabled: boolean; confirmed_at?: string | null }>(
+      '/api/user/two-factor'
+    );
+    return {
+      enabled: !!json.enabled,
+      confirmed_at: json.confirmed_at,
+    };
+  },
+
+  async setupTwoFactor(): Promise<TwoFactorSetupResult> {
+    return request<TwoFactorSetupResult>('/api/user/two-factor/setup', {
+      method: 'POST',
+    });
+  },
+
+  async confirmTwoFactor(code: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/user/two-factor/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  },
+
+  async disableTwoFactor(password: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/user/two-factor/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  },
+
+  // ── 3c. Notification & Privacy Preferences ─────────────────────────────────
+  async getNotificationPreferences(): Promise<UserNotificationPreferences> {
+    const json = await request<{ success: boolean; data: UserNotificationPreferences }>(
+      '/api/user/notification-preferences'
+    );
+    return json.data;
+  },
+
+  async updateNotificationPreferences(
+    data: Partial<UserNotificationPreferences>
+  ): Promise<UserNotificationPreferences> {
+    const json = await request<{ success: boolean; message: string; data: UserNotificationPreferences }>(
+      '/api/user/notification-preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async getPrivacyPreferences(): Promise<UserPrivacyPreferences> {
+    const json = await request<{ success: boolean; data: UserPrivacyPreferences }>(
+      '/api/user/privacy-preferences'
+    );
+    return json.data;
+  },
+
+  async updatePrivacyPreferences(
+    data: Partial<UserPrivacyPreferences>
+  ): Promise<UserPrivacyPreferences> {
+    const json = await request<{ success: boolean; message: string; data: UserPrivacyPreferences }>(
+      '/api/user/privacy-preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async exportUserData(): Promise<UserDataExport> {
+    const json = await request<{ success: boolean; message: string; data: UserDataExport }>(
+      '/api/user/data-export'
+    );
+    return json.data;
+  },
+
+  async deleteAccount(password: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    const res = await request<{ success: boolean; message: string }>('/api/user/delete-account', {
+      method: 'POST',
+      body: JSON.stringify({ password, reason }),
+    });
+    this.clearToken();
+    return res;
   },
 
   // ── 4. Addresses ──────────────────────────────────────────────────────────

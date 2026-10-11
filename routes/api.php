@@ -20,6 +20,9 @@ use App\Http\Controllers\Api\ReturnApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\UploadApiController;
+use App\Http\Controllers\Api\UserPreferenceApiController;
+use App\Http\Controllers\Api\UserSecurityApiController;
+use App\Http\Controllers\Api\UserPrivacyApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -76,7 +79,32 @@ Route::middleware(['throttle:api'])->group(function () {
         Route::get('/user', [AuthApiController::class, 'me']);
         Route::post('/auth/logout', [AuthApiController::class, 'logout']);
         Route::put('/user/profile', [AuthApiController::class, 'updateProfile']);
-        Route::put('/user/password', [AuthApiController::class, 'changePassword']);
+        Route::put('/user/password', [AuthApiController::class, 'changePassword'])->middleware('throttle:password-change');
+
+        // Verified Email Change
+        Route::post('/user/email/request-change', [UserSecurityApiController::class, 'requestEmailChange'])->middleware('throttle:email-change');
+        Route::post('/user/email/verify-change', [UserSecurityApiController::class, 'verifyEmailChange'])->middleware('throttle:email-change');
+
+        // Active Sessions & Devices Management
+        Route::get('/user/sessions', [UserSecurityApiController::class, 'getSessions']);
+        Route::delete('/user/sessions/{id}', [UserSecurityApiController::class, 'revokeSession']);
+        Route::delete('/user/sessions-others', [UserSecurityApiController::class, 'revokeOtherSessions']);
+
+        // Two-Step Verification (2FA / TOTP)
+        Route::get('/user/two-factor', [UserSecurityApiController::class, 'getTwoFactorStatus']);
+        Route::post('/user/two-factor/setup', [UserSecurityApiController::class, 'setupTwoFactor'])->middleware('throttle:two-factor');
+        Route::post('/user/two-factor/confirm', [UserSecurityApiController::class, 'confirmTwoFactor'])->middleware('throttle:two-factor');
+        Route::post('/user/two-factor/disable', [UserSecurityApiController::class, 'disableTwoFactor'])->middleware('throttle:two-factor');
+
+        // Persistent Notification Preferences
+        Route::get('/user/notification-preferences', [UserPreferenceApiController::class, 'getNotificationPreferences']);
+        Route::put('/user/notification-preferences', [UserPreferenceApiController::class, 'updateNotificationPreferences']);
+
+        // Privacy & Data Management
+        Route::get('/user/privacy-preferences', [UserPreferenceApiController::class, 'getPrivacyPreferences']);
+        Route::put('/user/privacy-preferences', [UserPreferenceApiController::class, 'updatePrivacyPreferences']);
+        Route::get('/user/data-export', [UserPrivacyApiController::class, 'exportUserData']);
+        Route::post('/user/delete-account', [UserPrivacyApiController::class, 'deleteAccount'])->middleware('throttle:account-delete');
 
         // User Addresses (IDOR protected strictly to user_id)
         Route::get('/user/addresses', [AddressApiController::class, 'index']);

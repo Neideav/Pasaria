@@ -38,6 +38,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [newPostalCode, setNewPostalCode] = useState('');
   const [removingAddressId, setRemovingAddressId] = useState<number | null>(null);
 
+  // Email Change Flow State
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [emailOtpCode, setEmailOtpCode] = useState('');
+  const [emailStep, setEmailStep] = useState<'request' | 'verify'>('request');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailModalError, setEmailModalError] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,7 +84,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     try {
       const res = await api.updateProfile({
         name: name.trim(),
-        email: email.trim(),
         phone: phone.trim(),
         avatar: avatar || undefined,
         address: address.trim(),
@@ -189,6 +196,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     }
   };
 
+  const handleRequestEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmailInput.trim()) return;
+    setEmailLoading(true);
+    setEmailModalError('');
+    try {
+      await api.requestEmailChange(newEmailInput.trim());
+      setEmailStep('verify');
+      showToast('Kode verifikasi telah dikirim ke alamat email baru.', 'info');
+    } catch (err: any) {
+      setEmailModalError(err.message || 'Gagal memproses permintaan perubahan email.');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleVerifyEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailOtpCode.trim()) return;
+    setEmailLoading(true);
+    setEmailModalError('');
+    try {
+      const res = await api.verifyEmailChange(emailOtpCode.trim());
+      setEmail(newEmailInput.trim());
+      if (res.user) {
+        onUpdateUser(res.user);
+      }
+      setShowEmailModal(false);
+      showToast('Alamat email berhasil diubah dan diverifikasi.', 'success');
+    } catch (err: any) {
+      setEmailModalError(err.message || 'Kode verifikasi tidak valid atau kedaluwarsa.');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
       {/* Header */}
@@ -274,14 +317,40 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-[#003d29]"
-                required
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-semibold text-slate-700">Email Akun</label>
+                {user?.email_verified_at ? (
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                    Terverifikasi ✓
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                    Belum Diverifikasi
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="email"
+                  value={email}
+                  readOnly
+                  disabled
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 cursor-not-allowed select-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewEmailInput('');
+                    setEmailOtpCode('');
+                    setEmailStep('request');
+                    setEmailModalError('');
+                    setShowEmailModal(true);
+                  }}
+                  className="shrink-0 min-h-[44px] px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 text-[#003d29] hover:bg-emerald-100 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Ubah Email
+                </button>
+              </div>
             </div>
 
             <div>
@@ -477,6 +546,115 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Verified Email Change Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-xl space-y-4 text-left">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="font-extrabold text-slate-900 text-sm">Ubah Alamat Email</h3>
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+
+            {emailModalError && (
+              <div role="alert" className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{emailModalError}</span>
+              </div>
+            )}
+
+            {emailStep === 'request' ? (
+              <form onSubmit={handleRequestEmailChange} className="space-y-4 text-xs">
+                <p className="text-slate-500">
+                  Masukkan alamat email baru Anda. Kami akan mengirimkan kode verifikasi 6 digit untuk memastikan kepemilikan email.
+                </p>
+                <div>
+                  <label htmlFor="new-email-field" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Alamat Email Baru
+                  </label>
+                  <input
+                    id="new-email-field"
+                    type="email"
+                    value={newEmailInput}
+                    onChange={(e) => setNewEmailInput(e.target.value)}
+                    placeholder="nama@email.com"
+                    required
+                    className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailModal(false)}
+                    className="min-h-[40px] px-4 py-2 rounded-full border border-slate-200 text-slate-600 font-semibold cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={emailLoading || !newEmailInput.trim()}
+                    className="min-h-[40px] px-5 py-2 rounded-full bg-[#003d29] text-white font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    {emailLoading ? 'Memproses...' : 'Kirim Kode Verifikasi'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyEmailChange} className="space-y-4 text-xs">
+                <p className="text-slate-500">
+                  Kode verifikasi 6 digit telah dikirimkan ke <strong className="text-slate-800">{newEmailInput}</strong>.
+                </p>
+                <div>
+                  <label htmlFor="otp-code-field" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Kode Verifikasi (OTP)
+                  </label>
+                  <input
+                    id="otp-code-field"
+                    type="text"
+                    maxLength={6}
+                    value={emailOtpCode}
+                    onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Contoh: 123456"
+                    required
+                    className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-200 text-center tracking-widest text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[#003d29]"
+                  />
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEmailStep('request')}
+                    className="text-emerald-800 hover:underline font-semibold text-xs cursor-pointer"
+                  >
+                    ← Ubah Email
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailModal(false)}
+                      className="min-h-[40px] px-4 py-2 rounded-full border border-slate-200 text-slate-600 font-semibold cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={emailLoading || emailOtpCode.length !== 6}
+                      className="min-h-[40px] px-5 py-2 rounded-full bg-[#003d29] text-white font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      {emailLoading ? 'Memverifikasi...' : 'Verifikasi & Simpan'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

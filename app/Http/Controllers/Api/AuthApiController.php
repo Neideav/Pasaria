@@ -348,7 +348,13 @@ class AuthApiController extends Controller
 
         $request->validate([
             'current_password' => 'required|string',
-            'new_password'     => 'required|string|min:6',
+            'new_password'     => 'required|string|min:8',
+            'new_password_confirmation' => $request->has('new_password_confirmation')
+                ? 'required|string|same:new_password'
+                : 'nullable|string',
+        ], [
+            'new_password.min' => 'Kata sandi baru minimal 8 karakter.',
+            'new_password_confirmation.same' => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
         if (!Hash::check($request->input('current_password'), $user->password)) {

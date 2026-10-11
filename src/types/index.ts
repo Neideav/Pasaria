@@ -126,6 +126,8 @@ export interface User {
   status?: "active" | "suspended";
   shop?: Shop | null;
   addresses?: UserAddress[];
+  email_verified_at?: string | null;
+  two_factor_enabled?: boolean;
 }
 
 export interface OrderItemType {
@@ -498,3 +500,56 @@ export interface AuditLogItem {
   user?: User;
 }
 
+export interface UserNotificationPreferences {
+  id?: number;
+  user_id?: number;
+  order_updates_email: boolean;
+  order_updates_in_app: boolean;
+  chat_messages_email: boolean;
+  chat_messages_in_app: boolean;
+  promotions_email: boolean;
+  promotions_in_app: boolean;
+  wishlist_alerts_email: boolean;
+  wishlist_alerts_in_app: boolean;
+  security_alerts_email: boolean;
+  security_alerts_in_app: boolean;
+  updated_at?: string;
+}
+
+export interface UserPrivacyPreferences {
+  id?: number;
+  user_id?: number;
+  personalization_enabled: boolean;
+  marketing_communication: boolean;
+  activity_logging: boolean;
+  updated_at?: string;
+}
+
+export interface UserSession {
+  id: number;
+  name: string;
+  is_current: boolean;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  confirmed_at?: string | null;
+}
+
+export interface TwoFactorSetupResult {
+  secret: string;
+  qr_uri: string;
+  recovery_codes: string[];
+}
+
+export interface UserDataExport {
+  generated_at: string;
+  platform: string;
+  user: Partial<User>;
+  addresses: UserAddress[];
+  orders: any[];
+  reviews: any[];
+  notifications: any[];
+}

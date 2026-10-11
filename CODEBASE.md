@@ -94,6 +94,10 @@ Configured via `app/Providers/AppServiceProvider.php` using Laravel 11 `RateLimi
 | `orders-create` | `POST /api/orders` | 10 req/min | User ID or IP address |
 | `uploads` | `POST /api/upload` | 10 req/min | User ID or IP address |
 | `messages-send` | `POST /api/conversations/messages` | 30 req/min | User ID or IP address |
+| `password-change` | `POST /api/user/password` | 5 req/min | User ID or IP address |
+| `email-change` | `POST /api/user/email/*` | 3 req/min | User ID or IP address |
+| `two-factor` | `POST /api/user/2fa/*` | 5 req/min | User ID or IP address |
+| `account-delete` | `DELETE /api/user/account` | 3 req/min | User ID or IP address |
 
 ### Standardized 429 response envelope
 
@@ -107,6 +111,9 @@ Handled in `bootstrap/app.php` via `ThrottleRequestsException`:
 <!-- BEGIN AUTO GENERATED: DATABASE_SCHEMA -->
 users (id PK, name, email unique, password, role enum[customer|seller|admin], avatar nullable, status string, email_verified_at, deleted_at nullable, remember_token)
 user_addresses (id PK, user_id FK -> users.id, label, recipient_name, phone, address_line, city, postal_code, is_default bool)
+user_notification_preferences (id PK, user_id unique FK -> users.id, order_updates bool, delivery_updates bool, chat_messages bool, reviews_qa bool, wishlist_price_alerts bool, promotional_discounts bool, marketplace_announcements bool, channel_in_app bool, channel_email bool)
+user_privacy_preferences (id PK, user_id unique FK -> users.id, personalized_recommendations bool, marketing_emails bool, activity_tracking bool, search_history_storage bool)
+user_two_factor_auth (id PK, user_id unique FK -> users.id, secret text encrypted, is_enabled bool, confirmed_at datetime nullable, recovery_codes json nullable)
 shops (id PK, user_id FK -> users.id, name, slug unique, description text, city, rating decimal, is_verified bool, status string, deleted_at nullable)
 categories (id PK, name, slug unique, item_count int, icon nullable)
 products (id PK, shop_id FK -> shops.id, category_id FK -> categories.id nullable, name, slug unique, price decimal, stock int, is_active bool, deleted_at nullable, index[shop_id, is_active], index[category, price])
@@ -141,6 +148,16 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | POST | /api/auth/verify-email | Api\AuthApiController@verifyEmail | Public / Authenticated |
 | POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated (throttle:auth-resend) |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
+| POST | /api/user/password | Api\AuthApiController@changePassword | Authenticated (throttle:password-change) |
+| GET,PUT | /api/user/notification-preferences | Api\UserPreferenceApiController | Authenticated |
+| GET,PUT | /api/user/privacy-preferences | Api\UserPreferenceApiController | Authenticated |
+| GET,DELETE | /api/user/sessions | Api\UserSecurityApiController | Authenticated |
+| DELETE | /api/user/sessions/others | Api\UserSecurityApiController@revokeOtherSessions | Authenticated |
+| POST | /api/user/email/request-change | Api\UserSecurityApiController@requestEmailChange | Authenticated (throttle:email-change) |
+| POST | /api/user/email/verify-change | Api\UserSecurityApiController@verifyEmailChange | Authenticated (throttle:email-change) |
+| GET,POST,DELETE | /api/user/2fa | Api\UserSecurityApiController | Authenticated (throttle:two-factor) |
+| GET | /api/user/data-export | Api\UserPrivacyApiController@exportData | Authenticated |
+| DELETE | /api/user/account | Api\UserPrivacyApiController@deleteAccount | Authenticated (throttle:account-delete) |
 | GET | /api/products | Api\ProductApiController@index | Public |
 | POST,PUT,DELETE | /api/products | Api\ProductApiController | Seller / Admin |
 | PATCH | /api/products/{id}/status | Api\ProductApiController@toggleStatus | Seller / Admin |

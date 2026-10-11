@@ -1018,6 +1018,14 @@ function AppContent() {
               }
               loadProducts();
             }}
+            onUpdateUser={(updated) => {
+              setUser(updated);
+              localStorage.setItem("pasaria_user", JSON.stringify(updated));
+            }}
+            onOpenShopDashboard={() => {
+              setView("shop_dashboard");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           />
         )}
 

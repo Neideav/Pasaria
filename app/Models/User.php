@@ -93,6 +93,26 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(AdminAction::class);
     }
 
+    public function notificationPreferences()
+    {
+        return $this->hasOne(UserNotificationPreference::class);
+    }
+
+    public function privacyPreferences()
+    {
+        return $this->hasOne(UserPrivacyPreference::class);
+    }
+
+    public function twoFactorAuth()
+    {
+        return $this->hasOne(UserTwoFactorAuth::class);
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return (bool) ($this->twoFactorAuth?->enabled);
+    }
+
     public function isCustomer(): bool
     {
         return $this->role === 'customer';
