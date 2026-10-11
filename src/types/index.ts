@@ -52,6 +52,7 @@ export interface Shop {
   is_verified?: boolean;
   verified?: boolean;
   status?: string;
+  notify_new_products?: boolean;
   created_at?: string;
 }
 
@@ -513,6 +514,28 @@ export interface UserNotificationPreferences {
   wishlist_alerts_in_app: boolean;
   security_alerts_email: boolean;
   security_alerts_in_app: boolean;
+  shipping_updates_email?: boolean;
+  shipping_updates_in_app?: boolean;
+  product_qa_email?: boolean;
+  product_qa_in_app?: boolean;
+  review_activity_email?: boolean;
+  review_activity_in_app?: boolean;
+  shop_updates_email?: boolean;
+  shop_updates_in_app?: boolean;
+  price_alerts_email?: boolean;
+  price_alerts_in_app?: boolean;
+  stock_alerts_email?: boolean;
+  stock_alerts_in_app?: boolean;
+  quiet_hours_enabled?: boolean;
+  quiet_hours_start?: string;
+  quiet_hours_end?: string;
+  quiet_hours_timezone?: string;
+  timezone?: string;
+  shipping_delivery_email?: boolean;
+  shipping_delivery_in_app?: boolean;
+  qa_answers_email?: boolean;
+  qa_answers_in_app?: boolean;
+  email_digest_frequency?: 'instant' | 'daily' | 'weekly';
   updated_at?: string;
 }
 
@@ -522,7 +545,108 @@ export interface UserPrivacyPreferences {
   personalization_enabled: boolean;
   marketing_communication: boolean;
   activity_logging: boolean;
+  default_anonymous_reviews?: boolean;
+  show_profile_publicly?: boolean;
   updated_at?: string;
+}
+
+export interface UserShoppingPreferences {
+  id?: number;
+  user_id?: number;
+  favorite_categories: string[];
+  favorite_brands: string[];
+  min_price: number | null;
+  max_price: number | null;
+  hide_out_of_stock: boolean;
+  prioritize_official_stores: boolean;
+  default_sort: 'popular' | 'price_asc' | 'price_desc' | 'rating' | 'newest';
+  preferred_density: 'comfortable' | 'compact';
+  recommendation_personalization: boolean;
+  theme: 'light' | 'dark' | 'system';
+  font_size: 'normal' | 'large';
+  reduced_motion: boolean;
+  high_contrast: boolean;
+  updated_at?: string;
+}
+
+export interface ProductAlert {
+  id: number;
+  user_id: number;
+  product_id: number;
+  alert_type: 'price_drop' | 'back_in_stock' | 'target_price' | 'shop_new_product';
+  target_price?: number | null;
+  last_observed_price?: number | null;
+  is_active: boolean;
+  last_notified_at?: string | null;
+  created_at: string;
+  product?: {
+    id: number;
+    name: string;
+    slug: string;
+    price: number;
+    original_price?: number | null;
+    image?: string;
+    stock: number;
+    is_active: boolean;
+    shop_name?: string;
+  } | null;
+}
+
+export interface UserSearchHistoryItem {
+  id: number;
+  user_id: number;
+  query: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserViewedProductItem {
+  id: number;
+  user_id: number;
+  product_id: number;
+  viewed_at: string;
+  product: {
+    id: number;
+    name: string;
+    slug: string;
+    price: number;
+    original_price?: number | null;
+    image?: string;
+    stock: number;
+    is_active: boolean;
+    shop_name?: string;
+    rating: number;
+    review_count: number;
+  };
+}
+
+export interface SellerPreferences {
+  id?: number;
+  user_id?: number;
+  shop_id?: number;
+  notify_new_orders: boolean;
+  notify_customer_chat: boolean;
+  notify_low_stock: boolean;
+  notify_reviews: boolean;
+  notify_returns: boolean;
+  low_stock_threshold: number;
+  vacation_mode: boolean;
+  vacation_message?: string | null;
+  vacation_start?: string | null;
+  vacation_end?: string | null;
+  updated_at?: string;
+}
+
+export interface CatalogMetadataCategory {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface CatalogMetadataBrand {
+  id: number;
+  name: string;
+  slug: string;
 }
 
 export interface UserSession {
@@ -553,3 +677,4 @@ export interface UserDataExport {
   reviews: any[];
   notifications: any[];
 }
+

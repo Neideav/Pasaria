@@ -205,6 +205,7 @@ class SellerApiController extends Controller
             'variant_id' => 'nullable|integer',
         ]);
 
+        $oldStock = (int) $product->stock;
         $stock = (int) $request->input('stock');
         $product->stock = $stock;
         $product->save();
@@ -218,6 +219,14 @@ class SellerApiController extends Controller
                 $variant->save();
             }
         }
+
+        // Trigger back-in-stock alert if transitioning from 0 to > 0
+        if ($oldStock === 0 && $stock > 0) {
+            \App\Services\ProductAlertService::handleBackInStock($product);
+        }
+
+        // Trigger seller low-stock check
+        \App\Services\SellerAlertService::handleLowStock($product);
 
         return response()->json([
             'success' => true,

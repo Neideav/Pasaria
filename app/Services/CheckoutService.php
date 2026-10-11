@@ -265,6 +265,18 @@ class CheckoutService
                         throw new \InvalidArgumentException("Toko '{$product->shop->name}' sedang tidak aktif atau ditangguhkan.");
                     }
 
+                    // Check seller vacation mode
+                    if ($product->shop_id) {
+                        $vacationPref = \App\Models\SellerPreference::where('shop_id', $product->shop_id)
+                            ->where('vacation_mode', true)
+                            ->first();
+                        if ($vacationPref) {
+                            $vacMsg = $vacationPref->vacation_message ? " ({$vacationPref->vacation_message})" : '';
+                            $shopName = $product->shop_name ?: ($product->shop ? $product->shop->name : 'Penjual');
+                            throw new \InvalidArgumentException("Toko '{$shopName}' sedang dalam mode libur dan tidak dapat menerima pesanan saat ini{$vacMsg}.");
+                        }
+                    }
+
                     $demandedQty = $demandedProductStock[$pId];
                     if ($product->stock < $demandedQty) {
                         throw new \RuntimeException("Stok untuk '{$product->name}' tidak mencukupi. Tersedia: {$product->stock}, diminta: {$demandedQty}.");
@@ -312,6 +324,11 @@ class CheckoutService
                         $p = $lockedProducts->get($pId);
                         $pName = $p ? $p->name : "#{$pId}";
                         throw new \RuntimeException("Gagal mengurangi stok untuk '{$pName}' karena stok berubah atau tidak mencukupi.");
+                    }
+
+                    $freshP = Product::find($pId);
+                    if ($freshP) {
+                        \App\Services\SellerAlertService::handleLowStock($freshP);
                     }
                 }
 

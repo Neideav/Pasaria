@@ -70,6 +70,8 @@ export const PrivacyTab: React.FC<PrivacyTabProps> = ({ onLogoutAndNavigateHome 
         personalization_enabled: privacyPrefs.personalization_enabled,
         marketing_communication: privacyPrefs.marketing_communication,
         activity_logging: privacyPrefs.activity_logging,
+        default_anonymous_reviews: privacyPrefs.default_anonymous_reviews,
+        show_profile_publicly: privacyPrefs.show_profile_publicly,
       });
 
       if (updated) {
@@ -187,7 +189,65 @@ export const PrivacyTab: React.FC<PrivacyTabProps> = ({ onLogoutAndNavigateHome 
               </div>
             </label>
 
-            {/* Toggle 2: Marketing Communication */}
+            {/* Toggle 2: Anonymous Reviews */}
+            <label className="flex items-start justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 hover:border-slate-300 transition-colors cursor-pointer">
+              <div className="pr-4">
+                <div className="font-extrabold text-slate-900">Ulasan Anonim Secara Default</div>
+                <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Sembunyikan nama akun asli saat menulis ulasan produk (nama disamarkan sebagai Pengguna PASARIA).
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={Boolean(privacyPrefs.default_anonymous_reviews)}
+                onChange={(e) =>
+                  setPrivacyPrefs((prev) => ({ ...prev, default_anonymous_reviews: e.target.checked }))
+                }
+                className="sr-only"
+              />
+              <div
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out cursor-pointer mt-1 ${
+                  privacyPrefs.default_anonymous_reviews ? 'bg-[#003d29]' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition duration-200 ease-in-out ${
+                    privacyPrefs.default_anonymous_reviews ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
+            </label>
+
+            {/* Toggle 3: Show Profile Publicly */}
+            <label className="flex items-start justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 hover:border-slate-300 transition-colors cursor-pointer">
+              <div className="pr-4">
+                <div className="font-extrabold text-slate-900">Tampilkan Profil Marketplace ke Publik</div>
+                <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Izinkan pembeli lain melihat ringkasan profil publik dan badge belanja Anda.
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={privacyPrefs.show_profile_publicly !== false}
+                onChange={(e) =>
+                  setPrivacyPrefs((prev) => ({ ...prev, show_profile_publicly: e.target.checked }))
+                }
+                className="sr-only"
+              />
+              <div
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out cursor-pointer mt-1 ${
+                  privacyPrefs.show_profile_publicly !== false ? 'bg-[#003d29]' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition duration-200 ease-in-out ${
+                    privacyPrefs.show_profile_publicly !== false ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
+            </label>
+
+            {/* Toggle 4: Marketing Communication */}
             <label className="flex items-start justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 hover:border-slate-300 transition-colors cursor-pointer">
               <div className="pr-4">
                 <div className="font-extrabold text-slate-900">Email Buletin & Pemasaran Opsional</div>
@@ -216,7 +276,7 @@ export const PrivacyTab: React.FC<PrivacyTabProps> = ({ onLogoutAndNavigateHome 
               </div>
             </label>
 
-            {/* Toggle 3: Activity Logging */}
+            {/* Toggle 5: Activity Logging */}
             <label className="flex items-start justify-between p-4 rounded-2xl bg-slate-50/80 border border-slate-200/70 hover:border-slate-300 transition-colors cursor-pointer">
               <div className="pr-4">
                 <div className="font-extrabold text-slate-900">Pencatatan Riwayat Aktivitas & Perangkat</div>

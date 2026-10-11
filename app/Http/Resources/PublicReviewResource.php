@@ -24,11 +24,20 @@ class PublicReviewResource extends JsonResource
                 'avatar' => null,
             ];
         } elseif ($this->user) {
-            $userData = [
-                'id' => $this->user->id,
-                'name' => $this->user->name,
-                'avatar' => $this->user->avatar,
-            ];
+            $showPublicly = $this->user->privacyPreferences ? (bool) $this->user->privacyPreferences->show_profile_publicly : true;
+            if (!$showPublicly) {
+                $userData = [
+                    'id' => 0,
+                    'name' => 'Pelanggan Terverifikasi',
+                    'avatar' => null,
+                ];
+            } else {
+                $userData = [
+                    'id' => $this->user->id,
+                    'name' => $this->user->name,
+                    'avatar' => $this->user->avatar,
+                ];
+            }
         }
 
         $mediaList = [];

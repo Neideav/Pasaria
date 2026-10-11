@@ -180,6 +180,32 @@ function AppContent() {
 
   // On mount: authenticate with Sanctum session & load data
   useEffect(() => {
+    // Apply appearance preferences to root element
+    try {
+      const savedTheme = localStorage.getItem("pasaria_theme") || "light";
+      const root = document.documentElement;
+      if (savedTheme === "dark") {
+        root.classList.add("dark");
+      } else if (savedTheme === "light") {
+        root.classList.remove("dark");
+      } else {
+        if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          root.classList.add("dark");
+        } else {
+          root.classList.remove("dark");
+        }
+      }
+
+      const savedFontSize = localStorage.getItem("pasaria_font_size");
+      root.classList.toggle("text-scale-large", savedFontSize === "large");
+
+      const savedReducedMotion = localStorage.getItem("pasaria_reduced_motion");
+      root.classList.toggle("reduced-motion", savedReducedMotion === "true");
+
+      const savedHighContrast = localStorage.getItem("pasaria_high_contrast");
+      root.classList.toggle("high-contrast", savedHighContrast === "true");
+    } catch {}
+
     const unsub = api.onUnauthorized(() => {
       setUser(null);
       localStorage.removeItem('pasaria_user');
@@ -422,6 +448,9 @@ function AppContent() {
 
   const handleSelectProduct = async (product: Product) => {
     try {
+      if (product.id) {
+        api.recordViewedProduct(product.id).catch(() => {});
+      }
       const data = await api.getProductBySlug(product.slug);
       setSelectedProduct(data.product);
       setRelatedProducts(data.related || []);
@@ -435,6 +464,9 @@ function AppContent() {
   };
 
   const handleNavigateSearch = (q: string) => {
+    if (q.trim()) {
+      api.recordSearchQuery(q.trim()).catch(() => {});
+    }
     setSearchQuery(q);
     setView("search");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1026,6 +1058,24 @@ function AppContent() {
               setView("shop_dashboard");
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
+            onNavigateProduct={(slug) => {
+              const p = products.find((x) => x.slug === slug);
+              if (p) {
+                handleSelectProduct(p);
+              } else {
+                api.getProductBySlug(slug).then((res) => {
+                  setSelectedProduct(res.product);
+                  setRelatedProducts(res.related || []);
+                  setView("product");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }).catch(() => {});
+              }
+            }}
+            onNavigateShop={(shopIdOrSlug) => {
+              handleViewShopPublic(String(shopIdOrSlug), typeof shopIdOrSlug === 'number' ? shopIdOrSlug : undefined);
+            }}
+            onSearchQuery={handleNavigateSearch}
+            onLogout={handleLogout}
           />
         )}
 

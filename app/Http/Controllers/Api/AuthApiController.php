@@ -62,6 +62,22 @@ class AuthApiController extends Controller
             ], 403);
         }
 
+        // Enforce Two-Factor Authentication (2FA) if enabled
+        if ($user->hasTwoFactorEnabled()) {
+            $challengeToken = \Illuminate\Support\Str::random(64);
+            Cache::put("2fa_challenge_{$challengeToken}", [
+                'user_id'    => $user->id,
+                'created_at' => now()->timestamp,
+            ], now()->addMinutes(5));
+
+            return response()->json([
+                'success'             => true,
+                'two_factor_required' => true,
+                'challenge_token'     => $challengeToken,
+                'message'             => 'Autentikasi dua langkah (2FA) diperlukan. Silakan masukkan kode verifikasi 6 digit atau kode pemulihan Anda.',
+            ], 200);
+        }
+
         // Generate Sanctum plain text bearer token
         $token = $user->createToken('pasaria_auth_token')->plainTextToken;
 
@@ -73,6 +89,94 @@ class AuthApiController extends Controller
             'message' => 'Selamat datang di PASARIA!',
             'token' => $token,
             'user' => $userData,
+        ]);
+    }
+
+    /**
+     * Complete 2FA login challenge using 6-digit TOTP code or single-use recovery code.
+     */
+    public function twoFactorChallenge(Request $request, \App\Services\TotpService $totp): JsonResponse
+    {
+        $request->validate([
+            'challenge_token' => 'required|string',
+            'code'            => 'nullable|string',
+            'recovery_code'   => 'nullable|string',
+        ]);
+
+        $challengeToken = trim((string) $request->input('challenge_token'));
+        $cached = Cache::get("2fa_challenge_{$challengeToken}");
+
+        if (!$cached || empty($cached['user_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tantangan 2FA tidak valid atau telah kedaluwarsa. Silakan lakukan login ulang.',
+            ], 422);
+        }
+
+        $user = User::find($cached['user_id']);
+        if (!$user || $user->isSuspended()) {
+            Cache::forget("2fa_challenge_{$challengeToken}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengguna tidak ditemukan atau akun dinonaktifkan.',
+            ], 403);
+        }
+
+        $twoFactor = \App\Models\UserTwoFactorAuth::where('user_id', $user->id)->first();
+        if (!$twoFactor || !$twoFactor->enabled || empty($twoFactor->secret)) {
+            Cache::forget("2fa_challenge_{$challengeToken}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Konfigurasi 2FA akun tidak valid.',
+            ], 422);
+        }
+
+        $code = trim((string) $request->input('code', ''));
+        $recoveryCode = strtoupper(trim((string) $request->input('recovery_code', '')));
+        $verified = false;
+
+        if (!empty($code)) {
+            if ($totp->verify($twoFactor->secret, $code)) {
+                $verified = true;
+            }
+        } elseif (!empty($recoveryCode)) {
+            $codes = is_array($twoFactor->recovery_codes_json) ? $twoFactor->recovery_codes_json : [];
+            $matchedIndex = null;
+            foreach ($codes as $idx => $stored) {
+                if (Hash::check($recoveryCode, $stored) || $recoveryCode === $stored) {
+                    $matchedIndex = $idx;
+                    break;
+                }
+            }
+
+            if ($matchedIndex !== null) {
+                $verified = true;
+                array_splice($codes, $matchedIndex, 1);
+                $twoFactor->recovery_codes_json = $codes;
+                $twoFactor->save();
+            }
+        }
+
+        if (!$verified) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kode autentikasi 2FA atau kode pemulihan tidak valid.',
+            ], 422);
+        }
+
+        // Prevent replay: forget challenge immediately
+        Cache::forget("2fa_challenge_{$challengeToken}");
+
+        $token = $user->createToken('pasaria_auth_token')->plainTextToken;
+
+        $userData = $user->load(['shop', 'addresses'])->toArray();
+        unset($userData['password'], $userData['remember_token']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Verifikasi dua langkah berhasil! Selamat datang di PASARIA.',
+            'token'   => $token,
+            'user'    => $userData,
         ]);
     }
 

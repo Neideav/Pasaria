@@ -14,6 +14,8 @@ class UserPrivacyPreference extends Model
         'personalization_enabled',
         'marketing_communication',
         'activity_logging',
+        'default_anonymous_reviews',
+        'show_profile_publicly',
     ];
 
     protected $casts = [
@@ -21,6 +23,8 @@ class UserPrivacyPreference extends Model
         'personalization_enabled' => 'boolean',
         'marketing_communication' => 'boolean',
         'activity_logging' => 'boolean',
+        'default_anonymous_reviews' => 'boolean',
+        'show_profile_publicly' => 'boolean',
     ];
 
     public function user()
@@ -39,6 +43,8 @@ class UserPrivacyPreference extends Model
                 'personalization_enabled' => true,
                 'marketing_communication' => false,
                 'activity_logging' => true,
+                'default_anonymous_reviews' => false,
+                'show_profile_publicly' => true,
             ]
         );
     }

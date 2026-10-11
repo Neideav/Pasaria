@@ -21,6 +21,7 @@ import { formatDateTime } from '../../utils/formatters';
 interface SecurityTabProps {
   user: User | null;
   onUpdateUser?: (updated: User) => void;
+  onLogout?: () => void;
 }
 
 interface PasswordStrength {
@@ -57,7 +58,7 @@ const getPasswordStrength = (pass: string): PasswordStrength => {
   }
 };
 
-export const SecurityTab: React.FC<SecurityTabProps> = ({ user, onUpdateUser }) => {
+export const SecurityTab: React.FC<SecurityTabProps> = ({ user, onUpdateUser, onLogout }) => {
   const { showToast } = useToast();
 
   // Password Change State
@@ -160,9 +161,20 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ user, onUpdateUser }) 
   };
 
   const handleRevokeSession = async (id: number) => {
+    const target = sessions.find((s) => s.id === id);
     setRevokingSessionId(id);
     try {
-      await api.revokeSession(id);
+      const res = await api.revokeSession(id);
+      if (target?.is_current || res.is_current) {
+        api.clearToken();
+        showToast('Sesi saat ini telah dicabut. Anda dialihkan ke beranda.', 'info');
+        if (onLogout) {
+          onLogout();
+        } else {
+          window.location.reload();
+        }
+        return;
+      }
       setSessions((prev) => prev.filter((s) => s.id !== id));
       showToast('Sesi perangkat berhasil dicabut.', 'info');
     } catch (err: any) {

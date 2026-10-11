@@ -29,6 +29,13 @@ import {
   TwoFactorStatus,
   TwoFactorSetupResult,
   UserDataExport,
+  UserShoppingPreferences,
+  ProductAlert,
+  UserSearchHistoryItem,
+  UserViewedProductItem,
+  SellerPreferences,
+  CatalogMetadataCategory,
+  CatalogMetadataBrand,
 } from '../types';
 
 const TOKEN_KEY = 'pasaria_token';
@@ -282,12 +289,32 @@ export const api = {
   },
 
   // ── 3. Authentication ─────────────────────────────────────────────────────
-  async login(username: string, password: string): Promise<{ user: User; token: string }> {
-    const json = await request<{ success: boolean; user: User; token: string }>(
+  async login(username: string, password: string): Promise<{ user?: User; token?: string; two_factor_required?: boolean; challenge_token?: string }> {
+    const json = await request<{ success: boolean; user?: User; token?: string; two_factor_required?: boolean; challenge_token?: string }>(
       '/api/auth/login',
       {
         method: 'POST',
         body: JSON.stringify({ username, password }),
+      }
+    );
+
+    if (json.token) {
+      this.setToken(json.token);
+    }
+    return {
+      user: json.user,
+      token: json.token,
+      two_factor_required: json.two_factor_required,
+      challenge_token: json.challenge_token,
+    };
+  },
+
+  async loginTwoFactorChallenge(data: { challenge_token: string; code?: string; recovery_code?: string }): Promise<{ user: User; token: string }> {
+    const json = await request<{ success: boolean; user: User; token: string }>(
+      '/api/auth/two-factor-challenge',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
       }
     );
 
@@ -509,6 +536,138 @@ export const api = {
     });
     this.clearToken();
     return res;
+  },
+
+  // ── 3d. Shopping Preferences ──────────────────────────────────────────────
+  async getShoppingPreferences(): Promise<{
+    preferences: UserShoppingPreferences;
+    available_categories: CatalogMetadataCategory[];
+    available_brands: CatalogMetadataBrand[];
+  }> {
+    const json = await request<{
+      success: boolean;
+      data: {
+        preferences: UserShoppingPreferences;
+        available_categories: CatalogMetadataCategory[];
+        available_brands: CatalogMetadataBrand[];
+      };
+    }>('/api/user/shopping-preferences');
+    return json.data;
+  },
+
+  async updateShoppingPreferences(
+    data: Partial<UserShoppingPreferences>
+  ): Promise<UserShoppingPreferences> {
+    const json = await request<{ success: boolean; message: string; data: UserShoppingPreferences }>(
+      '/api/user/shopping-preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  // ── 3e. Product Alerts & Price Watch ───────────────────────────────────────
+  async getProductAlerts(): Promise<ProductAlert[]> {
+    const json = await request<{ success: boolean; data: ProductAlert[] }>(
+      '/api/user/product-alerts'
+    );
+    return json.data || [];
+  },
+
+  async createProductAlert(data: {
+    product_id: number;
+    alert_type: 'price_drop' | 'back_in_stock' | 'target_price' | 'shop_new_product';
+    target_price?: number | null;
+  }): Promise<ProductAlert> {
+    const json = await request<{ success: boolean; message: string; data: ProductAlert }>(
+      '/api/user/product-alerts',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async updateProductAlert(
+    id: number,
+    data: {
+      is_active?: boolean;
+      target_price?: number | null;
+    }
+  ): Promise<ProductAlert> {
+    const json = await request<{ success: boolean; message: string; data: ProductAlert }>(
+      `/api/user/product-alerts/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async deleteProductAlert(id: number): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(
+      `/api/user/product-alerts/${id}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  // ── 3f. Account Activity History ───────────────────────────────────────────
+  async getRecentSearches(): Promise<UserSearchHistoryItem[]> {
+    const json = await request<{ success: boolean; data: UserSearchHistoryItem[] }>(
+      '/api/user/activity/recent-searches'
+    );
+    return json.data || [];
+  },
+
+  async recordSearchQuery(query: string): Promise<void> {
+    if (!this.getToken() || !query.trim()) return;
+    try {
+      await request('/api/user/activity/recent-searches', {
+        method: 'POST',
+        body: JSON.stringify({ query: query.trim() }),
+      });
+    } catch {
+      // Non-blocking history record
+    }
+  },
+
+  async deleteRecentSearch(id: number): Promise<void> {
+    await request(`/api/user/activity/recent-searches/${id}`, { method: 'DELETE' });
+  },
+
+  async clearRecentSearches(): Promise<void> {
+    await request('/api/user/activity/recent-searches', { method: 'DELETE' });
+  },
+
+  async getRecentlyViewed(): Promise<UserViewedProductItem[]> {
+    const json = await request<{ success: boolean; data: UserViewedProductItem[] }>(
+      '/api/user/activity/recently-viewed'
+    );
+    return json.data || [];
+  },
+
+  async recordViewedProduct(productId: number): Promise<void> {
+    if (!this.getToken() || !productId) return;
+    try {
+      await request('/api/user/activity/recently-viewed', {
+        method: 'POST',
+        body: JSON.stringify({ product_id: productId }),
+      });
+    } catch {
+      // Non-blocking history record
+    }
+  },
+
+  async deleteRecentlyViewed(id: number): Promise<void> {
+    await request(`/api/user/activity/recently-viewed/${id}`, { method: 'DELETE' });
+  },
+
+  async clearRecentlyViewed(): Promise<void> {
+    await request('/api/user/activity/recently-viewed', { method: 'DELETE' });
   },
 
   // ── 4. Addresses ──────────────────────────────────────────────────────────
@@ -805,6 +964,14 @@ export const api = {
     return json.data || [];
   },
 
+  async updateFollowPreferences(shopId: number, notifyNewProducts: boolean): Promise<boolean> {
+    const json = await request<{ success: boolean }>(`/api/shops/${shopId}/follow-preferences`, {
+      method: 'PUT',
+      body: JSON.stringify({ notify_new_products: notifyNewProducts }),
+    });
+    return !!json.success;
+  },
+
   // ── 12. Vouchers ──────────────────────────────────────────────────────────
   async getVouchers(): Promise<Voucher[]> {
     const json = await request<{ success: boolean; data: Voucher[] }>('/api/vouchers');
@@ -999,6 +1166,24 @@ export const api = {
       '/api/seller/finances'
     );
     return json.data || {};
+  },
+
+  async getSellerPreferences(): Promise<SellerPreferences> {
+    const json = await request<{ success: boolean; data: SellerPreferences }>(
+      '/api/seller/preferences'
+    );
+    return json.data;
+  },
+
+  async updateSellerPreferences(data: Partial<SellerPreferences>): Promise<SellerPreferences> {
+    const json = await request<{ success: boolean; message: string; data: SellerPreferences }>(
+      '/api/seller/preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
   },
 
   async requestPayout(data: {

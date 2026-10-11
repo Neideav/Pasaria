@@ -40,19 +40,36 @@ class UserPreferenceApiController extends Controller
         }
 
         $request->validate([
-            'order_updates_email'   => 'nullable|boolean',
-            'order_updates_in_app'  => 'nullable|boolean',
-            'chat_messages_email'   => 'nullable|boolean',
-            'chat_messages_in_app'  => 'nullable|boolean',
-            'promotions_email'      => 'nullable|boolean',
-            'promotions_in_app'     => 'nullable|boolean',
-            'wishlist_alerts_email' => 'nullable|boolean',
-            'wishlist_alerts_in_app'=> 'nullable|boolean',
+            'order_updates_email'     => 'nullable|boolean',
+            'order_updates_in_app'    => 'nullable|boolean',
+            'chat_messages_email'     => 'nullable|boolean',
+            'chat_messages_in_app'    => 'nullable|boolean',
+            'promotions_email'        => 'nullable|boolean',
+            'promotions_in_app'       => 'nullable|boolean',
+            'wishlist_alerts_email'   => 'nullable|boolean',
+            'wishlist_alerts_in_app'  => 'nullable|boolean',
+            'shipping_updates_email'  => 'nullable|boolean',
+            'shipping_updates_in_app' => 'nullable|boolean',
+            'product_qa_email'        => 'nullable|boolean',
+            'product_qa_in_app'       => 'nullable|boolean',
+            'review_activity_email'   => 'nullable|boolean',
+            'review_activity_in_app'  => 'nullable|boolean',
+            'shop_updates_email'      => 'nullable|boolean',
+            'shop_updates_in_app'     => 'nullable|boolean',
+            'price_alerts_email'      => 'nullable|boolean',
+            'price_alerts_in_app'     => 'nullable|boolean',
+            'stock_alerts_email'      => 'nullable|boolean',
+            'stock_alerts_in_app'     => 'nullable|boolean',
+            'quiet_hours_enabled'     => 'nullable|boolean',
+            'quiet_hours_start'       => 'nullable|string|max:10',
+            'quiet_hours_end'         => 'nullable|string|max:10',
+            'timezone'                => 'nullable|string|max:50',
+            'email_digest_frequency'  => 'nullable|string|in:instant,daily,weekly',
         ]);
 
         $preferences = UserNotificationPreference::getOrCreateForUser($user->id);
 
-        $updatable = [
+        $updatableBools = [
             'order_updates_email',
             'order_updates_in_app',
             'chat_messages_email',
@@ -61,11 +78,31 @@ class UserPreferenceApiController extends Controller
             'promotions_in_app',
             'wishlist_alerts_email',
             'wishlist_alerts_in_app',
+            'shipping_updates_email',
+            'shipping_updates_in_app',
+            'product_qa_email',
+            'product_qa_in_app',
+            'review_activity_email',
+            'review_activity_in_app',
+            'shop_updates_email',
+            'shop_updates_in_app',
+            'price_alerts_email',
+            'price_alerts_in_app',
+            'stock_alerts_email',
+            'stock_alerts_in_app',
+            'quiet_hours_enabled',
         ];
 
-        foreach ($updatable as $key) {
+        foreach ($updatableBools as $key) {
             if ($request->has($key)) {
                 $preferences->{$key} = $request->boolean($key);
+            }
+        }
+
+        $stringKeys = ['quiet_hours_start', 'quiet_hours_end', 'timezone', 'email_digest_frequency'];
+        foreach ($stringKeys as $sKey) {
+            if ($request->has($sKey) && !empty($request->input($sKey))) {
+                $preferences->{$sKey} = trim((string) $request->input($sKey));
             }
         }
 
@@ -111,14 +148,23 @@ class UserPreferenceApiController extends Controller
         }
 
         $request->validate([
-            'personalization_enabled' => 'nullable|boolean',
-            'marketing_communication' => 'nullable|boolean',
-            'activity_logging'        => 'nullable|boolean',
+            'personalization_enabled'    => 'nullable|boolean',
+            'marketing_communication'    => 'nullable|boolean',
+            'activity_logging'           => 'nullable|boolean',
+            'default_anonymous_reviews'  => 'nullable|boolean',
+            'show_profile_publicly'      => 'nullable|boolean',
         ]);
 
         $preferences = UserPrivacyPreference::getOrCreateForUser($user->id);
 
-        $keys = ['personalization_enabled', 'marketing_communication', 'activity_logging'];
+        $keys = [
+            'personalization_enabled',
+            'marketing_communication',
+            'activity_logging',
+            'default_anonymous_reviews',
+            'show_profile_publicly',
+        ];
+
         foreach ($keys as $k) {
             if ($request->has($k)) {
                 $preferences->{$k} = $request->boolean($k);

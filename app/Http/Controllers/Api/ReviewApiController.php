@@ -128,6 +128,11 @@ class ReviewApiController extends Controller
         }
 
         return DB::transaction(function () use ($request, $user, $productId, $product, $orderItem) {
+            $userPrivacy = \App\Models\UserPrivacyPreference::getOrCreateForUser($user->id);
+            $isAnonymous = $request->has('is_anonymous')
+                ? $request->boolean('is_anonymous')
+                : (bool) $userPrivacy->default_anonymous_reviews;
+
             $review = Review::create([
                 'user_id' => $user->id,
                 'order_id' => $orderItem->order_id,
@@ -136,7 +141,7 @@ class ReviewApiController extends Controller
                 'shop_id' => $product->shop_id ?: 1,
                 'rating' => (int) $request->input('rating'),
                 'review_text' => trim($request->input('review_text', '')),
-                'is_anonymous' => $request->boolean('is_anonymous', false),
+                'is_anonymous' => $isAnonymous,
                 'is_verified_purchase' => true,
                 'status' => 'approved',
             ]);

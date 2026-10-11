@@ -118,15 +118,34 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
                 }`}
               >
                 <div>
-                  <div className="flex justify-end mb-2">
-                    <button
-                      onClick={(e) => handleRemove(prod.id, e)}
-                      className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-500 transition-colors cursor-pointer motion-press active:scale-[0.96]"
-                      title="Hapus dari wishlist"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await api.createProductAlert({
+                              product_id: prod.id,
+                              alert_type: 'price_drop',
+                              target_price: Math.round(prod.price * 0.9),
+                            });
+                            alert(`Pantauan penurunan harga aktif untuk "${prod.name}".`);
+                          } catch (err: any) {
+                            alert(err.message || 'Gagal membuat pantauan harga.');
+                          }
+                        }}
+                        className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center text-[#003d29] transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                        title="Pantau penurunan harga"
+                      >
+                        <Heart className="w-4 h-4 text-emerald-700" />
+                      </button>
+                      <button
+                        onClick={(e) => handleRemove(prod.id, e)}
+                        className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-500 transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                        title="Hapus dari wishlist"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
 
                   <div className="relative w-full h-44 rounded-xl bg-[#f8f9fa] flex items-center justify-center p-3 mb-4 overflow-hidden group-hover:bg-[#f3f4f6] transition-colors">
                     <ProductVisual

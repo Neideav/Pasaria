@@ -22,6 +22,7 @@ class UserTwoFactorAuth extends Model
     protected $casts = [
         'user_id' => 'integer',
         'enabled' => 'boolean',
+        'secret' => 'encrypted',
         'recovery_codes_json' => 'array',
         'confirmed_at' => 'datetime',
     ];

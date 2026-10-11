@@ -8,6 +8,11 @@ import {
   Lock,
   Globe,
   ArrowLeft,
+  Sliders,
+  BellRing,
+  History,
+  Store,
+  Eye,
 } from 'lucide-react';
 import { User } from '../types';
 import { Language, translations } from '../i18n/translations';
@@ -17,6 +22,11 @@ import { SecurityTab } from './settings/SecurityTab';
 import { NotificationsTab } from './settings/NotificationsTab';
 import { PrivacyTab } from './settings/PrivacyTab';
 import { AppearanceTab } from './settings/AppearanceTab';
+import { ShoppingPreferencesTab } from './settings/ShoppingPreferencesTab';
+import { ProductAlertsTab } from './settings/ProductAlertsTab';
+import { ActivityHistoryTab } from './settings/ActivityHistoryTab';
+import { MarketplaceControlsTab } from './settings/MarketplaceControlsTab';
+import { SellerPreferencesTab } from './settings/SellerPreferencesTab';
 
 interface SettingsViewProps {
   user: User | null;
@@ -26,6 +36,10 @@ interface SettingsViewProps {
   onClearCache: () => void;
   onUpdateUser?: (updated: User) => void;
   onOpenShopDashboard?: () => void;
+  onNavigateProduct?: (slug: string) => void;
+  onNavigateShop?: (shopIdOrSlug: string | number) => void;
+  onSearchQuery?: (query: string) => void;
+  onLogout?: () => void;
 }
 
 export type SettingsTabId =
@@ -33,8 +47,13 @@ export type SettingsTabId =
   | 'addresses'
   | 'security'
   | 'notifications'
+  | 'shopping'
+  | 'alerts'
+  | 'activity'
+  | 'marketplace'
   | 'privacy'
-  | 'appearance';
+  | 'appearance'
+  | 'seller';
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   user,
@@ -44,9 +63,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onClearCache,
   onUpdateUser,
   onOpenShopDashboard,
+  onNavigateProduct,
+  onNavigateShop,
+  onSearchQuery,
+  onLogout,
 }) => {
   const t = translations[currentLang];
   const [activeTab, setActiveTab] = useState<SettingsTabId>('profile');
+
+  const isSellerOrAdmin = user?.role === 'seller' || user?.role === 'admin';
 
   const navigationTabs: Array<{
     id: SettingsTabId;
@@ -74,9 +99,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     },
     {
       id: 'notifications',
-      label: t.notificationsTab || 'Notifikasi',
+      label: t.notificationsTab || 'Notifikasi & Jam Tenang',
       icon: Bell,
-      description: 'Preferensi inbox dan email pesanan',
+      description: 'Preferensi inbox, email, dan jam istirahat',
+    },
+    {
+      id: 'shopping',
+      label: t.shoppingPreferencesTab || 'Preferensi Belanja',
+      icon: Sliders,
+      description: 'Kategori favorit, brand, dan filter katalog',
+    },
+    {
+      id: 'alerts',
+      label: t.productAlertsTab || 'Pantau Produk & Harga',
+      icon: BellRing,
+      description: 'Notifikasi harga turun dan ketersediaan stok',
+    },
+    {
+      id: 'activity',
+      label: t.activityHistoryTab || 'Riwayat Aktivitas',
+      icon: History,
+      description: 'Pencarian terakhir dan produk yang dilihat',
+    },
+    {
+      id: 'marketplace',
+      label: t.marketplaceControlsTab || 'Interaksi Toko',
+      icon: Store,
+      description: 'Toko yang diikuti dan ulasan anonim',
     },
     {
       id: 'privacy',
@@ -86,10 +135,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     },
     {
       id: 'appearance',
-      label: t.appearanceTab || 'Tampilan & Bahasa',
+      label: t.appearanceTab || 'Tampilan & Aksesibilitas',
       icon: Globe,
-      description: 'Bahasa antarmuka dan cache toko',
+      description: 'Tema gelap/terang, ukuran teks, dan bahasa',
     },
+    ...(isSellerOrAdmin
+      ? [
+          {
+            id: 'seller' as SettingsTabId,
+            label: t.sellerPreferencesTab || 'Preferensi Penjual',
+            icon: Store,
+            description: 'Batas stok menipis dan mode libur toko',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -102,7 +161,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>{t.settingsTitle || 'Pengaturan Akun'}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Akun & Preferensi
+            Akun & Preferensi Marketplace
           </h1>
           <p className="text-xs text-slate-500 mt-1 max-w-xl">
             {t.settingsSub || 'Kelola profil, keamanan, alamat pengiriman, dan preferensi akun PASARIA Anda.'}
@@ -205,11 +264,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <SecurityTab
               user={user}
               onUpdateUser={onUpdateUser}
+              onLogout={onLogout}
             />
           )}
 
           {activeTab === 'notifications' && (
             <NotificationsTab />
+          )}
+
+          {activeTab === 'shopping' && (
+            <ShoppingPreferencesTab />
+          )}
+
+          {activeTab === 'alerts' && (
+            <ProductAlertsTab
+              onNavigateProduct={onNavigateProduct}
+            />
+          )}
+
+          {activeTab === 'activity' && (
+            <ActivityHistoryTab
+              onSearchQuery={onSearchQuery}
+              onNavigateProduct={onNavigateProduct}
+            />
+          )}
+
+          {activeTab === 'marketplace' && (
+            <MarketplaceControlsTab
+              onNavigateShop={onNavigateShop}
+            />
           )}
 
           {activeTab === 'privacy' && (
@@ -223,6 +306,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               currentLang={currentLang}
               onLanguageChange={onLanguageChange}
               onClearCache={onClearCache}
+            />
+          )}
+
+          {activeTab === 'seller' && isSellerOrAdmin && (
+            <SellerPreferencesTab
+              onOpenShopDashboard={onOpenShopDashboard}
             />
           )}
         </main>

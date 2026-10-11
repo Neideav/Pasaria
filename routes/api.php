@@ -23,6 +23,10 @@ use App\Http\Controllers\Api\UploadApiController;
 use App\Http\Controllers\Api\UserPreferenceApiController;
 use App\Http\Controllers\Api\UserSecurityApiController;
 use App\Http\Controllers\Api\UserPrivacyApiController;
+use App\Http\Controllers\Api\UserShoppingPreferenceApiController;
+use App\Http\Controllers\Api\ProductAlertApiController;
+use App\Http\Controllers\Api\UserActivityApiController;
+use App\Http\Controllers\Api\SellerPreferenceApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -65,6 +69,7 @@ Route::middleware(['throttle:api'])->group(function () {
     // 2. AUTHENTICATION & ACCOUNT ACTIVATION (Rate-limited Endpoints)
     // =========================================================================
     Route::post('/auth/login', [AuthApiController::class, 'login'])->middleware('throttle:auth-login');
+    Route::post('/auth/two-factor-challenge', [AuthApiController::class, 'twoFactorChallenge'])->middleware('throttle:two-factor');
     Route::post('/auth/register', [AuthApiController::class, 'register'])->middleware('throttle:auth-register');
     Route::post('/auth/verify-email', [AuthApiController::class, 'verifyEmail'])->middleware('throttle:30,1');
     Route::post('/auth/resend-verification', [AuthApiController::class, 'resendVerification'])->middleware('throttle:auth-resend');
@@ -99,6 +104,26 @@ Route::middleware(['throttle:api'])->group(function () {
         // Persistent Notification Preferences
         Route::get('/user/notification-preferences', [UserPreferenceApiController::class, 'getNotificationPreferences']);
         Route::put('/user/notification-preferences', [UserPreferenceApiController::class, 'updateNotificationPreferences']);
+
+        // Shopping Preferences & Catalog Behavior
+        Route::get('/user/shopping-preferences', [UserShoppingPreferenceApiController::class, 'getPreferences']);
+        Route::put('/user/shopping-preferences', [UserShoppingPreferenceApiController::class, 'updatePreferences']);
+
+        // Product Alerts & Price Watch
+        Route::get('/user/product-alerts', [ProductAlertApiController::class, 'index']);
+        Route::post('/user/product-alerts', [ProductAlertApiController::class, 'store']);
+        Route::put('/user/product-alerts/{id}', [ProductAlertApiController::class, 'update']);
+        Route::delete('/user/product-alerts/{id}', [ProductAlertApiController::class, 'destroy']);
+
+        // Account Activity History Management
+        Route::get('/user/activity/recent-searches', [UserActivityApiController::class, 'getRecentSearches']);
+        Route::post('/user/activity/recent-searches', [UserActivityApiController::class, 'storeRecentSearch']);
+        Route::delete('/user/activity/recent-searches/{id}', [UserActivityApiController::class, 'destroyRecentSearch']);
+        Route::delete('/user/activity/recent-searches', [UserActivityApiController::class, 'clearRecentSearches']);
+        Route::get('/user/activity/recently-viewed', [UserActivityApiController::class, 'getRecentlyViewed']);
+        Route::post('/user/activity/recently-viewed', [UserActivityApiController::class, 'storeRecentlyViewed']);
+        Route::delete('/user/activity/recently-viewed/{id}', [UserActivityApiController::class, 'destroyRecentlyViewed']);
+        Route::delete('/user/activity/recently-viewed', [UserActivityApiController::class, 'clearRecentlyViewed']);
 
         // Privacy & Data Management
         Route::get('/user/privacy-preferences', [UserPreferenceApiController::class, 'getPrivacyPreferences']);
@@ -142,6 +167,7 @@ Route::middleware(['throttle:api'])->group(function () {
         Route::get('/shops/following', [ShopApiController::class, 'following']);
         Route::post('/shops/{id}/follow', [ShopApiController::class, 'follow']);
         Route::delete('/shops/{id}/follow', [ShopApiController::class, 'unfollow']);
+        Route::put('/shops/{id}/follow-preferences', [ShopApiController::class, 'updateFollowPreferences']);
 
         // Buyer-Seller Messaging (Chat)
         Route::get('/conversations', [ChatApiController::class, 'getConversations']);
@@ -169,6 +195,8 @@ Route::middleware(['throttle:api'])->group(function () {
     // =========================================================================
     Route::middleware(['auth:sanctum', 'account.active', 'role:seller,admin'])->group(function () {
         Route::get('/seller/dashboard', [SellerApiController::class, 'dashboard']);
+        Route::get('/seller/preferences', [SellerPreferenceApiController::class, 'getPreferences']);
+        Route::put('/seller/preferences', [SellerPreferenceApiController::class, 'updatePreferences']);
         Route::get('/seller/products', [SellerApiController::class, 'products']);
         Route::get('/seller/inventory', [SellerApiController::class, 'inventory']);
         Route::get('/seller/orders', [SellerApiController::class, 'orders']);

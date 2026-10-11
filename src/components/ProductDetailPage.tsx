@@ -14,6 +14,7 @@ import {
   MessageCircle,
   HelpCircle,
   Send,
+  BellRing,
 } from 'lucide-react';
 import { Product, ProductVariant, Review, ProductQuestion } from '../types';
 import { ProductVisual } from './ProductVisual';
@@ -470,6 +471,29 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               ) : (
                 <span>+ Keranjang Belanja</span>
               )}
+            </button>
+          </div>
+
+          {/* Price Watch / Alert Quick Action */}
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await api.createProductAlert({
+                    product_id: product.id,
+                    alert_type: 'price_drop',
+                    target_price: Math.round(currentPrice * 0.9),
+                  });
+                  showToast(`Pantauan harga aktif. Kami akan kabari saat "${product.name}" turun harga.`, 'success');
+                } catch (err: any) {
+                  showToast(err.message || 'Gagal membuat pantauan harga.', 'error');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#003d29] hover:underline cursor-pointer"
+            >
+              <BellRing className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Pantau Penurunan Harga Produk Ini</span>
             </button>
           </div>
 

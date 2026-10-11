@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class UserSecurityApiController extends Controller
 {
@@ -128,8 +129,20 @@ class UserSecurityApiController extends Controller
         ], now()->addMinutes(15));
 
         try {
-            Log::info("PASARIA: Email change verification code for user #{$user->id} to {$newEmail}: {$code}");
-        } catch (\Throwable $e) {}
+            Mail::raw(
+                "Halo {$user->name},\n\nKode verifikasi untuk mengubah email akun PASARIA Anda ke {$newEmail} adalah: {$code}\n\nKode ini berlaku selama 15 menit dan hanya dapat digunakan satu kali.\n\nJika Anda tidak meminta perubahan ini, abaikan email ini dan segera amankan akun Anda.",
+                function ($message) use ($newEmail) {
+                    $message->to($newEmail)
+                        ->subject('Kode Verifikasi Perubahan Email PASARIA');
+                }
+            );
+        } catch (\Throwable $mailErr) {
+            Cache::forget("email_change_{$user->id}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengirim email verifikasi ke alamat baru. Silakan periksa konfigurasi email atau coba lagi nanti.',
+            ], 500);
+        }
 
         $responsePayload = [
             'success'   => true,
@@ -230,12 +243,15 @@ class UserSecurityApiController extends Controller
         $recoveryCodes = $totp->generateRecoveryCodes(8);
         $qrUri = $totp->getQrCodeUri($user->email, $secret);
 
+        // Hash recovery codes at rest for protection
+        $hashedCodes = array_map(fn($c) => Hash::make($c), $recoveryCodes);
+
         UserTwoFactorAuth::updateOrCreate(
             ['user_id' => $user->id],
             [
                 'enabled'             => false,
                 'secret'              => $secret,
-                'recovery_codes_json' => $recoveryCodes,
+                'recovery_codes_json' => $hashedCodes,
                 'confirmed_at'        => null,
             ]
         );

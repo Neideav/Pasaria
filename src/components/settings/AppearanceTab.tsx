@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Globe,
   Sun,
   Moon,
   Monitor,
   RefreshCw,
-  Check,
   CheckCircle2,
+  Check,
+  Type,
+  Minimize2,
+  Eye,
+  Grid,
 } from 'lucide-react';
 import { Language } from '../../i18n/translations';
 import { useToast } from '../../context/ToastContext';
+import { api } from '../../services/api';
 
 interface AppearanceTabProps {
   currentLang: Language;
@@ -33,14 +38,114 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
     }
   });
 
+  const [fontSize, setFontSize] = useState<'normal' | 'large'>(() => {
+    try {
+      return localStorage.getItem('pasaria_font_size') === 'large' ? 'large' : 'normal';
+    } catch {
+      return 'normal';
+    }
+  });
+
+  const [reducedMotion, setReducedMotion] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pasaria_reduced_motion') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [highContrast, setHighContrast] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pasaria_high_contrast') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [gridDensity, setGridDensity] = useState<'comfortable' | 'compact'>(() => {
+    try {
+      return localStorage.getItem('pasaria_grid_density') === 'compact' ? 'compact' : 'comfortable';
+    } catch {
+      return 'comfortable';
+    }
+  });
+
   const [cacheClearing, setCacheClearing] = useState(false);
   const [cacheCleared, setCacheCleared] = useState(false);
+
+  // Apply theme to document root
+  const applyThemeToDOM = (t: 'light' | 'dark' | 'system') => {
+    const root = document.documentElement;
+    if (t === 'dark') {
+      root.classList.add('dark');
+    } else if (t === 'light') {
+      root.classList.remove('dark');
+    } else {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    }
+  };
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
     try {
       localStorage.setItem('pasaria_theme', newTheme);
-      showToast(`Tema ${newTheme === 'light' ? 'Terang' : newTheme === 'dark' ? 'Gelap' : 'Sistem'} dipilih.`, 'info');
+      applyThemeToDOM(newTheme);
+      showToast(`Tema ${newTheme === 'light' ? 'Terang' : newTheme === 'dark' ? 'Gelap' : 'Sistem'} diterapkan.`, 'info');
+      // If logged in, optionally persist to shopping preferences
+      if (api.isAuthenticated()) {
+        api.updateShoppingPreferences({ theme: newTheme }).catch(() => {});
+      }
+    } catch {}
+  };
+
+  const handleFontSizeChange = (size: 'normal' | 'large') => {
+    setFontSize(size);
+    try {
+      localStorage.setItem('pasaria_font_size', size);
+      document.documentElement.classList.toggle('text-scale-large', size === 'large');
+      showToast(`Ukuran teks diubah ke ${size === 'large' ? 'Besar' : 'Normal'}.`, 'info');
+      if (api.isAuthenticated()) {
+        api.updateShoppingPreferences({ font_size: size }).catch(() => {});
+      }
+    } catch {}
+  };
+
+  const handleReducedMotionToggle = (enabled: boolean) => {
+    setReducedMotion(enabled);
+    try {
+      localStorage.setItem('pasaria_reduced_motion', String(enabled));
+      document.documentElement.classList.toggle('reduced-motion', enabled);
+      showToast(enabled ? 'Animasi dinonaktifkan (Reduced Motion).' : 'Animasi diaktifkan kembali.', 'info');
+      if (api.isAuthenticated()) {
+        api.updateShoppingPreferences({ reduced_motion: enabled }).catch(() => {});
+      }
+    } catch {}
+  };
+
+  const handleHighContrastToggle = (enabled: boolean) => {
+    setHighContrast(enabled);
+    try {
+      localStorage.setItem('pasaria_high_contrast', String(enabled));
+      document.documentElement.classList.toggle('high-contrast', enabled);
+      showToast(enabled ? 'Mode kontras tinggi diaktifkan.' : 'Mode kontras standar diaktifkan.', 'info');
+      if (api.isAuthenticated()) {
+        api.updateShoppingPreferences({ high_contrast: enabled }).catch(() => {});
+      }
+    } catch {}
+  };
+
+  const handleGridDensityChange = (density: 'comfortable' | 'compact') => {
+    setGridDensity(density);
+    try {
+      localStorage.setItem('pasaria_grid_density', density);
+      showToast(`Tampilan katalog diatur ke mode ${density === 'compact' ? 'Kompak' : 'Nyaman'}.`, 'info');
+      if (api.isAuthenticated()) {
+        api.updateShoppingPreferences({ preferred_density: density }).catch(() => {});
+      }
     } catch {}
   };
 
@@ -196,7 +301,140 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
         </div>
       </div>
 
-      {/* 3. Cache & Store Sync */}
+      {/* 3. Accessibility Controls: Text Scale, Reduced Motion, Contrast */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-5">
+        <div>
+          <h2 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+            <Eye className="w-4 h-4 text-[#003d29]" />
+            <span>Aksesibilitas & Keterbacaan</span>
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Sesuaikan skala teks, gerak antarmuka, dan kontras warna sesuai kebutuhan visual Anda.
+          </p>
+        </div>
+
+        <div className="divide-y divide-slate-100 text-xs">
+          {/* Text Scaling */}
+          <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Type className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-bold text-slate-900">Ukuran Teks Antarmuka</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Tingkatkan ukuran huruf dasar untuk kemudahan membaca konten.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleFontSizeChange('normal')}
+                className={`px-3.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer ${
+                  fontSize === 'normal'
+                    ? 'bg-[#003d29] text-white border-[#003d29]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Normal (100%)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFontSizeChange('large')}
+                className={`px-3.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer ${
+                  fontSize === 'large'
+                    ? 'bg-[#003d29] text-white border-[#003d29]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Besar (112.5%)
+              </button>
+            </div>
+          </div>
+
+          {/* Reduced Motion */}
+          <div className="py-4 flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Minimize2 className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-bold text-slate-900">Kurangi Animasi (Reduced Motion)</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Minimalkan efek gerak, transisi, dan animasi geser di seluruh aplikasi.
+                </div>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={reducedMotion}
+                onChange={(e) => handleReducedMotionToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-[#003d29]"></div>
+            </label>
+          </div>
+
+          {/* High Contrast */}
+          <div className="py-4 flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Eye className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-bold text-slate-900">Mode Kontras Tinggi (High Contrast)</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Pertegas garis batas form dan perjelas kontras elemen tombol.
+                </div>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={highContrast}
+                onChange={(e) => handleHighContrastToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-[#003d29]"></div>
+            </label>
+          </div>
+
+          {/* Grid Density */}
+          <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Grid className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-bold text-slate-900">Kerapatan Grid Katalog</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Pilih tata letak kartu produk yang lebih lega atau lebih rapat.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleGridDensityChange('comfortable')}
+                className={`px-3.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer ${
+                  gridDensity === 'comfortable'
+                    ? 'bg-[#003d29] text-white border-[#003d29]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Nyaman
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGridDensityChange('compact')}
+                className={`px-3.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer ${
+                  gridDensity === 'compact'
+                    ? 'bg-[#003d29] text-white border-[#003d29]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Kompak
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Cache & Store Sync */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="space-y-1 flex-1 text-xs">
