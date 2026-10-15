@@ -4,17 +4,16 @@ import { ShoppingCart, ShieldCheck, Heart, Store, Truck } from 'lucide-react';
 export const Footer: React.FC = () => {
   return (
     <footer className="bg-white border-t border-slate-100 mt-20 pt-16 pb-12 text-left">
-      <div className="max-w-7xl mx-auto px-4 sm:px-8">
+      <div className="max-w-[1536px] mx-auto px-4 sm:px-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           {/* Brand Info */}
           <div className="col-span-2 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#003d29] flex items-center justify-center">
-                <ShoppingCart className="w-4 h-4 text-[#003d29]" strokeWidth={2.2} />
-              </div>
-              <span className="text-xl font-bold tracking-tight text-[#003d29]">
-                PASARIA
-              </span>
+            <div className="flex items-center">
+              <img
+                src="/images/logo_tp.png"
+                alt="PASARIA"
+                className="h-8 w-auto object-contain"
+              />
             </div>
             <p className="text-xs sm:text-sm text-slate-500 max-w-sm font-normal leading-relaxed">
               PASARIA adalah platform modern multi-vendor marketplace terpercaya di Indonesia. Menghubungkan pembeli, penjual resmi, dan UMKM dengan transaksi yang aman, transparan, dan terintegrasi.

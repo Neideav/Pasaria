@@ -77,7 +77,7 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 text-left space-y-8">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-6 text-left space-y-8">
       {/* Breadcrumb / Back button */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <button
@@ -234,7 +234,7 @@ export const ShopProfileView: React.FC<ShopProfileViewProps> = ({
             <p className="text-xs text-slate-500 font-semibold">Belum ada produk untuk kategori ini.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3 md:gap-3.5">
             {displayedProducts.map((product) => (
               <ProductCard
                 key={product.id}

@@ -21,13 +21,14 @@ import {
   Globe,
   MessageCircle,
   ShieldAlert,
-  Check,
+  ArrowRight,
 } from 'lucide-react';
 import { User, Product } from '../types';
 import { ProductVisual } from './ProductVisual';
 import { NotificationDropdown } from './NotificationDropdown';
 import { formatRupiah } from '../utils/formatters';
 import { Language, translations } from '../i18n/translations';
+import categoryCardImg from '../assets/images/hero_card_yellow_knit.jpg';
 
 interface NavbarProps {
   user: User | null;
@@ -72,28 +73,64 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   products,
 }) => {
-  const t = translations[currentLang];
+  const isId = currentLang === 'id';
   const [searchQuery, setSearchQuery] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const placeholderSuggestions = isId
+    ? [
+        'Cari "Jersey & Apparel"...',
+        'Cari "AirPods Max"...',
+        'Cari "Sneakers Urban"...',
+        'Cari "MacBook Pro M3"...',
+        'Cari "Kursi Ergonomis"...',
+        'Cari "Mechanical Keyboard"...',
+        'Cari "Bose QuietComfort"...',
+        'Cari "Buku Atomic Habits"...',
+      ]
+    : [
+        'Search "Jersey & Apparel"...',
+        'Search "AirPods Max"...',
+        'Search "Urban Sneakers"...',
+        'Search "MacBook Pro M3"...',
+        'Search "Ergonomic Chair"...',
+        'Search "Mechanical Keyboard"...',
+        'Search "Bose QuietComfort"...',
+        'Search "Atomic Habits"...',
+      ];
+
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % placeholderSuggestions.length);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, [placeholderSuggestions.length]);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const mobileSearchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
-  const drawerCloseBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Close menus on outside click
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 15);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
-        setShowSearchSuggestions(false);
-      }
-      if (mobileSearchContainerRef.current && !mobileSearchContainerRef.current.contains(event.target as Node)) {
         setShowSearchSuggestions(false);
       }
       if (categoriesRef.current && !categoriesRef.current.contains(event.target as Node)) {
@@ -109,36 +146,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Keyboard Escape listener to close drawer & popovers
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        if (isMobileMenuOpen) setIsMobileMenuOpen(false);
-        if (showCategoriesMenu) setShowCategoriesMenu(false);
-        if (showAccountMenu) setShowAccountMenu(false);
-        if (showSearchSuggestions) setShowSearchSuggestions(false);
-        if (showLangMenu) setShowLangMenu(false);
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isMobileMenuOpen, showCategoriesMenu, showAccountMenu, showSearchSuggestions, showLangMenu]);
-
-  // Lock body scroll when mobile drawer is open
-  useEffect(() => {
-    if (isMobileMenuOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      const timer = setTimeout(() => {
-        drawerCloseBtnRef.current?.focus();
-      }, 50);
-      return () => {
-        clearTimeout(timer);
-        document.body.style.overflow = originalOverflow || 'unset';
-      };
-    }
-  }, [isMobileMenuOpen]);
 
   const searchSuggestions = searchQuery.trim()
     ? products
@@ -166,161 +173,212 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const categoryList = [
-    { name: 'Headphones', count: 'Original Audio Gear', icon: Headphones, slug: 'headphones' },
-    { name: 'Electronics', count: 'Gadget & Aksesoris', icon: Laptop, slug: 'electronics' },
-    { name: 'Furniture', count: 'Peralatan Rumah', icon: Armchair, slug: 'furniture' },
-    { name: 'Shoes', count: 'Sepatu & Fashion', icon: Footprints, slug: 'shoes' },
-    { name: 'Bags', count: 'Tas & Koper', icon: ShoppingBag, slug: 'bags' },
-    { name: 'Books', count: 'Buku & Literasi', icon: Book, slug: 'books' },
+    { name: isId ? 'Audio & Headphone' : 'Headphones', slug: 'headphones' },
+    { name: isId ? 'Laptop & Komputer' : 'Laptops & Computers', slug: 'laptops' },
+    { name: isId ? 'Furniture & Rumah' : 'Furniture & Living', slug: 'furniture' },
+    { name: isId ? 'Sepatu & Fashion' : 'Shoes & Fashion', slug: 'shoes' },
+    { name: isId ? 'Tas & Aksesoris' : 'Bags & Accessories', slug: 'bags' },
+    { name: isId ? 'Buku & Edukasi' : 'Books & Learning', slug: 'books' },
   ];
 
+  const popularLinks = isId
+    ? [
+        { title: 'Promo & Diskon Kilat', target: 'Deals' },
+        { title: 'Produk Terlaris Minggu Ini', target: 'popular' },
+        { title: 'Official Store Terverifikasi', target: 'official' },
+        { title: 'Produk Baru Rilis', target: "What's New" },
+        { title: 'Lacak Kiriman Pesanan', target: 'Delivery' },
+        { title: 'Garansi Original PASARIA', target: 'all' },
+      ]
+    : [
+        { title: 'Flash Deals & Discounts', target: 'Deals' },
+        { title: 'Weekly Best Sellers', target: 'popular' },
+        { title: 'Verified Official Stores', target: 'official' },
+        { title: 'New Arrivals', target: "What's New" },
+        { title: 'Track Order Delivery', target: 'Delivery' },
+        { title: 'PASARIA Authenticity', target: 'all' },
+      ];
+
   return (
-    <>
-      <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3 flex items-center justify-between gap-3 sm:gap-4">
-          {/* Left: Mobile Menu Toggle, Brand Logo & Desktop Categories */}
-          <div className="flex items-center gap-2.5 sm:gap-7">
-            {/* Motion Point #1: Hamburger to 'X' icon transition (rotasi & crossfade transform 160ms var(--ease-out)) */}
+    <nav
+      className={`sticky top-0 z-40 transition-all duration-300 ${
+        isScrolled
+          ? 'bg-white/85 backdrop-blur-xl border-b border-slate-200/80 shadow-none'
+          : 'bg-[#fcfcfc] border-b border-slate-100 shadow-none'
+      }`}
+    >
+      <div
+        className={`max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${
+          isScrolled ? 'h-16 sm:h-17' : 'h-18 sm:h-20'
+        }`}
+      >
+        {/* Left Section: Brand Logo & Categories & Nav Links */}
+        <div className="flex items-center gap-3 lg:gap-4 xl:gap-5 justify-start shrink-0">
+          {/* Brand Logo (Left) */}
+          <button
+            onClick={onNavigateHome}
+            className="flex items-center group cursor-pointer focus:outline-none shrink-0"
+            aria-label="PASARIA Home"
+          >
+            <img
+              src="/images/logo_tp.png"
+              alt="PASARIA"
+              className="h-7 sm:h-8.5 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+          </button>
+
+          {/* Categories Mega Dropdown (Left next to logo) */}
+          <div className="relative hidden md:flex items-center" ref={categoriesRef}>
             <button
               type="button"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label={isMobileMenuOpen ? "Tutup navigasi utama" : "Buka navigasi utama"}
-              aria-expanded={isMobileMenuOpen}
-              aria-controls="mobile-navigation-drawer"
-              className="lg:hidden motion-press relative w-11 h-11 flex items-center justify-center rounded-xl text-slate-700 hover:text-[#003d29] hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0"
+              onClick={() => setShowCategoriesMenu(!showCategoriesMenu)}
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:text-[#003d29] transition-colors cursor-pointer py-1.5 px-3 rounded-full hover:bg-slate-100"
             >
-              <span
-                className={`absolute inset-0 flex items-center justify-center transition-[transform,opacity] duration-160 ease-[var(--ease-out)] ${
-                  isMobileMenuOpen
-                    ? 'opacity-0 rotate-90 scale-90 pointer-events-none'
-                    : 'opacity-100 rotate-0 scale-100'
+              <span>{isId ? 'Kategori' : 'Categories'}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                  showCategoriesMenu ? 'rotate-180 text-[#003d29]' : 'text-slate-400'
                 }`}
-              >
-                <Menu className="w-5 h-5 text-slate-800" />
-              </span>
-              <span
-                className={`absolute inset-0 flex items-center justify-center transition-[transform,opacity] duration-160 ease-[var(--ease-out)] ${
-                  isMobileMenuOpen
-                    ? 'opacity-100 rotate-0 scale-100'
-                    : 'opacity-0 -rotate-90 scale-90 pointer-events-none'
-                }`}
-              >
-                <X className="w-5 h-5 text-slate-800" />
-              </span>
+              />
             </button>
 
-            {/* Brand Logo */}
-            <button
-              type="button"
-              onClick={onNavigateHome}
-              className="motion-press flex items-center gap-2.5 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 rounded-xl p-1"
-            >
-              <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#003d29] text-white shadow-xs transition-transform group-hover:scale-105">
-                <ShoppingCart className="w-5 h-5 text-white" strokeWidth={2.2} />
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white" />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="text-xl sm:text-2xl font-black tracking-tight text-[#003d29]">
-                  PASARIA
-                </span>
-                <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-700 -mt-1 hidden sm:inline">
-                  Marketplace Indonesia
-                </span>
-              </div>
-            </button>
-
-            {/* Desktop Categories Dropdown */}
-            <div className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-700">
-              <div className="relative" ref={categoriesRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowCategoriesMenu(!showCategoriesMenu)}
-                  aria-haspopup="true"
-                  aria-expanded={showCategoriesMenu}
-                  aria-controls="desktop-categories-popover"
-                  className="motion-press flex items-center gap-1.5 hover:text-[#003d29] transition-colors cursor-pointer py-1.5 px-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
+            {showCategoriesMenu && (
+              <div className="absolute left-0 top-full mt-6 sm:mt-7 w-[720px] lg:w-[820px] xl:w-[860px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 z-50 animate-in fade-in slide-in-from-top-2 duration-150 shadow-none text-left flex gap-7 lg:gap-9">
+                {/* Left: Featured Image Card */}
+                <div
+                  onClick={() => {
+                    setShowCategoriesMenu(false);
+                    onNavigateCategory('all');
+                  }}
+                  className="w-48 sm:w-56 h-60 sm:h-68 rounded-xl overflow-hidden relative shrink-0 group/card cursor-pointer bg-slate-900"
                 >
-                  <span>Kategori</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-160 ease-[var(--ease-out)] ${
-                      showCategoriesMenu ? 'rotate-180 text-[#003d29]' : 'rotate-0 text-slate-400'
-                    }`}
+                  <img
+                    src={categoryCardImg}
+                    alt="Featured Collections"
+                    className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500 opacity-90"
                   />
-                </button>
-
-                {/* Motion Point #3: Category mega popover origin-anchored scale (transform-origin: top left, 180ms var(--ease-out)) */}
-                {showCategoriesMenu && (
-                  <div
-                    id="desktop-categories-popover"
-                    role="menu"
-                    className="motion-popover absolute left-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3.5 z-50 text-left"
-                    style={{ transformOrigin: 'top left' }}
-                  >
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 mb-1">
-                      Kategori Pilihan PASARIA
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {categoryList.map((cat) => {
-                        const Icon = cat.icon;
-                        return (
-                          <button
-                            key={cat.name}
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setShowCategoriesMenu(false);
-                              onNavigateCategory(cat.name);
-                            }}
-                            className="motion-press flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
-                          >
-                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-[#003d29] shrink-0">
-                              <Icon className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="truncate">
-                              <div className="text-xs font-bold text-slate-800 group-hover:text-[#003d29] truncate">
-                                {cat.name}
-                              </div>
-                              <div className="text-[9px] text-slate-400 truncate">
-                                {cat.count}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent flex items-end justify-between p-4">
+                    <span className="text-white font-extrabold text-sm sm:text-base tracking-tight leading-snug">
+                      {isId ? 'Koleksi Pilihan' : 'Featured Catalog'}
+                    </span>
+                    <div className="w-7 h-7 rounded-full bg-white text-slate-900 flex items-center justify-center shrink-0 shadow-xs group-hover/card:translate-x-1 transition-transform">
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
 
-              <button
-                type="button"
-                onClick={() => onNavigateCategory('Deals')}
-                className="motion-press hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
-              >
-                Promo & Diskon
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateCategory("What's New")}
-                className="motion-press hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
-              >
-                Produk Baru
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateCategory('Delivery')}
-                className="motion-press hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] rounded-lg px-2 py-1"
-              >
-                Lacak Kiriman
-              </button>
-            </div>
+                {/* Right: 2 Columns of Links */}
+                <div className="flex-1 grid grid-cols-2 gap-x-8 sm:gap-x-12 gap-y-3 py-1">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                      {isId ? 'Kategori Utama' : 'Main Categories'}
+                    </div>
+                    <div className="space-y-2.5">
+                      {categoryList.map((cat) => (
+                        <button
+                          key={cat.slug}
+                          type="button"
+                          onClick={() => {
+                            setShowCategoriesMenu(false);
+                            onNavigateCategory(cat.slug);
+                          }}
+                          className="text-sm font-medium text-slate-700 hover:text-slate-950 hover:underline transition-all block text-left cursor-pointer whitespace-nowrap w-full"
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                      {isId ? 'Paling Populer' : 'Popular Highlights'}
+                    </div>
+                    <div className="space-y-2.5">
+                      {popularLinks.map((link) => (
+                        <button
+                          key={link.title}
+                          type="button"
+                          onClick={() => {
+                            setShowCategoriesMenu(false);
+                            onNavigateCategory(link.target);
+                          }}
+                          className="text-sm font-medium text-slate-700 hover:text-slate-950 hover:underline transition-all block text-left cursor-pointer whitespace-nowrap w-full"
+                        >
+                          {link.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Center: Search Bar with Autocomplete */}
-          <div className="flex-1 max-w-md relative hidden md:block" ref={searchContainerRef}>
-            <form onSubmit={handleSearchSubmit} className="relative">
-              {/* Motion Point #6: Search input focus expand transition */}
+          {/* Additional Desktop Navigation Menus */}
+          <div className="hidden lg:flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                onNavigateCategory('all');
+              }}
+              className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium text-slate-700 hover:text-[#003d29] hover:bg-slate-100 transition-colors whitespace-nowrap cursor-pointer"
+            >
+              Official Store
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('products-section');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  onNavigateHome();
+                  setTimeout(() => {
+                    document.getElementById('products-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }, 150);
+                }
+              }}
+              className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium text-slate-700 hover:text-[#003d29] hover:bg-slate-100 transition-colors whitespace-nowrap cursor-pointer"
+            >
+              {isId ? 'Produk Terlaris' : 'Best Sellers'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigateCategory('Deals');
+              }}
+              className="hidden xl:inline-flex px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium text-slate-700 hover:text-[#003d29] hover:bg-slate-100 transition-colors whitespace-nowrap cursor-pointer"
+            >
+              {isId ? 'Promo Spesial' : 'Deals'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('services-section');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  onNavigateHome();
+                  setTimeout(() => {
+                    document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }, 150);
+                }
+              }}
+              className="hidden 2xl:inline-flex px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium text-slate-700 hover:text-[#003d29] hover:bg-slate-100 transition-colors whitespace-nowrap cursor-pointer"
+            >
+              {isId ? 'Bantuan' : 'Help'}
+            </button>
+          </div>
+        </div>
+
+        {/* Center Section: Centered Search Bar */}
+        <div className="flex-1 max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl mx-2 sm:mx-4 relative" ref={searchContainerRef}>
+          <form onSubmit={handleSearchSubmit} className="relative w-full">
+            <div className="relative flex items-center w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none stroke-[2]" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => {
@@ -328,723 +386,471 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setShowSearchSuggestions(true);
                 }}
                 onFocus={() => setShowSearchSuggestions(true)}
-                placeholder="Cari produk original, headphone, gadget, toko..."
-                className="w-full min-h-[44px] pl-4 pr-11 py-2.5 text-xs sm:text-sm bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-4 focus:ring-[#003d29]/15 focus:shadow-md transition-[box-shadow,border-color,background-color] duration-160 ease-[var(--ease-out)] placeholder:text-slate-400"
+                placeholder={placeholderSuggestions[placeholderIndex]}
+                className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm bg-[#f4f4f5] hover:bg-[#ececee] focus:bg-white text-slate-900 rounded-full border border-transparent focus:border-slate-300 focus:outline-none transition-all placeholder:text-slate-400 placeholder:transition-opacity placeholder:duration-300"
               />
-              <button
-                type="submit"
-                aria-label="Cari"
-                className="motion-press absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-[#003d29] transition-colors cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-            </form>
-
-            {/* Motion Point #5: Search autocomplete suggestion box (smooth vertical appearance & fade 180ms var(--ease-out)) */}
-            {showSearchSuggestions && searchQuery.trim().length > 0 && (
-              <div
-                className="motion-search-suggestions absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden text-left"
-                style={{ transformOrigin: 'top center' }}
-              >
-                {searchSuggestions.length > 0 ? (
-                  <div>
-                    <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Saran Produk PASARIA
-                    </div>
-                    {searchSuggestions.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleSelectSuggestion(item.name)}
-                        className="motion-press w-full min-h-[44px] flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:bg-slate-50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-                            <ProductVisual imageKey={item.image} name={item.name} size="sm" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-slate-800 group-hover:text-[#003d29] transition-colors line-clamp-1">
-                              {item.name}
-                            </div>
-                            <div className="text-[10px] text-emerald-700 font-semibold">
-                              ★ {Number(item.rating || 5).toFixed(1)}{' '}
-                              <span className="text-slate-400 font-normal">({item.review_count || 0})</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-xs font-bold text-[#003d29] tabular-nums">
-                          {formatRupiah(item.price)}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 text-center text-xs text-slate-500">
-                    Tekan Enter untuk mencari "{searchQuery}"
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Right: Actions (Wishlist, Chat, Notification, Cart, Language, Account) */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5">
-            {/* Wishlist Button - Motion Point #7: .motion-press */}
-            {user && onNavigateWishlist && (
-              <button
-                type="button"
-                onClick={onNavigateWishlist}
-                aria-label="Wishlist Saya"
-                title="Wishlist Saya"
-                className="motion-press w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-rose-600 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
-              >
-                <Heart className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Chat Button - .motion-press */}
-            {user && onOpenChat && (
-              <button
-                type="button"
-                onClick={onOpenChat}
-                aria-label="Pesan dan Chat"
-                title="Pesan / Chat"
-                className="motion-press w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
-              >
-                <MessageCircle className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Real Notification Dropdown - Motion Point #8 */}
-            {user && <NotificationDropdown />}
-
-            {/* Cart Icon - Motion Point #7: .motion-press & .motion-badge-pop */}
-            <button
-              type="button"
-              onClick={onNavigateCart}
-              aria-label={`Keranjang Belanja, ${cartCount} barang`}
-              title="Keranjang Belanja"
-              className="motion-press relative w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 shrink-0"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              {cartCount > 0 && (
-                <span
-                  key={cartCount}
-                  className="motion-badge-pop absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#003d29] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white pointer-events-none"
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowSearchSuggestions(false);
+                  }}
+                  className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
-            {/* Desktop Language Switcher - Motion Point #9 */}
-            <div className="relative hidden md:block" ref={langRef}>
-              <button
-                type="button"
-                onClick={() => setShowLangMenu(!showLangMenu)}
-                aria-haspopup="true"
-                aria-expanded={showLangMenu}
-                aria-label={`Pilih Bahasa: ${currentLang.toUpperCase()}`}
-                className="motion-press min-h-[44px] flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
-              >
-                <Globe className="w-3.5 h-3.5 text-slate-600" />
-                <span className="uppercase text-[11px] font-bold">{currentLang}</span>
-                <ChevronDown
-                  className={`w-3 h-3 text-slate-400 transition-transform duration-160 ease-[var(--ease-out)] ${
-                    showLangMenu ? 'rotate-180 text-[#003d29]' : 'rotate-0'
-                  }`}
-                />
-              </button>
-
-              {showLangMenu && (
-                <div
-                  role="menu"
-                  aria-label="Pilihan Bahasa"
-                  className="motion-popover absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-left"
-                  style={{ transformOrigin: 'top right' }}
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onLanguageChange('id');
-                      setShowLangMenu(false);
-                    }}
-                    className={`motion-press w-full min-h-[36px] flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-slate-50 cursor-pointer ${
-                      currentLang === 'id' ? 'font-bold text-[#003d29] bg-emerald-50/60' : 'text-slate-700'
-                    }`}
-                  >
-                    <span>Bahasa Indonesia</span>
-                    {currentLang === 'id' && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onLanguageChange('en');
-                      setShowLangMenu(false);
-                    }}
-                    className={`motion-press w-full min-h-[36px] flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-slate-50 cursor-pointer ${
-                      currentLang === 'en' ? 'font-bold text-[#003d29] bg-emerald-50/60' : 'text-slate-700'
-                    }`}
-                  >
-                    <span>English</span>
-                    {currentLang === 'en' && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
-                  </button>
-                </div>
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
-
-            {/* Account Dropdown - Motion Point #4: Profile dropdown menu origin-anchored scale (top right, 160ms var(--ease-out)) */}
-            <div className="relative" ref={accountRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!user) {
-                    onOpenAuth();
-                  } else {
-                    setShowAccountMenu(!showAccountMenu);
-                  }
-                }}
-                aria-haspopup={user ? "true" : undefined}
-                aria-expanded={user ? showAccountMenu : undefined}
-                aria-controls={user ? "desktop-account-menu" : undefined}
-                aria-label={user ? `Menu Akun: ${user.name}` : "Masuk ke Akun"}
-                className="motion-press min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
-              >
-                <UserIcon className="w-4 h-4 text-slate-700" />
-                <span className="hidden sm:inline">
-                  {user ? user.name.split(' ')[0] : 'Masuk'}
-                </span>
-              </button>
-
-              {user && showAccountMenu && (
-                <div
-                  id="desktop-account-menu"
-                  role="menu"
-                  className="motion-popover-160 absolute right-0 mt-2.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 text-left"
-                  style={{ transformOrigin: 'top right' }}
-                >
-                  <div className="px-4 py-2 border-b border-slate-100">
-                    <div className="text-xs font-bold text-slate-900 truncate">{user.name}</div>
-                    <div className="text-[11px] text-slate-400 truncate">{user.email}</div>
-                    <span className="mt-1 inline-block text-[10px] font-bold uppercase tracking-wider text-[#003d29] bg-emerald-50 px-2 py-0.5 rounded-full">
-                      {user.role}
-                    </span>
-                  </div>
-                  <div className="py-1 text-xs">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onNavigateProfile();
-                      }}
-                      className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
-                    >
-                      <UserIcon className="w-4 h-4 text-slate-500" />
-                      <span>Profil Saya</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onNavigateOrders();
-                      }}
-                      className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
-                    >
-                      <Package className="w-4 h-4 text-slate-500" />
-                      <span>Pesanan Saya</span>
-                    </button>
-
-                    {onNavigateWishlist && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          onNavigateWishlist();
-                        }}
-                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
-                      >
-                        <Heart className="w-4 h-4 text-rose-500" />
-                        <span>Wishlist</span>
-                      </button>
-                    )}
-
-                    {onNavigateFollowing && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          onNavigateFollowing();
-                        }}
-                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
-                      >
-                        <Store className="w-4 h-4 text-slate-500" />
-                        <span>Toko yang Diikuti</span>
-                      </button>
-                    )}
-
-                    {/* Seller Center Navigation */}
-                    {onNavigateShop && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          onNavigateShop();
-                        }}
-                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 font-bold text-[#003d29] bg-emerald-50/50 hover:bg-emerald-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-emerald-50"
-                      >
-                        <Store className="w-4 h-4 text-[#003d29]" />
-                        <span>{user?.shop ? 'Seller Center (Toko Saya)' : 'Buka Toko Gratis'}</span>
-                      </button>
-                    )}
-
-                    {/* Admin Panel Navigation (Role: admin or support) */}
-                    {(user?.role === 'admin' || user?.role === 'support') && onNavigateAdmin && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          onNavigateAdmin();
-                        }}
-                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 font-bold text-amber-800 bg-amber-50/50 hover:bg-amber-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-amber-50"
-                      >
-                        <ShieldAlert className="w-4 h-4 text-amber-700" />
-                        <span>Admin Panel PASARIA</span>
-                      </button>
-                    )}
-
-                    {onNavigateSettings && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          onNavigateSettings();
-                        }}
-                        className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer focus:outline-none focus-visible:bg-slate-50"
-                      >
-                        <SettingsIcon className="w-4 h-4 text-slate-500" />
-                        <span>Pengaturan & Keamanan</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-1">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        onLogout();
-                      }}
-                      className="motion-press w-full min-h-[40px] flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-rose-50"
-                    >
-                      <LogOut className="w-4 h-4 text-rose-500" />
-                      <span>Keluar Akun</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Search Row (visible on small mobile screens below md) */}
-        <div className="px-4 pb-3 md:hidden" ref={mobileSearchContainerRef}>
-          <form onSubmit={handleSearchSubmit} className="relative">
-            {/* Motion Point #6: Mobile Search input focus expand transition */}
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setShowSearchSuggestions(true);
-              }}
-              onFocus={() => setShowSearchSuggestions(true)}
-              placeholder="Cari produk original di PASARIA..."
-              className="w-full min-h-[44px] pl-4 pr-11 py-2.5 text-xs bg-slate-100/90 hover:bg-slate-100 focus:bg-white text-slate-800 rounded-full border border-transparent focus:border-emerald-600/30 focus:outline-none focus:ring-4 focus:ring-[#003d29]/15 focus:shadow-md transition-[box-shadow,border-color,background-color] duration-160 ease-[var(--ease-out)] placeholder:text-slate-400"
-            />
-            <button
-              type="submit"
-              aria-label="Cari"
-              className="motion-press absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-[#003d29] transition-colors cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
-            >
-              <Search className="w-4 h-4" />
-            </button>
           </form>
 
-          {/* Motion Point #5: Mobile Search autocomplete suggestion box */}
+          {/* Search Suggestions Dropdown */}
           {showSearchSuggestions && searchQuery.trim().length > 0 && (
-            <div
-              className="motion-search-suggestions absolute left-4 right-4 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden text-left"
-              style={{ transformOrigin: 'top center' }}
-            >
+            <div className="absolute left-0 right-0 top-full mt-4 sm:mt-5 bg-white rounded-2xl border border-slate-200 py-2 z-50 overflow-hidden shadow-none text-left">
               {searchSuggestions.length > 0 ? (
                 <div>
-                  <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Saran Produk PASARIA
+                  <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {isId ? 'Saran Produk PASARIA' : 'Suggested Products'}
                   </div>
                   {searchSuggestions.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => handleSelectSuggestion(item.name)}
-                      className="motion-press w-full min-h-[44px] flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer focus:outline-none focus-visible:bg-slate-50"
+                      className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-slate-50 transition-colors text-left group cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
                           <ProductVisual imageKey={item.image} name={item.name} size="sm" />
                         </div>
-                        <div>
-                          <div className="text-xs font-semibold text-slate-800 group-hover:text-[#003d29] transition-colors line-clamp-1">
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-slate-800 group-hover:text-slate-950 truncate">
                             {item.name}
                           </div>
-                          <div className="text-[10px] text-emerald-700 font-semibold">
-                            ★ {Number(item.rating || 5).toFixed(1)}{' '}
-                            <span className="text-slate-400 font-normal">({item.review_count || 0})</span>
+                          <div className="text-[10px] text-slate-400 truncate">
+                            {formatRupiah(item.price)}
                           </div>
                         </div>
-                      </div>
-                      <div className="text-xs font-bold text-[#003d29] tabular-nums">
-                        {formatRupiah(item.price)}
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="px-4 py-3 text-center text-xs text-slate-500">
-                  Tekan Enter untuk mencari "{searchQuery}"
+                  {isId
+                    ? `Tekan Enter untuk mencari "${searchQuery}"`
+                    : `Press Enter to search "${searchQuery}"`}
                 </div>
               )}
             </div>
           )}
         </div>
-      </nav>
 
-      {/* Motion Point #2: Mobile Navigation Drawer Modal & Backdrop */}
-      {/* Container maintains hardware-accelerated drawer slide and backdrop fade */}
-      <div
-        className={`fixed inset-0 z-50 lg:hidden flex transition-opacity duration-200 ease-[var(--ease-out)] ${
-          isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
-        }`}
-        aria-hidden={!isMobileMenuOpen}
-      >
-        {/* Dark transparent backdrop with smooth fade (opacity 200ms var(--ease-out)) */}
-        <div
-          className={`fixed inset-0 bg-black/50 transition-opacity duration-200 ease-[var(--ease-out)] ${
-            isMobileMenuOpen ? 'opacity-100' : 'opacity-0'
-          }`}
-          onClick={() => setIsMobileMenuOpen(false)}
-          aria-hidden="true"
-        />
-
-        {/* Mobile Drawer Panel with hardware-accelerated slide-in (300ms var(--ease-drawer)) */}
-        <div
-          id="mobile-navigation-drawer"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Navigasi Utama Mobile"
-          tabIndex={-1}
-          className={`relative w-full max-w-xs sm:max-w-sm bg-white h-full shadow-2xl z-10 flex flex-col justify-between overflow-y-auto pointer-events-auto transition-transform duration-300 ease-[var(--ease-drawer)] will-change-transform ${
-            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-          style={{
-            transform: isMobileMenuOpen ? 'translate3d(0, 0, 0)' : 'translate3d(-100%, 0, 0)',
-          }}
-        >
-          <div>
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-[#003d29] text-white shadow-xs">
-                  <ShoppingCart className="w-5 h-5 text-white" strokeWidth={2.2} />
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white" />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-lg font-black tracking-tight text-[#003d29]">PASARIA</span>
-                  <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-700 -mt-0.5">
-                    Marketplace Indonesia
-                  </span>
-                </div>
-              </div>
-
+        {/* Right Section: Actions, Cart, Language, Account */}
+        <div className="flex items-center gap-2 sm:gap-2.5 justify-end shrink-0">
+          {!user ? (
+            /* Unauthenticated state */
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              {/* Cart Button (Icon Only with Badge) */}
               <button
                 type="button"
-                ref={drawerCloseBtnRef}
-                onClick={() => setIsMobileMenuOpen(false)}
-                aria-label="Tutup navigasi utama"
-                className="motion-press w-11 h-11 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                onClick={onNavigateCart}
+                className="w-8 h-8 rounded-full border border-slate-200 hover:border-slate-300 bg-transparent flex items-center justify-center text-slate-700 hover:text-slate-950 transition-colors cursor-pointer relative"
+                title={isId ? 'Keranjang Belanja' : 'Cart'}
               >
-                <X className="w-5 h-5" />
+                <ShoppingCart className="w-3.5 h-3.5" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#003d29] text-white text-[9px] font-extrabold flex items-center justify-center leading-none">
+                    {cartCount}
+                  </span>
+                )}
               </button>
-            </div>
 
-            {/* User Profile Card or Auth Prompt */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50/70">
-              {user ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-100 text-[#003d29] flex items-center justify-center font-bold text-base shrink-0">
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <div className="text-sm font-bold text-slate-900 truncate">{user.name}</div>
-                    <div className="text-xs text-slate-500 truncate">{user.email}</div>
-                    <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-[#003d29] bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                      {user.role}
-                    </span>
-                  </div>
-                </div>
-              ) : (
+              {/* Language Selector (EN / ID) */}
+              <div className="relative hidden sm:block" ref={langRef}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onOpenAuth();
-                  }}
-                  className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl bg-[#003d29] text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#064e3b] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shadow-xs"
+                  onClick={() => setShowLangMenu(!showLangMenu)}
+                  className="text-xs font-semibold text-slate-700 hover:text-slate-950 transition-colors cursor-pointer uppercase py-1 px-1.5"
                 >
-                  <UserIcon className="w-4 h-4" />
-                  <span>Masuk / Daftar Akun</span>
+                  {currentLang === 'id' ? 'ID' : 'EN'}
+                </button>
+
+                {showLangMenu && (
+                  <div className="absolute right-0 mt-2 w-28 bg-white rounded-xl border border-slate-200 py-1 z-50 text-left shadow-none">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLanguageChange('id');
+                        setShowLangMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                        currentLang === 'id' ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      🇮🇩 ID (Bahasa)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLanguageChange('en');
+                        setShowLangMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                        currentLang === 'en' ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      🇺🇸 EN-US
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Auth Buttons on Far Right */}
+              <button
+                type="button"
+                onClick={() => onOpenAuth('login')}
+                className="text-xs sm:text-sm font-semibold text-slate-800 hover:text-slate-950 transition-colors cursor-pointer py-1 px-1.5 whitespace-nowrap"
+              >
+                {isId ? 'Log in' : 'Log in'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onOpenAuth('register')}
+                className="px-4 sm:px-5 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95 whitespace-nowrap shadow-none"
+              >
+                {isId ? 'Daftar' : 'Sign up'}
+              </button>
+            </div>
+          ) : (
+            /* Authenticated state: Wishlist, Chat, Notifications, Cart (Icon only), Language, Profile (Far Right) */
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              {/* Wishlist Button */}
+              {onNavigateWishlist && (
+                <button
+                  type="button"
+                  onClick={onNavigateWishlist}
+                  className="w-8 h-8 rounded-full border border-slate-200 hover:border-slate-300 bg-transparent flex items-center justify-center text-slate-600 hover:text-rose-500 transition-colors cursor-pointer"
+                  title={isId ? 'Wishlist Saya' : 'My Wishlist'}
+                >
+                  <Heart className="w-3.5 h-3.5" />
                 </button>
               )}
-            </div>
 
-            {/* Navigation Items List */}
-            <nav className="p-3 space-y-1 text-left" aria-label="Menu navigasi mobile">
+              {/* Chat Button */}
+              {onOpenChat && (
+                <button
+                  type="button"
+                  onClick={onOpenChat}
+                  className="w-8 h-8 rounded-full border border-slate-200 hover:border-slate-300 bg-transparent flex items-center justify-center text-slate-600 hover:text-[#003d29] transition-colors cursor-pointer"
+                  title={isId ? 'Pesan / Chat' : 'Messages'}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Notification Bell Dropdown */}
+              <NotificationDropdown />
+
+              {/* Cart Button (Icon Only with Badge, no label) */}
               <button
                 type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onNavigateHome();
-                }}
-                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-slate-800 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                onClick={onNavigateCart}
+                className="w-8 h-8 rounded-full border border-slate-200 hover:border-slate-300 bg-transparent flex items-center justify-center text-slate-700 hover:text-slate-950 transition-colors cursor-pointer relative"
+                title={isId ? 'Keranjang Belanja' : 'Cart'}
               >
-                <ShoppingCart className="w-4 h-4 text-emerald-700 shrink-0" />
-                <span>Beranda</span>
+                <ShoppingCart className="w-3.5 h-3.5" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#003d29] text-white text-[9px] font-extrabold flex items-center justify-center leading-none">
+                    {cartCount}
+                  </span>
+                )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onNavigateCategory('Deals');
-                }}
-                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-                <span>Promo & Diskon</span>
-              </button>
+              {/* Language Selector (EN / ID) */}
+              <div className="relative hidden sm:block" ref={langRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowLangMenu(!showLangMenu)}
+                  className="text-xs font-semibold text-slate-700 hover:text-slate-950 transition-colors cursor-pointer uppercase py-1 px-1.5"
+                >
+                  {currentLang === 'id' ? 'ID' : 'EN'}
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onNavigateCategory("What's New");
-                }}
-                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-              >
-                <Package className="w-4 h-4 text-blue-500 shrink-0" />
-                <span>Produk Baru</span>
-              </button>
+                {showLangMenu && (
+                  <div className="absolute right-0 mt-2 w-28 bg-white rounded-xl border border-slate-200 py-1 z-50 text-left shadow-none">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLanguageChange('id');
+                        setShowLangMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                        currentLang === 'id' ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      🇮🇩 ID (Bahasa)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLanguageChange('en');
+                        setShowLangMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                        currentLang === 'en' ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      🇺🇸 EN-US
+                    </button>
+                  </div>
+                )}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onNavigateCategory('Delivery');
-                }}
-                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-              >
-                <Globe className="w-4 h-4 text-indigo-500 shrink-0" />
-                <span>Lacak Kiriman</span>
-              </button>
+              {/* Account Dropdown (Far Right) */}
+              <div className="relative" ref={accountRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowAccountMenu(!showAccountMenu)}
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap py-1 px-2.5 rounded-full border border-slate-200 hover:border-slate-300"
+                >
+                  <UserIcon className="w-3.5 h-3.5 text-slate-600" />
+                  <span>{user.name.split(' ')[0]}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
 
-              {/* Categories Grid */}
-              <div className="pt-2 pb-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-1">
-                  Kategori Pilihan
-                </div>
-                <div className="grid grid-cols-2 gap-1.5 px-1 pt-1">
-                  {categoryList.map((cat) => {
-                    const Icon = cat.icon;
-                    return (
+                {showAccountMenu && (
+                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none text-left">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <div className="text-xs font-bold text-slate-900 truncate">{user.name}</div>
+                      <div className="text-[11px] text-slate-400 truncate">{user.email}</div>
+                      <span className="mt-1 inline-block text-[9px] font-bold uppercase tracking-wider text-[#003d29] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        {user.role}
+                      </span>
+                    </div>
+                    <div className="py-1 text-xs font-medium">
                       <button
-                        key={cat.name}
                         type="button"
                         onClick={() => {
-                          setIsMobileMenuOpen(false);
-                          onNavigateCategory(cat.name);
+                          setShowAccountMenu(false);
+                          onNavigateProfile();
                         }}
-                        className="motion-press min-h-[44px] py-2.5 px-3 rounded-xl flex items-center gap-2 text-left bg-slate-50 hover:bg-emerald-50 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
                       >
-                        <Icon className="w-4 h-4 text-[#003d29] shrink-0" />
-                        <span className="text-xs font-medium text-slate-800 truncate">{cat.name}</span>
+                        <UserIcon className="w-3.5 h-3.5" />
+                        <span>{isId ? 'Profil Saya' : 'My Profile'}</span>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          onNavigateOrders();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
+                      >
+                        <Package className="w-3.5 h-3.5" />
+                        <span>{isId ? 'Pesanan Saya' : 'My Orders'}</span>
+                      </button>
 
-              {/* Authenticated user menu */}
-              {user && (
-                <div className="pt-2 pb-1 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-1">
-                    Akun Saya
+                      {onNavigateWishlist && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateWishlist();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <Heart className="w-3.5 h-3.5" />
+                          <span>Wishlist</span>
+                        </button>
+                      )}
+
+                      {onNavigateFollowing && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateFollowing();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-[#003d29] transition-colors cursor-pointer"
+                        >
+                          <Store className="w-3.5 h-3.5" />
+                          <span>{isId ? 'Toko yang Diikuti' : 'Following Shops'}</span>
+                        </button>
+                      )}
+
+                      {/* Seller Center Navigation */}
+                      {onNavigateShop && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateShop();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 font-bold text-[#003d29] hover:bg-emerald-50/50 transition-colors cursor-pointer"
+                        >
+                          <Store className="w-3.5 h-3.5 text-[#003d29]" />
+                          <span>{user?.shop ? 'Seller Center' : (isId ? 'Buka Toko Gratis' : 'Open Store')}</span>
+                        </button>
+                      )}
+
+                      {/* Admin Panel Navigation */}
+                      {(user?.role === 'admin' || user?.role === 'support') && onNavigateAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateAdmin();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 font-bold text-amber-800 hover:bg-amber-50/50 transition-colors cursor-pointer"
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Admin Panel PASARIA</span>
+                        </button>
+                      )}
+
+                      {onNavigateSettings && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountMenu(false);
+                            onNavigateSettings();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-950 transition-colors cursor-pointer"
+                        >
+                          <SettingsIcon className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{isId ? 'Pengaturan' : 'Settings'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          onLogout();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>{isId ? 'Keluar Akun' : 'Log out'}</span>
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      onNavigateProfile();
-                    }}
-                    className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                  >
-                    <UserIcon className="w-4 h-4 text-slate-600 shrink-0" />
-                    <span>Profil Saya</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      onNavigateOrders();
-                    }}
-                    className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                  >
-                    <Package className="w-4 h-4 text-slate-600 shrink-0" />
-                    <span>Pesanan Saya</span>
-                  </button>
-
-                  {onNavigateWishlist && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        onNavigateWishlist();
-                      }}
-                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-rose-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                    >
-                      <Heart className="w-4 h-4 text-rose-500 shrink-0" />
-                      <span>Wishlist</span>
-                    </button>
-                  )}
-
-                  {onNavigateFollowing && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        onNavigateFollowing();
-                      }}
-                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                    >
-                      <Store className="w-4 h-4 text-slate-600 shrink-0" />
-                      <span>Toko yang Diikuti</span>
-                    </button>
-                  )}
-
-                  {onNavigateShop && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        onNavigateShop();
-                      }}
-                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-[#003d29] bg-emerald-50/70 hover:bg-emerald-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                    >
-                      <Store className="w-4 h-4 text-[#003d29] shrink-0" />
-                      <span>{user?.shop ? 'Seller Center (Toko Saya)' : 'Buka Toko Gratis'}</span>
-                    </button>
-                  )}
-
-                  {(user?.role === 'admin' || user?.role === 'support') && onNavigateAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        onNavigateAdmin();
-                      }}
-                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 cursor-pointer"
-                    >
-                      <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
-                      <span>Admin Panel PASARIA</span>
-                    </button>
-                  )}
-
-                  {onNavigateSettings && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        onNavigateSettings();
-                      }}
-                      className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center gap-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#003d29] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer"
-                    >
-                      <SettingsIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span>Pengaturan & Keamanan</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </nav>
-          </div>
-
-          {/* Bottom Actions (Language Switcher & Logout) */}
-          <div className="p-4 border-t border-slate-100 bg-slate-50/60 space-y-2">
-            <div className="flex items-center justify-between px-2 py-1 text-xs">
-              <span className="text-slate-500 font-medium flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-slate-400" />
-                Bahasa
-              </span>
-              <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => onLanguageChange('id')}
-                  className={`motion-press min-h-[36px] min-w-[36px] px-3 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center justify-center ${
-                    currentLang === 'id'
-                      ? 'bg-[#003d29] text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  ID
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onLanguageChange('en')}
-                  className={`motion-press min-h-[36px] min-w-[36px] px-3 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer flex items-center justify-center ${
-                    currentLang === 'en'
-                      ? 'bg-[#003d29] text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  EN
-                </button>
+                )}
               </div>
             </div>
+          )}
 
-            {user && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onLogout();
-                }}
-                className="motion-press w-full min-h-[44px] py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 cursor-pointer"
-              >
-                <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
-                <span>Keluar Akun</span>
-              </button>
-            )}
-          </div>
+          {/* Mobile Menu Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-1.5 text-slate-700 hover:text-slate-950 cursor-pointer"
+            aria-label="Toggle mobile menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
-    </>
+
+      {/* Mobile Menu Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-2.5 text-left animate-in fade-in duration-150">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            {isId ? 'Menu Navigasi' : 'Navigation'}
+          </div>
+
+          {/* Mobile Categories list */}
+          <div className="space-y-1 pl-1">
+            <div className="text-xs font-bold text-slate-800 py-1">
+              {isId ? 'Kategori Produk' : 'Product Categories'}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 pb-2">
+              {categoryList.map((cat) => (
+                <button
+                  key={cat.slug}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onNavigateCategory(cat.slug);
+                  }}
+                  className="text-left text-xs text-slate-600 hover:text-[#003d29] py-1 truncate"
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onNavigateCategory('Deals');
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Promo & Diskon' : 'Deals'}
+          </button>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onNavigateCategory("What's New");
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Produk Baru' : "What's New"}
+          </button>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onNavigateCategory('Delivery');
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Lacak Kiriman' : 'Delivery Tracking'}
+          </button>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              if (onNavigateShop) onNavigateShop();
+            }}
+            className="block w-full py-1.5 text-xs font-semibold text-slate-800 hover:text-[#003d29]"
+          >
+            {isId ? 'Buka Toko / Seller Center' : 'Open Store / Seller Center'}
+          </button>
+
+          <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+            <span className="text-xs text-slate-500 font-medium">Bahasa / Language</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  onLanguageChange('id');
+                  setMobileMenuOpen(false);
+                }}
+                className={`text-xs px-2.5 py-1 rounded-md font-bold ${
+                  currentLang === 'id' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                ID
+              </button>
+              <button
+                onClick={() => {
+                  onLanguageChange('en');
+                  setMobileMenuOpen(false);
+                }}
+                className={`text-xs px-2.5 py-1 rounded-md font-bold ${
+                  currentLang === 'en' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </nav>
   );
 };

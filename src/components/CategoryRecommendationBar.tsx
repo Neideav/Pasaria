@@ -93,7 +93,7 @@ export const CategoryRecommendationBar: React.FC<CategoryRecommendationBarProps>
   ];
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-6 sm:my-8">
+    <section className="max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-8 my-6 sm:my-8">
       {/* Section Headline */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-1 mb-4 sm:mb-5">
         <div>

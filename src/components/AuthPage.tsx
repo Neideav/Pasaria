@@ -186,12 +186,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <div className="flex items-center justify-between">
           <button
             onClick={onNavigateHome}
-            className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
+            className="flex items-center group cursor-pointer focus:outline-none"
           >
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#003d29] text-white transition-transform group-hover:scale-105">
-              <ShoppingBag className="w-5 h-5 text-white" strokeWidth={2.2} />
-            </div>
-            <span className="text-xl font-black tracking-tight text-[#003d29]">PASARIA</span>
+            <img
+              src="/images/logo_tp.png"
+              alt="PASARIA"
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-105"
+            />
           </button>
 
           <button

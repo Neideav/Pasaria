@@ -388,6 +388,8 @@ export interface CheckoutOrderInput {
   items: CheckoutOrderItemInput[];
   recipient_name: string;
   recipient_phone: string;
+  customer_name?: string;
+  customer_phone?: string;
   shipping_address: string;
   payment_method: string;
   shipping_method?: string;

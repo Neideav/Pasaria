@@ -122,23 +122,36 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return {} as T;
   }
 
-  // Parse response body (robust against non-JSON server errors)
-  const contentType = res.headers.get('content-type') || '';
+  // Parse response body (robust against non-JSON server errors and prepended PHP warnings)
   let json: any = null;
   let text = '';
 
-  if (contentType.includes('application/json')) {
+  try {
+    text = await res.text();
+    // Attempt standard parse first
     try {
-      json = await res.json();
+      json = JSON.parse(text);
     } catch {
-      json = null;
+      // If server prepended a deprecation warning or HTML before JSON, extract JSON payload
+      const jsonStart = text.indexOf('{');
+      const jsonArrayStart = text.indexOf('[');
+      let startIdx = -1;
+      if (jsonStart !== -1 && jsonArrayStart !== -1) {
+        startIdx = Math.min(jsonStart, jsonArrayStart);
+      } else if (jsonStart !== -1) {
+        startIdx = jsonStart;
+      } else if (jsonArrayStart !== -1) {
+        startIdx = jsonArrayStart;
+      }
+
+      if (startIdx !== -1) {
+        json = JSON.parse(text.slice(startIdx));
+      } else {
+        json = null;
+      }
     }
-  } else {
-    try {
-      text = await res.text();
-    } catch {
-      text = '';
-    }
+  } catch {
+    json = null;
   }
 
   // Handle HTTP error responses

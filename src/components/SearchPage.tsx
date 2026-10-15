@@ -28,7 +28,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   onResetFilters,
 }) => {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 text-left">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-4 text-left">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs text-slate-400 py-3 mb-2">
         <button onClick={onBackToHome} className="hover:text-slate-800 transition-colors">
@@ -71,7 +71,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
 
       {/* Results Grid */}
       {products.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3 md:gap-3.5">
           {products.map((product) => (
             <ProductCard
               key={product.id}

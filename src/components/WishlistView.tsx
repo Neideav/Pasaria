@@ -59,7 +59,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 text-left">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-8 text-left">
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2 text-rose-600 font-bold text-xs uppercase tracking-wider mb-1">
@@ -106,7 +106,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3 md:gap-3.5">
           {items.map((prod) => {
             const isRemoving = removingId === prod.id;
             return (
