@@ -471,7 +471,7 @@ export const ShopDashboardView: React.FC<ShopDashboardViewProps> = ({
     : [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-8 text-left space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200/80 gap-4">
         <div>

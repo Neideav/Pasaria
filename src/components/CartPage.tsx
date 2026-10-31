@@ -74,7 +74,7 @@ export const CartPage: React.FC<CartPageProps> = ({
 
   if (items.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-20 text-center">
+      <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-20 text-center">
         <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
           <ShoppingBag className="w-8 h-8" />
         </div>
@@ -92,7 +92,7 @@ export const CartPage: React.FC<CartPageProps> = ({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-8 text-left">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">

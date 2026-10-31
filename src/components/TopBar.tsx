@@ -49,7 +49,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <div className="bg-[#003d29] text-white text-xs font-normal py-2 px-4 sm:px-8 border-b border-emerald-950/20 select-none">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="max-w-[1536px] mx-auto flex items-center justify-between">
         {/* Left: Contact */}
         <div className="flex items-center gap-2 text-emerald-100/90 font-medium">
           <Phone className="w-3.5 h-3.5 text-emerald-300 shrink-0" />

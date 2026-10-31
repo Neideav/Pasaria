@@ -52,6 +52,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // 2FA Challenge State
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
+
   // Testimonial Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -102,12 +108,45 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
     try {
       const data = await api.login(username.trim(), password);
-      setSuccessMsg(isId ? 'Berhasil masuk! Mengalihkan...' : 'Logged in successfully! Redirecting...');
+      if (data.two_factor_required && data.challenge_token) {
+        setChallengeToken(data.challenge_token);
+        return;
+      }
+      const loggedInUser = data.user;
+      if (loggedInUser) {
+        setSuccessMsg(isId ? 'Berhasil masuk! Mengalihkan...' : 'Logged in successfully! Redirecting...');
+        setTimeout(() => {
+          onLoginSuccess(loggedInUser);
+        }, 400);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || (isId ? 'Gagal masuk. Periksa kembali email dan kata sandi Anda.' : 'Login failed. Please check your credentials.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTwoFactorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!challengeToken) return;
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const data = await api.loginTwoFactorChallenge({
+        challenge_token: challengeToken,
+        code: useRecovery ? undefined : twoFactorCode.trim(),
+        recovery_code: useRecovery ? recoveryCode.trim() : undefined,
+      });
+
+      setSuccessMsg(isId ? 'Verifikasi berhasil! Mengalihkan...' : 'Verification successful! Redirecting...');
       setTimeout(() => {
         onLoginSuccess(data.user);
       }, 400);
     } catch (err: any) {
-      setErrorMsg(err.message || (isId ? 'Gagal masuk. Periksa kembali email dan kata sandi Anda.' : 'Login failed. Please check your credentials.'));
+      setErrorMsg(err.message || (isId ? 'Kode 2FA atau kode pemulihan tidak valid.' : 'Invalid 2FA or recovery code.'));
     } finally {
       setLoading(false);
     }
@@ -147,12 +186,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <div className="flex items-center justify-between">
           <button
             onClick={onNavigateHome}
-            className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
+            className="flex items-center group cursor-pointer focus:outline-none"
           >
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#003d29] text-white transition-transform group-hover:scale-105">
-              <ShoppingBag className="w-5 h-5 text-white" strokeWidth={2.2} />
-            </div>
-            <span className="text-xl font-black tracking-tight text-[#003d29]">PASARIA</span>
+            <img
+              src="/images/logo_tp.png"
+              alt="PASARIA"
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-105"
+            />
           </button>
 
           <button
@@ -273,6 +313,84 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-slate-900 hover:bg-black transition-all cursor-pointer disabled:opacity-50 mt-2 shadow-sm active:scale-[0.99]"
               >
                 {loading ? (isId ? 'Membuat akun...' : 'Creating account...') : isId ? 'Buat Akun' : 'Create account'}
+              </button>
+            </form>
+          ) : challengeToken ? (
+            /* 2FA Challenge Form */
+            <form onSubmit={handleTwoFactorSubmit} className="space-y-4 text-left">
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs leading-relaxed font-medium">
+                {isId
+                  ? 'Verifikasi dua langkah aktif pada akun Anda. Masukkan kode 6 digit dari aplikasi autentikator Anda atau gunakan kode pemulihan cadangan.'
+                  : 'Two-factor authentication is required. Enter the 6-digit code from your authenticator app or enter a recovery code.'}
+              </div>
+
+              {!useRecovery ? (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    {isId ? 'Kode Autentikasi 6-Digit (TOTP)' : '6-Digit TOTP Code'}
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    autoFocus
+                    placeholder="123456"
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
+                    className="w-full text-center tracking-widest text-lg font-mono py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setUseRecovery(true)}
+                    className="text-xs text-emerald-800 hover:underline font-semibold mt-2 cursor-pointer"
+                  >
+                    {isId ? 'Gunakan Kode Pemulihan Cadangan' : 'Use a recovery code instead'}
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    {isId ? 'Kode Pemulihan Cadangan' : 'Backup Recovery Code'}
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="abcd-1234"
+                    value={recoveryCode}
+                    onChange={(e) => setRecoveryCode(e.target.value)}
+                    className="w-full text-center uppercase tracking-wider text-sm font-mono py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setUseRecovery(false)}
+                    className="text-xs text-emerald-800 hover:underline font-semibold mt-2 cursor-pointer"
+                  >
+                    {isId ? 'Gunakan Kode Authenticator 6-Digit' : 'Use 6-digit authenticator code'}
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || (!useRecovery && twoFactorCode.length < 6) || (useRecovery && !recoveryCode.trim())}
+                className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-slate-900 hover:bg-black transition-all cursor-pointer disabled:opacity-50 mt-2 shadow-sm active:scale-[0.99]"
+              >
+                {loading
+                  ? (isId ? 'Memverifikasi...' : 'Verifying...')
+                  : isId
+                  ? 'Verifikasi & Masuk'
+                  : 'Verify & Continue'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setChallengeToken(null);
+                  setTwoFactorCode('');
+                  setRecoveryCode('');
+                }}
+                className="w-full text-center text-xs text-slate-500 hover:text-slate-800 py-1 cursor-pointer"
+              >
+                {isId ? 'Kembali ke Login' : 'Back to Login'}
               </button>
             </form>
           ) : (

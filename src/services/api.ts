@@ -23,6 +23,19 @@ import {
   SellerInventoryItem,
   AdminDashboardResult,
   AuditLogItem,
+  UserNotificationPreferences,
+  UserPrivacyPreferences,
+  UserSession,
+  TwoFactorStatus,
+  TwoFactorSetupResult,
+  UserDataExport,
+  UserShoppingPreferences,
+  ProductAlert,
+  UserSearchHistoryItem,
+  UserViewedProductItem,
+  SellerPreferences,
+  CatalogMetadataCategory,
+  CatalogMetadataBrand,
 } from '../types';
 
 const TOKEN_KEY = 'pasaria_token';
@@ -109,23 +122,36 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return {} as T;
   }
 
-  // Parse response body (robust against non-JSON server errors)
-  const contentType = res.headers.get('content-type') || '';
+  // Parse response body (robust against non-JSON server errors and prepended PHP warnings)
   let json: any = null;
   let text = '';
 
-  if (contentType.includes('application/json')) {
+  try {
+    text = await res.text();
+    // Attempt standard parse first
     try {
-      json = await res.json();
+      json = JSON.parse(text);
     } catch {
-      json = null;
+      // If server prepended a deprecation warning or HTML before JSON, extract JSON payload
+      const jsonStart = text.indexOf('{');
+      const jsonArrayStart = text.indexOf('[');
+      let startIdx = -1;
+      if (jsonStart !== -1 && jsonArrayStart !== -1) {
+        startIdx = Math.min(jsonStart, jsonArrayStart);
+      } else if (jsonStart !== -1) {
+        startIdx = jsonStart;
+      } else if (jsonArrayStart !== -1) {
+        startIdx = jsonArrayStart;
+      }
+
+      if (startIdx !== -1) {
+        json = JSON.parse(text.slice(startIdx));
+      } else {
+        json = null;
+      }
     }
-  } else {
-    try {
-      text = await res.text();
-    } catch {
-      text = '';
-    }
+  } catch {
+    json = null;
   }
 
   // Handle HTTP error responses
@@ -276,12 +302,32 @@ export const api = {
   },
 
   // ── 3. Authentication ─────────────────────────────────────────────────────
-  async login(username: string, password: string): Promise<{ user: User; token: string }> {
-    const json = await request<{ success: boolean; user: User; token: string }>(
+  async login(username: string, password: string): Promise<{ user?: User; token?: string; two_factor_required?: boolean; challenge_token?: string }> {
+    const json = await request<{ success: boolean; user?: User; token?: string; two_factor_required?: boolean; challenge_token?: string }>(
       '/api/auth/login',
       {
         method: 'POST',
         body: JSON.stringify({ username, password }),
+      }
+    );
+
+    if (json.token) {
+      this.setToken(json.token);
+    }
+    return {
+      user: json.user,
+      token: json.token,
+      two_factor_required: json.two_factor_required,
+      challenge_token: json.challenge_token,
+    };
+  },
+
+  async loginTwoFactorChallenge(data: { challenge_token: string; code?: string; recovery_code?: string }): Promise<{ user: User; token: string }> {
+    const json = await request<{ success: boolean; user: User; token: string }>(
+      '/api/auth/two-factor-challenge',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
       }
     );
 
@@ -361,16 +407,280 @@ export const api = {
   async changePassword(
     arg1: string | { current_password: string; new_password: string; new_password_confirmation?: string },
     newPassword?: string
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; message?: string; token?: string }> {
     const body =
       typeof arg1 === 'object'
         ? arg1
         : { current_password: arg1, new_password: newPassword, new_password_confirmation: newPassword };
 
-    return request<{ success: boolean }>('/api/user/password', {
+    const res = await request<{ success: boolean; message?: string; token?: string }>('/api/user/password', {
       method: 'PUT',
       body: JSON.stringify(body),
     });
+
+    if (res.token) {
+      this.setToken(res.token);
+    }
+
+    return res;
+  },
+
+  async requestEmailChange(new_email: string): Promise<{ success: boolean; message: string; new_email?: string; verification_code?: string }> {
+    return request<{ success: boolean; message: string; new_email?: string; verification_code?: string }>(
+      '/api/user/email/request-change',
+      {
+        method: 'POST',
+        body: JSON.stringify({ new_email }),
+      }
+    );
+  },
+
+  async verifyEmailChange(code: string): Promise<{ success: boolean; message: string; user?: User }> {
+    return request<{ success: boolean; message: string; user?: User }>(
+      '/api/user/email/verify-change',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      }
+    );
+  },
+
+  // ── 3b. Active Sessions & Two-Factor Authentication ───────────────────────
+  async getActiveSessions(): Promise<UserSession[]> {
+    const json = await request<{ success: boolean; data: UserSession[] }>('/api/user/sessions');
+    return json.data || [];
+  },
+
+  async revokeSession(id: number): Promise<{ success: boolean; message: string; is_current?: boolean }> {
+    return request<{ success: boolean; message: string; is_current?: boolean }>(
+      `/api/user/sessions/${id}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  async revokeOtherSessions(): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/user/sessions-others', {
+      method: 'DELETE',
+    });
+  },
+
+  async getTwoFactorStatus(): Promise<TwoFactorStatus> {
+    const json = await request<{ success: boolean; enabled: boolean; confirmed_at?: string | null }>(
+      '/api/user/two-factor'
+    );
+    return {
+      enabled: !!json.enabled,
+      confirmed_at: json.confirmed_at,
+    };
+  },
+
+  async setupTwoFactor(): Promise<TwoFactorSetupResult> {
+    return request<TwoFactorSetupResult>('/api/user/two-factor/setup', {
+      method: 'POST',
+    });
+  },
+
+  async confirmTwoFactor(code: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/user/two-factor/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  },
+
+  async disableTwoFactor(password: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>('/api/user/two-factor/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  },
+
+  // ── 3c. Notification & Privacy Preferences ─────────────────────────────────
+  async getNotificationPreferences(): Promise<UserNotificationPreferences> {
+    const json = await request<{ success: boolean; data: UserNotificationPreferences }>(
+      '/api/user/notification-preferences'
+    );
+    return json.data;
+  },
+
+  async updateNotificationPreferences(
+    data: Partial<UserNotificationPreferences>
+  ): Promise<UserNotificationPreferences> {
+    const json = await request<{ success: boolean; message: string; data: UserNotificationPreferences }>(
+      '/api/user/notification-preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async getPrivacyPreferences(): Promise<UserPrivacyPreferences> {
+    const json = await request<{ success: boolean; data: UserPrivacyPreferences }>(
+      '/api/user/privacy-preferences'
+    );
+    return json.data;
+  },
+
+  async updatePrivacyPreferences(
+    data: Partial<UserPrivacyPreferences>
+  ): Promise<UserPrivacyPreferences> {
+    const json = await request<{ success: boolean; message: string; data: UserPrivacyPreferences }>(
+      '/api/user/privacy-preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async exportUserData(): Promise<UserDataExport> {
+    const json = await request<{ success: boolean; message: string; data: UserDataExport }>(
+      '/api/user/data-export'
+    );
+    return json.data;
+  },
+
+  async deleteAccount(password: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    const res = await request<{ success: boolean; message: string }>('/api/user/delete-account', {
+      method: 'POST',
+      body: JSON.stringify({ password, reason }),
+    });
+    this.clearToken();
+    return res;
+  },
+
+  // ── 3d. Shopping Preferences ──────────────────────────────────────────────
+  async getShoppingPreferences(): Promise<{
+    preferences: UserShoppingPreferences;
+    available_categories: CatalogMetadataCategory[];
+    available_brands: CatalogMetadataBrand[];
+  }> {
+    const json = await request<{
+      success: boolean;
+      data: {
+        preferences: UserShoppingPreferences;
+        available_categories: CatalogMetadataCategory[];
+        available_brands: CatalogMetadataBrand[];
+      };
+    }>('/api/user/shopping-preferences');
+    return json.data;
+  },
+
+  async updateShoppingPreferences(
+    data: Partial<UserShoppingPreferences>
+  ): Promise<UserShoppingPreferences> {
+    const json = await request<{ success: boolean; message: string; data: UserShoppingPreferences }>(
+      '/api/user/shopping-preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  // ── 3e. Product Alerts & Price Watch ───────────────────────────────────────
+  async getProductAlerts(): Promise<ProductAlert[]> {
+    const json = await request<{ success: boolean; data: ProductAlert[] }>(
+      '/api/user/product-alerts'
+    );
+    return json.data || [];
+  },
+
+  async createProductAlert(data: {
+    product_id: number;
+    alert_type: 'price_drop' | 'back_in_stock' | 'target_price' | 'shop_new_product';
+    target_price?: number | null;
+  }): Promise<ProductAlert> {
+    const json = await request<{ success: boolean; message: string; data: ProductAlert }>(
+      '/api/user/product-alerts',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async updateProductAlert(
+    id: number,
+    data: {
+      is_active?: boolean;
+      target_price?: number | null;
+    }
+  ): Promise<ProductAlert> {
+    const json = await request<{ success: boolean; message: string; data: ProductAlert }>(
+      `/api/user/product-alerts/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
+  },
+
+  async deleteProductAlert(id: number): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(
+      `/api/user/product-alerts/${id}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  // ── 3f. Account Activity History ───────────────────────────────────────────
+  async getRecentSearches(): Promise<UserSearchHistoryItem[]> {
+    const json = await request<{ success: boolean; data: UserSearchHistoryItem[] }>(
+      '/api/user/activity/recent-searches'
+    );
+    return json.data || [];
+  },
+
+  async recordSearchQuery(query: string): Promise<void> {
+    if (!this.getToken() || !query.trim()) return;
+    try {
+      await request('/api/user/activity/recent-searches', {
+        method: 'POST',
+        body: JSON.stringify({ query: query.trim() }),
+      });
+    } catch {
+      // Non-blocking history record
+    }
+  },
+
+  async deleteRecentSearch(id: number): Promise<void> {
+    await request(`/api/user/activity/recent-searches/${id}`, { method: 'DELETE' });
+  },
+
+  async clearRecentSearches(): Promise<void> {
+    await request('/api/user/activity/recent-searches', { method: 'DELETE' });
+  },
+
+  async getRecentlyViewed(): Promise<UserViewedProductItem[]> {
+    const json = await request<{ success: boolean; data: UserViewedProductItem[] }>(
+      '/api/user/activity/recently-viewed'
+    );
+    return json.data || [];
+  },
+
+  async recordViewedProduct(productId: number): Promise<void> {
+    if (!this.getToken() || !productId) return;
+    try {
+      await request('/api/user/activity/recently-viewed', {
+        method: 'POST',
+        body: JSON.stringify({ product_id: productId }),
+      });
+    } catch {
+      // Non-blocking history record
+    }
+  },
+
+  async deleteRecentlyViewed(id: number): Promise<void> {
+    await request(`/api/user/activity/recently-viewed/${id}`, { method: 'DELETE' });
+  },
+
+  async clearRecentlyViewed(): Promise<void> {
+    await request('/api/user/activity/recently-viewed', { method: 'DELETE' });
   },
 
   // ── 4. Addresses ──────────────────────────────────────────────────────────
@@ -667,6 +977,14 @@ export const api = {
     return json.data || [];
   },
 
+  async updateFollowPreferences(shopId: number, notifyNewProducts: boolean): Promise<boolean> {
+    const json = await request<{ success: boolean }>(`/api/shops/${shopId}/follow-preferences`, {
+      method: 'PUT',
+      body: JSON.stringify({ notify_new_products: notifyNewProducts }),
+    });
+    return !!json.success;
+  },
+
   // ── 12. Vouchers ──────────────────────────────────────────────────────────
   async getVouchers(): Promise<Voucher[]> {
     const json = await request<{ success: boolean; data: Voucher[] }>('/api/vouchers');
@@ -861,6 +1179,24 @@ export const api = {
       '/api/seller/finances'
     );
     return json.data || {};
+  },
+
+  async getSellerPreferences(): Promise<SellerPreferences> {
+    const json = await request<{ success: boolean; data: SellerPreferences }>(
+      '/api/seller/preferences'
+    );
+    return json.data;
+  },
+
+  async updateSellerPreferences(data: Partial<SellerPreferences>): Promise<SellerPreferences> {
+    const json = await request<{ success: boolean; message: string; data: SellerPreferences }>(
+      '/api/seller/preferences',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return json.data;
   },
 
   async requestPayout(data: {

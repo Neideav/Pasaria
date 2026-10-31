@@ -300,6 +300,9 @@ class ProductApiController extends Controller
             }
         }
 
+        // Dispatch shop-follow new product alerts
+        \App\Services\ProductAlertService::handleNewProductPublished($product);
+
         return response()->json([
             'success' => true,
             'product' => $product->load(['variants', 'shop'])->toArray(),
@@ -378,6 +381,9 @@ class ProductApiController extends Controller
             'variants.*.stock'=> 'required_with:variants|integer|min:0',
         ]);
 
+        $oldPrice = (float) $product->price;
+        $oldStock = (int) $product->stock;
+
         if ($request->has('name') && trim($request->input('name')) !== $product->name) {
             $product->name = trim($request->input('name'));
             $baseSlug = Str::slug($product->name);
@@ -424,6 +430,22 @@ class ProductApiController extends Controller
         }
 
         $product->save();
+
+        $newPrice = (float) $product->price;
+        $newStock = (int) $product->stock;
+
+        // Trigger price-drop alert if price decreased
+        if ($newPrice < $oldPrice) {
+            \App\Services\ProductAlertService::handlePriceDrop($product, $oldPrice, $newPrice);
+        }
+
+        // Trigger back-in-stock alert if transitioning from 0 to >0
+        if ($oldStock === 0 && $newStock > 0) {
+            \App\Services\ProductAlertService::handleBackInStock($product);
+        }
+
+        // Trigger seller low-stock warning
+        \App\Services\SellerAlertService::handleLowStock($product);
 
         // Update or recreate variants if provided
         if ($request->has('variants') && is_array($request->input('variants'))) {

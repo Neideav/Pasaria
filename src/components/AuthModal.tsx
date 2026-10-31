@@ -44,9 +44,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // 2FA Challenge State
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
+
   // Focus trap and Escape key listener
   useEffect(() => {
     if (!isOpen) return;
+    setChallengeToken(null);
+    setTwoFactorCode('');
+    setRecoveryCode('');
+    setUseRecovery(false);
 
     const timer = setTimeout(() => {
       if (modalRef.current) {
@@ -102,10 +112,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       const data = await api.login(username.trim(), password);
+      if (data.two_factor_required && data.challenge_token) {
+        setChallengeToken(data.challenge_token);
+        setErrorMsg('');
+        return;
+      }
+      if (data.user) {
+        onLoginSuccess(data.user);
+        onClose();
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal masuk. Periksa kembali email dan kata sandi Anda.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTwoFactorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!challengeToken) return;
+
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      const data = await api.loginTwoFactorChallenge({
+        challenge_token: challengeToken,
+        code: useRecovery ? undefined : twoFactorCode.trim(),
+        recovery_code: useRecovery ? recoveryCode.trim() : undefined,
+      });
+
       onLoginSuccess(data.user);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Gagal masuk. Periksa kembali email dan kata sandi Anda.');
+      setErrorMsg(err.message || 'Kode verifikasi 2FA atau kode pemulihan tidak valid.');
     } finally {
       setLoading(false);
     }
@@ -199,8 +239,78 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
-        {/* Motion Point #22: Login vs Register View Horizontal Slide / Crossfade (180ms var(--ease-out)) */}
-        {tab === 'login' ? (
+        {challengeToken ? (
+          <form onSubmit={handleTwoFactorSubmit} className="space-y-4 text-xs">
+            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] leading-relaxed font-medium">
+              Verifikasi dua langkah aktif pada akun Anda. Masukkan kode 6 digit dari aplikasi autentikator Anda atau gunakan kode pemulihan cadangan.
+            </div>
+
+            {!useRecovery ? (
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Kode Autentikasi 6-Digit (TOTP)
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  autoFocus
+                  placeholder="Contoh: 123456"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full text-center tracking-widest text-lg font-mono py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-[#003d29]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setUseRecovery(true)}
+                  className="text-[11px] text-[#003d29] hover:underline font-semibold mt-2 cursor-pointer"
+                >
+                  Gunakan Kode Pemulihan Cadangan (Recovery Code)
+                </button>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Kode Pemulihan Cadangan (Recovery Code)
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Contoh: abcd-1234"
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value)}
+                  className="w-full text-center uppercase tracking-wider text-sm font-mono py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-[#003d29]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setUseRecovery(false)}
+                  className="text-[11px] text-[#003d29] hover:underline font-semibold mt-2 cursor-pointer"
+                >
+                  Gunakan Kode Authenticator 6-Digit
+                </button>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || (!useRecovery && twoFactorCode.length < 6) || (useRecovery && !recoveryCode.trim())}
+              className="w-full min-h-[44px] py-2.5 rounded-xl bg-[#003d29] hover:bg-[#064e3b] text-white font-extrabold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? 'Memverifikasi...' : 'Verifikasi & Masuk Akun'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setChallengeToken(null);
+                setTwoFactorCode('');
+                setRecoveryCode('');
+              }}
+              className="w-full text-center text-xs text-slate-500 hover:text-slate-800 py-1 cursor-pointer"
+            >
+              Kembali ke Login
+            </button>
+          </form>
+        ) : tab === 'login' ? (
           <form key="login-form" onSubmit={handleLoginSubmit} className="motion-auth-form-enter-reverse space-y-4 text-xs">
             <div>
               <label htmlFor="auth-login-identifier" className="block text-[11px] font-semibold text-slate-700 mb-1">

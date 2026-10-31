@@ -59,7 +59,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 text-left">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-8 text-left">
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2 text-rose-600 font-bold text-xs uppercase tracking-wider mb-1">
@@ -106,7 +106,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3 md:gap-3.5">
           {items.map((prod) => {
             const isRemoving = removingId === prod.id;
             return (
@@ -118,15 +118,34 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
                 }`}
               >
                 <div>
-                  <div className="flex justify-end mb-2">
-                    <button
-                      onClick={(e) => handleRemove(prod.id, e)}
-                      className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-500 transition-colors cursor-pointer motion-press active:scale-[0.96]"
-                      title="Hapus dari wishlist"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await api.createProductAlert({
+                              product_id: prod.id,
+                              alert_type: 'price_drop',
+                              target_price: Math.round(prod.price * 0.9),
+                            });
+                            alert(`Pantauan penurunan harga aktif untuk "${prod.name}".`);
+                          } catch (err: any) {
+                            alert(err.message || 'Gagal membuat pantauan harga.');
+                          }
+                        }}
+                        className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center text-[#003d29] transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                        title="Pantau penurunan harga"
+                      >
+                        <Heart className="w-4 h-4 text-emerald-700" />
+                      </button>
+                      <button
+                        onClick={(e) => handleRemove(prod.id, e)}
+                        className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-500 transition-colors cursor-pointer motion-press active:scale-[0.96]"
+                        title="Hapus dari wishlist"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
 
                   <div className="relative w-full h-44 rounded-xl bg-[#f8f9fa] flex items-center justify-center p-3 mb-4 overflow-hidden group-hover:bg-[#f3f4f6] transition-colors">
                     <ProductVisual

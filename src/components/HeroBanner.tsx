@@ -1,235 +1,219 @@
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Tag, Users, ArrowRight } from 'lucide-react';
 import { Language } from '../i18n/translations';
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Sparkles, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
-import heroImg1 from '../assets/images/hero_headphone_lifestyle_1790485238666.jpg';
-import heroImg2 from '../assets/images/service_home_delivery_1790485280855.jpg';
-import heroImg3 from '../assets/images/service_online_payment_1790485268106.jpg';
+import heroHeadphones from '../assets/images/hero_headphones_lifestyle.jpg';
+import heroFurniture from '../assets/images/hero_furniture_living.jpg';
+import heroSneakersFashion from '../assets/images/hero_sneakers_fashion.jpg';
+import heroLifestyle from '../assets/images/hero_lifestyle_panoramic.jpg';
 
 interface HeroBannerProps {
   lang?: Language;
-  onBuyNow: (categoryOrSlug?: string) => void;
+  onBuyNow?: (categoryOrSlug?: string) => void;
   onContactUs?: () => void;
 }
 
-interface BannerSlide {
-  badge: string;
-  title: string;
-  description: string;
-  ctaText: string;
-  image: string;
-  imageAlt: string;
-  bgColor: string;
-  auraGradient: string;
-  badgeBg: string;
-  badgeText: string;
-}
+export const HeroBanner: React.FC<HeroBannerProps> = ({ lang = 'id', onBuyNow }) => {
+  const isId = lang === 'id';
+  const [activeSlide, setActiveSlide] = useState(0);
 
-const SLIDES: BannerSlide[] = [
-  {
-    badge: '✨ Pasar Modern Terpercaya',
-    title: 'PASARIA — Belanja Hemat, Praktis & Aman Setiap Hari',
-    description: 'Temukan ribuan produk pilihan dari seller resmi terverifikasi se-Indonesia. Jaminan original, garansi pengembalian, dan pengiriman super cepat.',
-    ctaText: 'Mulai Belanja',
-    image: heroImg1,
-    imageAlt: 'Pengalaman berbelanja modern di PASARIA',
-    bgColor: 'bg-[#fcf0e4]',
-    auraGradient: 'from-[#fae7d4]',
-    badgeBg: 'bg-emerald-100/80',
-    badgeText: 'text-[#003d29]',
-  },
-  {
-    badge: '🚀 Bebas Ongkir Se-Nusantara',
-    title: 'Pengiriman Cepat & Terlindungi ke Pintu Rumah Anda',
-    description: 'Nikmati kurir prioritas PASARIA Express dengan pelacakan posisi paket secara transparan dan jaminan kompensasi tepat waktu.',
-    ctaText: 'Lihat Promo Ongkir',
-    image: heroImg2,
-    imageAlt: 'Layanan kurir pengiriman cepat PASARIA',
-    bgColor: 'bg-[#e8f5e9]',
-    auraGradient: 'from-[#c8e6c9]',
-    badgeBg: 'bg-emerald-200/80',
-    badgeText: 'text-emerald-950',
-  },
-  {
-    badge: '🛡️ Transaksi Dijamin 100% Aman',
-    title: 'Pembayaran Rekening Escrow Terproteksi Penuh',
-    description: 'Belanja tenang tanpa rasa cemas melalui QRIS instan, Virtual Account semua bank utama, hingga kemudahan Cash on Delivery (COD).',
-    ctaText: 'Eksplor Penawaran',
-    image: heroImg3,
-    imageAlt: 'Sistem pembayaran aman dan terverifikasi PASARIA',
-    bgColor: 'bg-[#e8f0fe]',
-    auraGradient: 'from-[#d2e3fc]',
-    badgeBg: 'bg-blue-100/80',
-    badgeText: 'text-blue-900',
-  },
-];
+  const slides = [
+    {
+      id: 1,
+      title: isId ? 'Tingkatkan Kualitas Hidup Anda' : 'Elevate Your Everyday',
+      subtitle: isId
+        ? 'Temukan berbagai produk pilihan original dan terkurasi di seluruh kategori untuk kebutuhan gaya hidup Anda.'
+        : 'Discover quality products across every category — made for the way you live.',
+      ctaText: isId ? 'Belanja Sekarang' : 'Shop Now',
+      category: 'all',
+      badgeTag: isId ? 'PROMO SPESIAL' : 'SUMMER SALE',
+      badgeDiscount: '40%',
+      image: heroLifestyle,
+      leftImage: heroHeadphones,
+      leftCategory: 'headphones',
+      rightImage: heroSneakersFashion,
+      rightCategory: 'shoes',
+      alt: 'Koleksi produk gaya hidup terkurasi',
+      bgTone: 'bg-[#eef3eb]',
+    },
+    {
+      id: 2,
+      title: isId ? 'Audio Fidelitas Tinggi' : 'Pure Acoustic Freedom',
+      subtitle: isId
+        ? 'Dengarkan setiap detail nada dengan kejernihan suara tanpa kompromi dan active noise cancellation.'
+        : 'Experience studio-grade sound, deep bass, and active noise cancellation designed for pure immersion.',
+      ctaText: isId ? 'Jelajahi Audio' : 'Explore Audio',
+      category: 'headphones',
+      badgeTag: isId ? 'AUDIO FEST' : 'AUDIO DEALS',
+      badgeDiscount: '25%',
+      image: heroHeadphones,
+      leftImage: heroFurniture,
+      leftCategory: 'furniture',
+      rightImage: heroSneakersFashion,
+      rightCategory: 'shoes',
+      alt: 'Headphone premium nirkabel',
+      bgTone: 'bg-[#faf4ea]',
+    },
+    {
+      id: 3,
+      title: isId ? 'Harmoni Ruang & Hunian' : 'Modern Living Spaces',
+      subtitle: isId
+        ? 'Sentuhan dekorasi minimalis dan perabot Skandinavia untuk kenyamanan rumah impian Anda.'
+        : 'Comfortable Scandinavian furniture and soothing modern decor crafted for every room.',
+      ctaText: isId ? 'Lihat Dekorasi' : 'Shop Decor',
+      category: 'furniture',
+      badgeTag: isId ? 'HOME LIVING' : 'HOME SALE',
+      badgeDiscount: '30%',
+      image: heroFurniture,
+      leftImage: heroLifestyle,
+      leftCategory: 'all',
+      rightImage: heroHeadphones,
+      rightCategory: 'headphones',
+      alt: 'Perabot dekorasi rumah minimalis',
+      bgTone: 'bg-[#eef5fa]',
+    },
+    {
+      id: 4,
+      title: isId ? 'Gaya Kasual & Streetwear' : 'Urban Streetwear Style',
+      subtitle: isId
+        ? 'Koleksi sepatu kasual, tas kanvas ramah lingkungan, dan apparel terkini dengan bahan premium.'
+        : 'Premium sneakers, eco-friendly canvas tote bags, and everyday urban style essentials.',
+      ctaText: isId ? 'Koleksi Fashion' : 'Shop Fashion',
+      category: 'shoes',
+      badgeTag: isId ? 'FASHION WEEK' : 'NEW ARRIVAL',
+      badgeDiscount: '20%',
+      image: heroSneakersFashion,
+      leftImage: heroFurniture,
+      leftCategory: 'furniture',
+      rightImage: heroLifestyle,
+      rightCategory: 'all',
+      alt: 'Sepatu kasual dan tas kanvas modern',
+      bgTone: 'bg-[#fbf2e9]',
+    },
+  ];
 
-export const HeroBanner: React.FC<HeroBannerProps> = ({ lang = "id", onBuyNow, onContactUs }) => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const touchStartXRef = useRef<number | null>(null);
-
-  // Auto-advance slide every 5.5s when not paused/hovered
+  // Auto-advance slides smoothly every 6 seconds
   useEffect(() => {
-    if (isPaused) return;
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev === SLIDES.length - 1 ? 0 : prev + 1));
-    }, 5500);
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % slides.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
 
-    return () => clearInterval(interval);
-  }, [isPaused]);
-
-  const handlePrev = () => {
-    setCurrentSlide((prev) => (prev === 0 ? SLIDES.length - 1 : prev - 1));
-  };
-
-  const handleNext = () => {
-    setCurrentSlide((prev) => (prev === SLIDES.length - 1 ? 0 : prev + 1));
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartXRef.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartXRef.current === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartXRef.current - touchEndX;
-    if (Math.abs(diff) > 40) {
-      if (diff > 0) {
-        handleNext();
-      } else {
-        handlePrev();
-      }
-    }
-    touchStartXRef.current = null;
-  };
+  const current = slides[activeSlide];
 
   return (
-    <section
-      className="max-w-7xl mx-auto px-4 sm:px-8 pt-4 pb-8"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      onFocus={() => setIsPaused(true)}
-      onBlur={() => setIsPaused(false)}
-      aria-roledescription="carousel"
-      aria-label="Promosi Unggulan PASARIA"
-    >
+    <section id="hero-banner-section" className="max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-6">
+      {/* Panoramic Banner Card */}
       <div
-        className="relative overflow-hidden rounded-3xl min-h-[300px] sm:min-h-[380px] lg:min-h-[420px]"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        className={`w-full rounded-2xl border border-slate-200/90 ${current.bgTone} transition-colors duration-500 overflow-hidden relative min-h-[440px] sm:min-h-[480px] md:min-h-[500px] flex flex-col justify-between p-6 sm:p-8 md:p-10 lg:p-12`}
       >
-        {/* Motion Point #40: Carousel track GPU translateX on iOS spring curve (300ms var(--ease-drawer)) */}
-        <div
-          className="flex w-full transition-transform duration-300 ease-[var(--ease-drawer)] will-change-transform"
-          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
-        >
-          {SLIDES.map((slide, index) => (
-            <div
-              key={index}
-              className={`w-full shrink-0 relative flex items-center ${slide.bgColor}`}
-              role="group"
-              aria-roledescription="slide"
-              aria-label={`Slide ${index + 1} dari ${SLIDES.length}: ${slide.title}`}
-              aria-hidden={currentSlide !== index}
+        {/* Main Banner Content (Split 2-Column Grid) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center z-10 my-auto">
+          {/* Left Column: Typography, Subtitle & Action */}
+          <div className="lg:col-span-7 flex flex-col items-start text-left max-w-xl pr-0 lg:pr-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-bold text-[#0d2a1f] tracking-tight leading-[1.12]">
+              {current.title}
+            </h1>
+            <p className="text-xs sm:text-sm md:text-base text-slate-600 font-medium leading-relaxed mt-3 sm:mt-4 mb-6 sm:mb-8 max-w-lg">
+              {current.subtitle}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => onBuyNow?.(current.category)}
+              className="group inline-flex items-center gap-2.5 px-6 sm:px-7 py-3 sm:py-3.5 rounded-full bg-[#003d29] hover:bg-[#00261a] text-white text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95"
             >
-              {/* Decorative background aura */}
+              <span>{current.ctaText}</span>
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </button>
+          </div>
+
+          {/* Right Column: 3-Card Overlapping Fan Layout */}
+          <div className="lg:col-span-5 w-full flex items-center justify-center lg:justify-end relative mt-6 lg:mt-0 py-4 sm:py-6">
+            <div className="relative flex items-center justify-center max-w-[440px] sm:max-w-[480px] w-full select-none">
+              {/* Left Card - Tilted Left */}
               <div
-                className={`absolute right-0 top-0 bottom-0 w-2/3 bg-gradient-to-l ${slide.auraGradient} to-transparent pointer-events-none`}
-              />
+                onClick={() => onBuyNow?.(current.leftCategory)}
+                className="w-[115px] sm:w-[140px] md:w-[160px] lg:w-[170px] aspect-[3/4] rounded-2xl overflow-hidden border border-slate-200/80 -rotate-6 -mr-9 sm:-mr-12 md:-mr-14 z-10 shrink-0 cursor-pointer transition-transform duration-300 hover:z-30 hover:scale-105 shadow-none"
+              >
+                <img
+                  key={`left-${current.id}`}
+                  src={current.leftImage}
+                  alt="Complementary category"
+                  className="w-full h-full object-cover transition-opacity duration-500"
+                  loading="eager"
+                />
+              </div>
 
-              <div className="w-full grid grid-cols-1 md:grid-cols-12 items-center gap-6 z-10 px-6 sm:px-12 lg:px-16 py-8 sm:py-12">
-                {/* Left Column: Headline & CTA */}
-                <div className="md:col-span-7 lg:col-span-6 space-y-5 sm:space-y-6 text-left">
-                  <div
-                    className={`inline-flex items-center gap-2 px-3.5 py-1 rounded-full ${slide.badgeBg} ${slide.badgeText} text-xs font-extrabold uppercase tracking-wider shadow-2xs`}
-                  >
-                    <span>{slide.badge}</span>
-                  </div>
+              {/* Center Card - Prominent Foreground */}
+              <div
+                onClick={() => onBuyNow?.(current.category)}
+                className="w-[135px] sm:w-[165px] md:w-[185px] lg:w-[195px] aspect-[3/4] rounded-2xl overflow-hidden border border-slate-200/80 z-20 shrink-0 cursor-pointer transition-transform duration-300 hover:scale-105 shadow-none"
+              >
+                <img
+                  key={`center-${current.id}`}
+                  src={current.image}
+                  alt={current.alt}
+                  className="w-full h-full object-cover transition-all duration-500 animate-in fade-in"
+                  loading="eager"
+                />
+              </div>
 
-                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-[#003d29] tracking-tight leading-[1.18] text-balance">
-                    {slide.title}
-                  </h1>
-
-                  <p className="text-xs sm:text-sm lg:text-base text-stone-600 font-normal max-w-md leading-relaxed">
-                    {slide.description}
-                  </p>
-
-                  <div className="pt-2 flex items-center gap-3">
-                    {/* Motion Point #41: HeroBanner CTA Button Hover Lift & Tactile Press */}
-                    <button
-                      type="button"
-                      onClick={() => onBuyNow()}
-                      className="motion-press inline-flex items-center justify-center gap-2 px-7 sm:px-8 py-3.5 text-sm sm:text-base font-bold text-white bg-[#003d29] hover:bg-[#064e3b] hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] rounded-full shadow-md shadow-emerald-950/15 transition-[transform,box-shadow,background-color] duration-160 ease-[var(--ease-out)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2"
-                    >
-                      <span>{slide.ctaText}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Right Column: Hero Image */}
-                <div className="md:col-span-5 lg:col-span-6 flex justify-center md:justify-end relative">
-                  <div className="relative w-full max-w-[420px] aspect-[4/3] rounded-2xl overflow-hidden shadow-lg border-4 border-white/70 bg-white/40">
-                    <img
-                      src={slide.image}
-                      alt={slide.imageAlt}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-center transform transition-transform duration-700 hover:scale-105"
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                    />
-                  </div>
-                </div>
+              {/* Right Card - Tilted Right */}
+              <div
+                onClick={() => onBuyNow?.(current.rightCategory)}
+                className="w-[115px] sm:w-[140px] md:w-[160px] lg:w-[170px] aspect-[3/4] rounded-2xl overflow-hidden border border-slate-200/80 rotate-6 -ml-9 sm:-ml-12 md:-ml-14 z-10 shrink-0 cursor-pointer transition-transform duration-300 hover:z-30 hover:scale-105 shadow-none"
+              >
+                <img
+                  key={`right-${current.id}`}
+                  src={current.rightImage}
+                  alt="Complementary category"
+                  className="w-full h-full object-cover transition-opacity duration-500"
+                  loading="eager"
+                />
               </div>
             </div>
-          ))}
+          </div>
         </div>
 
-        {/* Motion Point #44: HeroBanner Arrow Nav Button Hover Glow & Tactile Press */}
-        <button
-          type="button"
-          onClick={handlePrev}
-          aria-label="Slide sebelumnya"
-          className="motion-press absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/85 backdrop-blur-xs hover:bg-white text-slate-700 hover:text-slate-900 shadow-md hover:scale-105 active:scale-95 transition-[transform,background-color,color] duration-160 ease-[var(--ease-out)] flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
+        {/* Bottom Bar: Trust Badges (Left) & Carousel Pagination Dots (Center/Right) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 sm:pt-8 border-t border-slate-900/10 z-10">
+          {/* Trust Badges */}
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-slate-700 text-xs font-semibold">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[#003d29] stroke-[2]" />
+              <span>{isId ? 'Kualitas Terjamin' : 'Premium Quality'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Tag className="w-4 h-4 text-[#003d29] stroke-[2]" />
+              <span>{isId ? 'Harga Terbaik' : 'Great Prices'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-[#003d29] stroke-[2]" />
+              <span>{isId ? 'Dipercaya 10K+ Pembeli' : 'Trusted by 10K+ Customers'}</span>
+            </div>
+          </div>
 
-        <button
-          type="button"
-          onClick={handleNext}
-          aria-label="Slide berikutnya"
-          className="motion-press absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/85 backdrop-blur-xs hover:bg-white text-slate-700 hover:text-slate-900 shadow-md hover:scale-105 active:scale-95 transition-[transform,background-color,color] duration-160 ease-[var(--ease-out)] flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29]"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-
-        {/* Motion Point #40: Dot Indicator Morph (w-3 -> w-8 rounded-full transition-[width,background-color] duration-250 ease-[var(--ease-out)]) */}
-        <div
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white/60 backdrop-blur-xs px-3 py-1.5 rounded-full shadow-2xs border border-white/40"
-          role="tablist"
-          aria-label="Pilih Slide"
-        >
-          {SLIDES.map((_, index) => {
-            const isActive = currentSlide === index;
-            return (
+          {/* Carousel Pagination Dots */}
+          <div className="flex items-center justify-center sm:justify-end gap-2">
+            {slides.map((s, idx) => (
               <button
-                key={index}
+                key={s.id}
                 type="button"
-                onClick={() => setCurrentSlide(index)}
-                role="tab"
-                aria-selected={isActive}
-                aria-label={`Buka slide ${index + 1}`}
-                className={`h-3 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] transition-[width,background-color] duration-250 ease-[var(--ease-out)] ${
-                  isActive
-                    ? 'w-8 bg-[#003d29]'
-                    : 'w-3 bg-stone-300 hover:bg-stone-400'
+                onClick={() => setActiveSlide(idx)}
+                aria-label={`Go to slide ${idx + 1}`}
+                className={`transition-all duration-300 rounded-full cursor-pointer ${
+                  activeSlide === idx
+                    ? 'w-6 h-2 bg-[#003d29]'
+                    : 'w-2 h-2 bg-slate-300 hover:bg-slate-400'
                 }`}
               />
-            );
-          })}
+            ))}
+          </div>
         </div>
       </div>
     </section>
   );
 };
+
+

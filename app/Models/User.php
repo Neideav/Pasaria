@@ -93,6 +93,51 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(AdminAction::class);
     }
 
+    public function notificationPreferences()
+    {
+        return $this->hasOne(UserNotificationPreference::class);
+    }
+
+    public function privacyPreferences()
+    {
+        return $this->hasOne(UserPrivacyPreference::class);
+    }
+
+    public function twoFactorAuth()
+    {
+        return $this->hasOne(UserTwoFactorAuth::class);
+    }
+
+    public function shoppingPreference()
+    {
+        return $this->hasOne(UserShoppingPreference::class);
+    }
+
+    public function productAlerts()
+    {
+        return $this->hasMany(ProductAlert::class);
+    }
+
+    public function searchHistories()
+    {
+        return $this->hasMany(UserSearchHistory::class);
+    }
+
+    public function viewedProducts()
+    {
+        return $this->hasMany(UserViewedProduct::class);
+    }
+
+    public function sellerPreference()
+    {
+        return $this->hasOne(SellerPreference::class);
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return (bool) ($this->twoFactorAuth?->enabled);
+    }
+
     public function isCustomer(): bool
     {
         return $this->role === 'customer';

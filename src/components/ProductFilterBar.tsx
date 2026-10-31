@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, SlidersHorizontal, Check, X, Sparkles } from 'lucide-react';
-import { formatRupiah } from '../utils/formatters';
+import { ChevronDown, SlidersHorizontal, Check, X, RotateCcw } from 'lucide-react';
 
 export interface FilterState {
   category: string;
   minPrice: number;
   maxPrice: number;
   minRating: number;
+  color?: string;
+  material?: string;
+  offer?: string;
   sort: string;
 }
 
@@ -16,437 +18,517 @@ interface ProductFilterBarProps {
   onResetFilters: () => void;
 }
 
+const CATEGORY_OPTIONS = [
+  { label: 'Semua Kategori', value: 'all' },
+  { label: 'Audio & Headphone', value: 'headphones' },
+  { label: 'Sepatu & Fashion', value: 'shoes' },
+  { label: 'Furniture & Rumah', value: 'furniture' },
+  { label: 'Tas & Aksesoris', value: 'bags' },
+  { label: 'Laptop & Komputer', value: 'laptops' },
+  { label: 'Buku & Edukasi', value: 'books' },
+  { label: 'Kecantikan & Beauty', value: 'beauty' },
+  { label: 'Olahraga & Sports', value: 'sports' },
+];
+
+const PRICE_TIERS = [
+  { label: 'Semua Harga', min: 0, max: 999999999 },
+  { label: 'Di bawah Rp 100.000', min: 0, max: 100000 },
+  { label: 'Rp 100.000 - Rp 500.000', min: 100000, max: 500000 },
+  { label: 'Rp 500.000 - Rp 1.500.000', min: 500000, max: 1500000 },
+  { label: 'Di atas Rp 1.500.000', min: 1500000, max: 999999999 },
+];
+
+const RATING_OPTIONS = [
+  { label: 'Semua Rating', rating: 0 },
+  { label: '★ 4.5 Bintang ke Atas', rating: 4.5 },
+  { label: '★ 4.8 Bintang ke Atas', rating: 4.8 },
+  { label: '★ 5.0 Bintang Sempurna', rating: 5.0 },
+];
+
+const COLOR_OPTIONS = [
+  { label: 'Semua Warna', value: 'all', dot: '' },
+  { label: 'Hitam (Black)', value: 'black', dot: '#111827' },
+  { label: 'Putih (White)', value: 'white', dot: '#ffffff' },
+  { label: 'Abu-abu (Grey)', value: 'grey', dot: '#6b7280' },
+  { label: 'Biru (Navy)', value: 'blue', dot: '#2563eb' },
+  { label: 'Hijau (Green)', value: 'green', dot: '#059669' },
+  { label: 'Cokelat (Brown)', value: 'brown', dot: '#78350f' },
+  { label: 'Merah (Red)', value: 'red', dot: '#dc2626' },
+  { label: 'Kuning (Yellow)', value: 'yellow', dot: '#eab308' },
+];
+
+const MATERIAL_OPTIONS = [
+  { label: 'Semua Material', value: 'all' },
+  { label: 'Kulit Asli (Leather)', value: 'leather' },
+  { label: 'Kayu Alami (Wood)', value: 'wood' },
+  { label: 'Katun & Kanvas (Cotton)', value: 'cotton' },
+  { label: 'Logam & Aluminium (Metal)', value: 'metal' },
+  { label: 'Polimer & Plastik ABS', value: 'plastic' },
+  { label: 'Keramik & Kaca', value: 'ceramic' },
+];
+
+const OFFER_OPTIONS = [
+  { label: 'Semua Penawaran', value: 'all' },
+  { label: 'Diskon Spesial (% OFF)', value: 'discount' },
+  { label: 'Official Store Terverifikasi', value: 'official' },
+  { label: 'Stok Tersedia (Siap Kirim)', value: 'instock' },
+  { label: 'Produk Terpopuler (Rating 5★)', value: 'popular' },
+];
+
+const SORT_OPTIONS = [
+  { label: 'Paling Populer', shortLabel: 'Populer', value: 'popular' },
+  { label: 'Harga: Termurah ke Termahal', shortLabel: 'Harga: Terendah', value: 'price-asc' },
+  { label: 'Harga: Termahal ke Termurah', shortLabel: 'Harga: Tertinggi', value: 'price-desc' },
+  { label: 'Rating Tertinggi', shortLabel: 'Rating Tertinggi', value: 'rating' },
+  { label: 'Produk Terbaru', shortLabel: 'Terbaru', value: 'newest' },
+];
+
 export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
   filters,
   onChangeFilters,
   onResetFilters,
 }) => {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click or Escape key
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setActiveDropdown(null);
-        setDropdownCoords(null);
       }
     }
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setActiveDropdown(null);
-        setDropdownCoords(null);
-      }
-    }
-
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close dropdown when scrolling horizontally or resizing
-  useEffect(() => {
-    const handleScrollOrResize = () => {
-      if (activeDropdown) {
-        setActiveDropdown(null);
-        setDropdownCoords(null);
-      }
-    };
-
-    window.addEventListener('resize', handleScrollOrResize);
-    const scrollEl = scrollContainerRef.current;
-    if (scrollEl) {
-      scrollEl.addEventListener('scroll', handleScrollOrResize, { passive: true });
-    }
-    return () => {
-      window.removeEventListener('resize', handleScrollOrResize);
-      if (scrollEl) {
-        scrollEl.removeEventListener('scroll', handleScrollOrResize);
-      }
-    };
-  }, [activeDropdown]);
-
-  const toggleDropdown = (name: string, e?: React.MouseEvent<HTMLButtonElement>) => {
-    if (activeDropdown === name) {
-      setActiveDropdown(null);
-      setDropdownCoords(null);
-    } else {
-      if (e && containerRef.current) {
-        const btnRect = e.currentTarget.getBoundingClientRect();
-        const contRect = containerRef.current.getBoundingClientRect();
-        const rawLeft = btnRect.left - contRect.left;
-        const maxLeft = contRect.width - 250;
-        setDropdownCoords({
-          top: btnRect.bottom - contRect.top + 6,
-          left: Math.max(8, Math.min(rawLeft, Math.max(8, maxLeft))),
-        });
-      }
-      setActiveDropdown(name);
-    }
+  const toggleDropdown = (name: string) => {
+    setActiveDropdown(activeDropdown === name ? null : name);
   };
 
   const hasActiveFilters =
-    filters.minPrice > 0 ||
-    (filters.maxPrice > 0 && filters.maxPrice < 999999999) ||
-    filters.minRating > 0 ||
-    (filters.category !== 'all' && filters.category !== '');
+    (filters.minPrice && filters.minPrice > 0) ||
+    (filters.maxPrice && filters.maxPrice < 999999999) ||
+    (filters.minRating && filters.minRating > 0) ||
+    (filters.category && filters.category !== 'all') ||
+    (filters.color && filters.color !== 'all') ||
+    (filters.material && filters.material !== 'all') ||
+    (filters.offer && filters.offer !== 'all');
 
-  const categories = [
-    { label: 'Semua Kategori', value: 'all' },
-    { label: 'Audio & Headphone', value: 'Audio & Headphone' },
-    { label: 'Laptop & Komputer', value: 'Laptop & Komputer' },
-    { label: 'Furniture & Rumah', value: 'Furniture & Rumah' },
-    { label: 'Sepatu & Fashion', value: 'Sepatu & Fashion' },
-    { label: 'Tas & Aksesoris', value: 'Tas & Aksesoris' },
-    { label: 'Buku & Edukasi', value: 'Buku & Edukasi' },
-    { label: 'Headphones', value: 'Headphones' },
-    { label: 'Earbuds', value: 'Earbuds' },
-    { label: 'Speakers', value: 'Speakers' },
-    { label: 'Accessories', value: 'Accessories' },
-  ];
+  // Helpers to get human-readable labels
+  const getCategoryTitle = () => {
+    if (!filters.category || filters.category === 'all') return 'Headphone Type';
+    const found = CATEGORY_OPTIONS.find(
+      (c) => c.value.toLowerCase() === filters.category.toLowerCase()
+    );
+    return found ? found.label.split(' ')[0] : filters.category;
+  };
 
-  const priceTiers = [
-    { label: 'Semua Harga', min: 0, max: 999999999 },
-    { label: 'Di bawah Rp 500 rb', min: 0, max: 500000 },
-    { label: 'Rp 500 rb - Rp 1,5 jt', min: 500000, max: 1500000 },
-    { label: 'Rp 1,5 jt - Rp 5 jt', min: 1500000, max: 5000000 },
-    { label: 'Di atas Rp 5 jt', min: 5000000, max: 999999999 },
-  ];
+  const getPriceTitle = () => {
+    if (!filters.minPrice && (!filters.maxPrice || filters.maxPrice >= 999999999)) return 'Price';
+    if (filters.maxPrice <= 100000) return '< Rp 100rb';
+    if (filters.minPrice >= 100000 && filters.maxPrice <= 500000) return 'Rp 100rb - 500rb';
+    if (filters.minPrice >= 500000 && filters.maxPrice <= 1500000) return 'Rp 500rb - 1.5jt';
+    if (filters.minPrice >= 1500000) return '> Rp 1.5jt';
+    return 'Price';
+  };
 
-  const ratingTiers = [
-    { label: 'Semua Rating', rating: 0 },
-    { label: '★ 4.5 ke Atas', rating: 4.5 },
-    { label: '★ 4.8 ke Atas', rating: 4.8 },
-    { label: '★ 5.0 Sempurna', rating: 5.0 },
-  ];
+  const getColorTitle = () => {
+    if (!filters.color || filters.color === 'all') return 'Color';
+    const found = COLOR_OPTIONS.find((c) => c.value === filters.color);
+    return found ? found.label.split(' ')[0] : 'Color';
+  };
 
-  const sortOptions = [
-    { label: 'Paling Populer', value: 'popular' },
-    { label: 'Harga: Rendah ke Tinggi', value: 'price-asc' },
-    { label: 'Harga: Tinggi ke Rendah', value: 'price-desc' },
-    { label: 'Rating Tertinggi', value: 'rating' },
-    { label: 'Terbaru', value: 'newest' },
-  ];
+  const getMaterialTitle = () => {
+    if (!filters.material || filters.material === 'all') return 'Material';
+    const found = MATERIAL_OPTIONS.find((m) => m.value === filters.material);
+    return found ? found.label.split(' ')[0] : 'Material';
+  };
 
-  // Active Category Label
-  const activeCatObj = categories.find(
-    (c) => c.value.toLowerCase() === filters.category.toLowerCase()
-  );
-  const isCategoryActive = filters.category !== 'all' && filters.category !== '';
-  const categoryBtnLabel = isCategoryActive
-    ? activeCatObj?.label || filters.category
-    : 'Kategori Produk';
+  const getOfferTitle = () => {
+    if (!filters.offer || filters.offer === 'all') return 'Offer';
+    const found = OFFER_OPTIONS.find((o) => o.value === filters.offer);
+    return found ? found.label.split(' ')[0] : 'Offer';
+  };
 
-  // Active Price Label
-  const isPriceActive =
-    filters.minPrice > 0 || (filters.maxPrice > 0 && filters.maxPrice < 999999999);
-  const activePriceTier = priceTiers.find(
-    (tier) => filters.minPrice === tier.min && filters.maxPrice === tier.max
-  );
-  const priceBtnLabel = isPriceActive
-    ? activePriceTier?.label ||
-      (filters.minPrice > 0 && filters.maxPrice < 999999999
-        ? `${formatRupiah(filters.minPrice)} - ${formatRupiah(filters.maxPrice)}`
-        : filters.minPrice > 0
-        ? `≥ ${formatRupiah(filters.minPrice)}`
-        : `≤ ${formatRupiah(filters.maxPrice)}`)
-    : 'Rentang Harga';
-
-  // Active Rating Label
-  const isRatingActive = filters.minRating > 0;
-  const ratingBtnLabel = isRatingActive
-    ? `★ ${filters.minRating}+`
-    : 'Rating Ulasan';
-
-  // Current Sort Label
-  const currentSortLabel =
-    sortOptions.find((s) => s.value === filters.sort)?.label || 'Paling Populer';
+  const getSortTitle = () => {
+    const found = SORT_OPTIONS.find((s) => s.value === filters.sort);
+    return found ? found.shortLabel : 'Populer';
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-2 relative" ref={containerRef}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-        {/* Left: Horizontal Filter Scroll Container */}
-        <div
-          ref={scrollContainerRef}
-          role="region"
-          aria-label="Filter Produk"
-          className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth snap-x snap-mandatory py-1 px-1 -mx-1 sm:px-0 sm:mx-0 max-w-full"
-        >
-          {/* Category Chip */}
-          <button
-            type="button"
-            onClick={(e) => toggleDropdown('category', e)}
-            aria-haspopup="true"
-            aria-expanded={activeDropdown === 'category'}
-            aria-label={`Filter Kategori: ${categoryBtnLabel}`}
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
-              isCategoryActive
-                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
-                : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
-            }`}
-          >
-            <span>{categoryBtnLabel}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform duration-200 ease-[var(--ease-out)] ${
-                isCategoryActive ? 'text-white' : 'opacity-60'
-              } ${activeDropdown === 'category' ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {/* Price Chip */}
-          <button
-            type="button"
-            onClick={(e) => toggleDropdown('price', e)}
-            aria-haspopup="true"
-            aria-expanded={activeDropdown === 'price'}
-            aria-label={`Filter Rentang Harga: ${priceBtnLabel}`}
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
-              isPriceActive
-                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
-                : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
-            }`}
-          >
-            <span>{priceBtnLabel}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform duration-200 ease-[var(--ease-out)] ${
-                isPriceActive ? 'text-white' : 'opacity-60'
-              } ${activeDropdown === 'price' ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {/* Rating Chip */}
-          <button
-            type="button"
-            onClick={(e) => toggleDropdown('rating', e)}
-            aria-haspopup="true"
-            aria-expanded={activeDropdown === 'rating'}
-            aria-label={`Filter Rating: ${ratingBtnLabel}`}
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
-              isRatingActive
-                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
-                : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
-            }`}
-          >
-            <span>{ratingBtnLabel}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform duration-200 ease-[var(--ease-out)] ${
-                isRatingActive ? 'text-white' : 'opacity-60'
-              } ${activeDropdown === 'rating' ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {/* Special Offer Quick Filter */}
-          <button
-            type="button"
-            onClick={() => {
-              if (filters.minPrice === 0 && filters.maxPrice === 1500000) {
-                onChangeFilters({ minPrice: 0, maxPrice: 999999999 });
-              } else {
-                onChangeFilters({ minPrice: 0, maxPrice: 1500000 });
-              }
-            }}
-            aria-pressed={filters.minPrice === 0 && filters.maxPrice === 1500000}
-            aria-label="Filter Promo Spesial"
-            className={`min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] cursor-pointer border shrink-0 snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 ${
-              filters.minPrice === 0 && filters.maxPrice === 1500000
-                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs'
-                : 'bg-slate-100/90 text-slate-700 border-slate-200/60 hover:bg-slate-200/80'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Promo Spesial</span>
-          </button>
-
-          {/* Reset Filters / All Filters */}
-          {hasActiveFilters ? (
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-3 sm:py-4 relative" ref={containerRef}>
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-b border-slate-200/80 pb-4 sm:pb-5">
+        {/* Left: Pill Filters (Clean wrap, no overflow clipping, fully interactive) */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* 1. Category / Type Filter */}
+          <div className="relative">
             <button
-              type="button"
-              onClick={onResetFilters}
-              aria-label="Reset semua filter"
-              className="min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 cursor-pointer shrink-0 snap-start"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Reset Filter</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => toggleDropdown('category', e)}
-              aria-label="Buka pilihan filter"
-              className="min-h-[44px] px-4 py-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 bg-slate-100/90 text-slate-700 border border-slate-200/60 hover:bg-slate-200/80 motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0 snap-start"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 opacity-60" />
-              <span>Semua Filter</span>
-            </button>
-          )}
-        </div>
-
-        {/* Right: Sort By Dropdown */}
-        <div className="relative shrink-0 flex items-center gap-2 self-start sm:self-auto">
-          <span className="text-xs text-slate-400 font-medium hidden sm:inline">Urutkan:</span>
-          <button
-            type="button"
-            onClick={() => toggleDropdown('sort')}
-            aria-haspopup="true"
-            aria-expanded={activeDropdown === 'sort'}
-            aria-label={`Urutkan produk: ${currentSortLabel}`}
-            className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold bg-white text-slate-800 border border-slate-200 hover:border-slate-300 shadow-2xs motion-press active:scale-[0.97] transition-[background-color,color,border-color,box-shadow,transform] duration-160 ease-[var(--ease-out)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d29] focus-visible:ring-offset-2 cursor-pointer shrink-0"
-          >
-            <span>{currentSortLabel}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 opacity-60 transition-transform duration-200 ease-[var(--ease-out)] ${
-                activeDropdown === 'sort' ? 'rotate-180' : ''
+              onClick={() => toggleDropdown('type')}
+              className={`inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm transition-colors cursor-pointer border shadow-none bg-transparent ${
+                filters.category && filters.category !== 'all'
+                  ? 'text-[#003d29] border-[#003d29] font-bold'
+                  : 'text-slate-700 border-slate-200 hover:border-slate-400 font-medium'
               }`}
-            />
-          </button>
-
-          {activeDropdown === 'sort' && (
-            <div
-              role="menu"
-              aria-label="Pilihan Urutan"
-              style={{ transformOrigin: 'top right' }}
-              className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 motion-popover"
             >
-              {sortOptions.map((s) => {
-                const isSortActive = filters.sort === s.value;
-                return (
+              <span>{getCategoryTitle()}</span>
+              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+            </button>
+            {activeDropdown === 'type' && (
+              <div className="absolute left-0 mt-2 w-56 sm:w-60 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none animate-in fade-in">
+                {CATEGORY_OPTIONS.map((cat) => {
+                  const isActive =
+                    (filters.category || 'all').toLowerCase() === cat.value.toLowerCase();
+                  return (
+                    <button
+                      key={cat.value}
+                      onClick={() => {
+                        onChangeFilters({ category: cat.value });
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <span className={isActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
+                        {cat.label}
+                      </span>
+                      {isActive && <Check className="w-4 h-4 text-[#003d29]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Price Filter */}
+          <div className="relative">
+            <button
+              onClick={() => toggleDropdown('price')}
+              className={`inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm transition-colors cursor-pointer border shadow-none bg-transparent ${
+                (filters.minPrice && filters.minPrice > 0) ||
+                (filters.maxPrice && filters.maxPrice < 999999999)
+                  ? 'text-[#003d29] border-[#003d29] font-bold'
+                  : 'text-slate-700 border-slate-200 hover:border-slate-400 font-medium'
+              }`}
+            >
+              <span>{getPriceTitle()}</span>
+              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+            </button>
+            {activeDropdown === 'price' && (
+              <div className="absolute left-0 mt-2 w-60 sm:w-64 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none animate-in fade-in">
+                {PRICE_TIERS.map((tier) => {
+                  const isActive =
+                    filters.minPrice === tier.min && filters.maxPrice === tier.max;
+                  return (
+                    <button
+                      key={tier.label}
+                      onClick={() => {
+                        onChangeFilters({ minPrice: tier.min, maxPrice: tier.max });
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <span className={isActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
+                        {tier.label}
+                      </span>
+                      {isActive && <Check className="w-4 h-4 text-[#003d29]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 3. Review Rating Filter */}
+          <div className="relative">
+            <button
+              onClick={() => toggleDropdown('review')}
+              className={`inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm transition-colors cursor-pointer border shadow-none bg-transparent ${
+                filters.minRating && filters.minRating > 0
+                  ? 'text-[#003d29] border-[#003d29] font-bold'
+                  : 'text-slate-700 border-slate-200 hover:border-slate-400 font-medium'
+              }`}
+            >
+              <span>{filters.minRating > 0 ? `★ ${filters.minRating}+` : 'Review'}</span>
+              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+            </button>
+            {activeDropdown === 'review' && (
+              <div className="absolute left-0 mt-2 w-56 sm:w-60 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none animate-in fade-in">
+                {RATING_OPTIONS.map((r) => {
+                  const isActive = (filters.minRating || 0) === r.rating;
+                  return (
+                    <button
+                      key={r.label}
+                      onClick={() => {
+                        onChangeFilters({ minRating: r.rating });
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <span className={isActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
+                        {r.label}
+                      </span>
+                      {isActive && <Check className="w-4 h-4 text-[#003d29]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 4. Color Filter */}
+          <div className="relative">
+            <button
+              onClick={() => toggleDropdown('color')}
+              className={`inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm transition-colors cursor-pointer border shadow-none bg-transparent ${
+                filters.color && filters.color !== 'all'
+                  ? 'text-[#003d29] border-[#003d29] font-bold'
+                  : 'text-slate-700 border-slate-200 hover:border-slate-400 font-medium'
+              }`}
+            >
+              <span>{getColorTitle()}</span>
+              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+            </button>
+            {activeDropdown === 'color' && (
+              <div className="absolute left-0 mt-2 w-52 sm:w-56 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none animate-in fade-in max-h-64 overflow-y-auto">
+                {COLOR_OPTIONS.map((c) => {
+                  const isActive = (filters.color || 'all') === c.value;
+                  return (
+                    <button
+                      key={c.value}
+                      onClick={() => {
+                        onChangeFilters({ color: c.value });
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {c.dot && (
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                            style={{ backgroundColor: c.dot }}
+                          />
+                        )}
+                        <span className={isActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
+                          {c.label}
+                        </span>
+                      </div>
+                      {isActive && <Check className="w-4 h-4 text-[#003d29]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 5. Material Filter */}
+          <div className="relative">
+            <button
+              onClick={() => toggleDropdown('material')}
+              className={`inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm transition-colors cursor-pointer border shadow-none bg-transparent ${
+                filters.material && filters.material !== 'all'
+                  ? 'text-[#003d29] border-[#003d29] font-bold'
+                  : 'text-slate-700 border-slate-200 hover:border-slate-400 font-medium'
+              }`}
+            >
+              <span>{getMaterialTitle()}</span>
+              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+            </button>
+            {activeDropdown === 'material' && (
+              <div className="absolute left-0 mt-2 w-56 sm:w-60 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none animate-in fade-in">
+                {MATERIAL_OPTIONS.map((m) => {
+                  const isActive = (filters.material || 'all') === m.value;
+                  return (
+                    <button
+                      key={m.value}
+                      onClick={() => {
+                        onChangeFilters({ material: m.value });
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <span className={isActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
+                        {m.label}
+                      </span>
+                      {isActive && <Check className="w-4 h-4 text-[#003d29]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 6. Offer Filter */}
+          <div className="relative">
+            <button
+              onClick={() => toggleDropdown('offer')}
+              className={`inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm transition-colors cursor-pointer border shadow-none bg-transparent ${
+                filters.offer && filters.offer !== 'all'
+                  ? 'text-[#003d29] border-[#003d29] font-bold'
+                  : 'text-slate-700 border-slate-200 hover:border-slate-400 font-medium'
+              }`}
+            >
+              <span>{getOfferTitle()}</span>
+              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+            </button>
+            {activeDropdown === 'offer' && (
+              <div className="absolute left-0 mt-2 w-60 sm:w-64 bg-white rounded-2xl border border-slate-200 py-2 z-50 shadow-none animate-in fade-in">
+                {OFFER_OPTIONS.map((o) => {
+                  const isActive = (filters.offer || 'all') === o.value;
+                  return (
+                    <button
+                      key={o.value}
+                      onClick={() => {
+                        onChangeFilters({ offer: o.value });
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <span className={isActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
+                        {o.label}
+                      </span>
+                      {isActive && <Check className="w-4 h-4 text-[#003d29]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 7. All Filters (Summary & Multi-Select Popover) */}
+          <div className="relative">
+            {hasActiveFilters ? (
+              <button
+                onClick={onResetFilters}
+                className="inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold bg-transparent text-red-600 border border-red-200 hover:border-red-300 hover:bg-red-50/50 transition-colors cursor-pointer shadow-none"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Reset Filters</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => toggleDropdown('all_filters')}
+                className="inline-flex items-center gap-2 px-4 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium bg-transparent text-slate-700 border border-slate-200 hover:border-slate-400 transition-colors cursor-pointer shadow-none"
+              >
+                <SlidersHorizontal className="w-4 h-4 opacity-60" />
+                <span>All Filters</span>
+              </button>
+            )}
+
+            {activeDropdown === 'all_filters' && (
+              <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-slate-200 p-5 z-50 shadow-none animate-in fade-in">
+                <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                  <span className="font-bold text-sm text-slate-900">Semua Filter Produk</span>
                   <button
-                    key={s.value}
-                    type="button"
-                    role="menuitem"
+                    onClick={() => setActiveDropdown(null)}
+                    className="text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Quick selection blocks */}
+                <div className="space-y-4 py-4 text-xs sm:text-sm">
+                  <div>
+                    <span className="font-semibold text-slate-700 mb-2 block">Kategori Cepat</span>
+                    <div className="flex flex-wrap gap-2">
+                      {CATEGORY_OPTIONS.slice(0, 5).map((c) => (
+                        <button
+                          key={c.value}
+                          onClick={() => onChangeFilters({ category: c.value })}
+                          className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                            (filters.category || 'all') === c.value
+                              ? 'border-[#003d29] text-[#003d29] font-bold'
+                              : 'border-slate-200 text-slate-600 hover:border-slate-400'
+                          }`}
+                        >
+                          {c.label.split(' ')[0]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-semibold text-slate-700 mb-2 block">Rating Minimal</span>
+                    <div className="flex gap-2">
+                      {[0, 4.5, 4.8, 5.0].map((rate) => (
+                        <button
+                          key={rate}
+                          onClick={() => onChangeFilters({ minRating: rate })}
+                          className={`flex-1 py-1.5 rounded-xl text-center text-xs font-medium border transition-colors ${
+                            (filters.minRating || 0) === rate
+                              ? 'border-[#003d29] text-[#003d29] font-bold'
+                              : 'border-slate-200 text-slate-600 hover:border-slate-400'
+                          }`}
+                        >
+                          {rate === 0 ? 'Semua' : `★ ${rate}+`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <button
                     onClick={() => {
-                      onChangeFilters({ sort: s.value });
+                      onResetFilters();
                       setActiveDropdown(null);
                     }}
-                    className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
+                    className="text-xs sm:text-sm text-slate-500 hover:text-red-600 font-semibold"
                   >
-                    <span
-                      className={
-                        isSortActive ? 'font-bold text-[#003d29]' : 'text-slate-700'
-                      }
-                    >
-                      {s.label}
-                    </span>
-                    {isSortActive && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
+                    Reset Semua
                   </button>
-                );
-              })}
+                  <button
+                    onClick={() => setActiveDropdown(null)}
+                    className="px-5 py-2 rounded-full text-xs sm:text-sm font-bold text-white bg-[#003d29] hover:bg-[#00261a] transition-colors"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Sort By Dropdown (Fixed Right, shrink-0, Never Wraps Below) */}
+        <div className="relative shrink-0 ml-auto z-20">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <span className="text-xs sm:text-sm text-slate-400 font-medium hidden md:inline">
+              Sort by:
+            </span>
+            <button
+              onClick={() => toggleDropdown('sort')}
+              className="inline-flex items-center gap-2 px-3.5 sm:px-4.5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium bg-transparent text-slate-700 border border-slate-200 hover:border-slate-400 transition-colors cursor-pointer shadow-none whitespace-nowrap"
+            >
+              <span className="max-w-[130px] sm:max-w-[160px] truncate">{getSortTitle()}</span>
+              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+            </button>
+          </div>
+
+          {activeDropdown === 'sort' && (
+            <div className="absolute right-0 mt-2 w-56 sm:w-60 bg-white rounded-2xl border border-slate-200 py-2 z-40 shadow-none animate-in fade-in">
+              {SORT_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => {
+                    onChangeFilters({ sort: s.value });
+                    setActiveDropdown(null);
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-xs sm:text-sm text-left hover:bg-slate-50 transition-colors"
+                >
+                  <span
+                    className={
+                      filters.sort === s.value ? 'font-bold text-[#003d29]' : 'text-slate-700'
+                    }
+                  >
+                    {s.label}
+                  </span>
+                  {filters.sort === s.value && <Check className="w-4 h-4 text-[#003d29]" />}
+                </button>
+              ))}
             </div>
           )}
         </div>
       </div>
-
-      {/* Popovers for Category, Price, and Rating (Rendered in containerRef to prevent overflow clipping) */}
-      {activeDropdown === 'category' && (
-        <div
-          role="menu"
-          aria-label="Pilih Kategori Produk"
-          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left, transformOrigin: 'top center' } : { transformOrigin: 'top center' }}
-          className="absolute mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 motion-popover"
-        >
-          <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Pilih Kategori
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            {categories.map((cat) => {
-              const isCatActive =
-                (cat.value === 'all' && (filters.category === 'all' || !filters.category)) ||
-                filters.category.toLowerCase() === cat.value.toLowerCase();
-              return (
-                <button
-                  key={cat.value}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onChangeFilters({ category: cat.value });
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
-                >
-                  <span className={isCatActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
-                    {cat.label}
-                  </span>
-                  {isCatActive && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {activeDropdown === 'price' && (
-        <div
-          role="menu"
-          aria-label="Pilih Rentang Harga"
-          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left, transformOrigin: 'top center' } : { transformOrigin: 'top center' }}
-          className="absolute mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 motion-popover"
-        >
-          <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Rentang Harga
-          </div>
-          {priceTiers.map((tier) => {
-            const isTierActive =
-              filters.minPrice === tier.min && filters.maxPrice === tier.max;
-            return (
-              <button
-                key={tier.label}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onChangeFilters({ minPrice: tier.min, maxPrice: tier.max });
-                  setActiveDropdown(null);
-                }}
-                className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
-              >
-                <span className={isTierActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
-                  {tier.label}
-                </span>
-                {isTierActive && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {activeDropdown === 'rating' && (
-        <div
-          role="menu"
-          aria-label="Pilih Rating Ulasan"
-          style={dropdownCoords ? { top: dropdownCoords.top, left: dropdownCoords.left, transformOrigin: 'top center' } : { transformOrigin: 'top center' }}
-          className="absolute mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 motion-popover"
-        >
-          <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Minimal Rating
-          </div>
-          {ratingTiers.map((r) => {
-            const isTierActive =
-              r.rating === 0 ? filters.minRating === 0 : filters.minRating === r.rating;
-            return (
-              <button
-                key={r.label}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onChangeFilters({ minRating: r.rating });
-                  setActiveDropdown(null);
-                }}
-                className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 text-xs text-left hover:bg-slate-50 transition-colors duration-120 focus:outline-none focus-visible:bg-slate-50 cursor-pointer"
-              >
-                <span className={isTierActive ? 'font-bold text-[#003d29]' : 'text-slate-700'}>
-                  {r.label}
-                </span>
-                {isTierActive && <Check className="w-3.5 h-3.5 text-[#003d29]" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };
+

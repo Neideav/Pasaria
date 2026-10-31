@@ -10,6 +10,7 @@ import { TestimonialsSection } from "./components/TestimonialsSection";
 import { CTASection } from "./components/CTASection";
 import { Footer } from "./components/Footer";
 import { CheckoutModal } from "./components/CheckoutModal";
+import { CheckoutPage } from "./components/CheckoutPage";
 import { CartPage } from "./components/CartPage";
 import { SearchPage } from "./components/SearchPage";
 import { AuthModal } from "./components/AuthModal";
@@ -58,6 +59,7 @@ function AppContent() {
     | "following"
     | "admin"
     | "auth"
+    | "checkout"
   >("home");
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -175,11 +177,37 @@ function AppContent() {
     offer: "all",
     sort: "popular",
   });
-  const INITIAL_VISIBLE_COUNT = 15; // 3 rows maximum on 5-col desktop
+  const INITIAL_VISIBLE_COUNT = 18; // 3 rows maximum on 6-col desktop
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
   // On mount: authenticate with Sanctum session & load data
   useEffect(() => {
+    // Apply appearance preferences to root element
+    try {
+      const savedTheme = localStorage.getItem("pasaria_theme") || "light";
+      const root = document.documentElement;
+      if (savedTheme === "dark") {
+        root.classList.add("dark");
+      } else if (savedTheme === "light") {
+        root.classList.remove("dark");
+      } else {
+        if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          root.classList.add("dark");
+        } else {
+          root.classList.remove("dark");
+        }
+      }
+
+      const savedFontSize = localStorage.getItem("pasaria_font_size");
+      root.classList.toggle("text-scale-large", savedFontSize === "large");
+
+      const savedReducedMotion = localStorage.getItem("pasaria_reduced_motion");
+      root.classList.toggle("reduced-motion", savedReducedMotion === "true");
+
+      const savedHighContrast = localStorage.getItem("pasaria_high_contrast");
+      root.classList.toggle("high-contrast", savedHighContrast === "true");
+    } catch {}
+
     const unsub = api.onUnauthorized(() => {
       setUser(null);
       localStorage.removeItem('pasaria_user');
@@ -422,6 +450,9 @@ function AppContent() {
 
   const handleSelectProduct = async (product: Product) => {
     try {
+      if (product.id) {
+        api.recordViewedProduct(product.id).catch(() => {});
+      }
       const data = await api.getProductBySlug(product.slug);
       setSelectedProduct(data.product);
       setRelatedProducts(data.related || []);
@@ -435,6 +466,9 @@ function AppContent() {
   };
 
   const handleNavigateSearch = (q: string) => {
+    if (q.trim()) {
+      api.recordSearchQuery(q.trim()).catch(() => {});
+    }
     setSearchQuery(q);
     setView("search");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -587,7 +621,8 @@ function AppContent() {
       return;
     }
     handleAddToCart(product, quantity, color, variantId);
-    setCheckoutModalOpen(true);
+    setView("checkout");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleLoginSuccess = async (loggedUser: User) => {
@@ -601,7 +636,8 @@ function AppContent() {
       const { type, product, quantity, color, variantId } = pendingCartAction;
       handleAddToCart(product, quantity, color, variantId);
       if (type === "buy") {
-        setCheckoutModalOpen(true);
+        setView("checkout");
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
       setPendingCartAction(null);
     }
@@ -665,7 +701,7 @@ function AppContent() {
   const currentProducts = products.slice(0, visibleCount);
   const hasMoreProducts = visibleCount < products.length;
 
-  const weeklyProducts = products.slice(0, 5);
+  const weeklyProducts = products.slice(0, 6);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fcfcfc] text-[#1c2a23]">
@@ -791,7 +827,7 @@ function AppContent() {
             />
 
             {/* Main Product Grid */}
-            <section id="products-section" className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
+            <section id="products-section" className="max-w-[1536px] mx-auto px-4 sm:px-8 py-8 text-left">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
@@ -820,7 +856,7 @@ function AppContent() {
                   </button>
                 </div>
               ) : currentProducts.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3 md:gap-3.5">
                   {currentProducts.map((p) => (
                     <ProductCard
                       key={p.id}
@@ -840,7 +876,7 @@ function AppContent() {
               {hasMoreProducts ? (
                 <div className="flex flex-col items-center justify-center mt-10">
                   <button
-                    onClick={() => setVisibleCount((prev) => prev + 15)}
+                    onClick={() => setVisibleCount((prev) => prev + 18)}
                     className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-full text-xs sm:text-sm font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-800 transition-all cursor-pointer shadow-none active:scale-[0.98]"
                   >
                     <span>Muat Lebih Banyak</span>
@@ -850,7 +886,7 @@ function AppContent() {
                     Menampilkan {Math.min(visibleCount, products.length)} dari {products.length} produk
                   </span>
                 </div>
-              ) : products.length > 15 ? (
+              ) : products.length > 18 ? (
                 <div className="text-center mt-10">
                   <p className="text-xs text-slate-400 font-medium">
                     Semua produk telah ditampilkan ({products.length} produk)
@@ -861,13 +897,13 @@ function AppContent() {
 
             {/* Weekly Popular Products */}
             {weeklyProducts.length > 0 && (
-              <section className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left border-t border-slate-100">
+              <section id="weekly-popular-section" className="max-w-[1536px] mx-auto px-4 sm:px-8 py-8 text-left border-t border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
                     Produk Terlaris Minggu Ini
                   </h2>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-3.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3 md:gap-3.5">
                   {weeklyProducts.map((p) => (
                     <ProductCard
                       key={`weekly-${p.id}`}
@@ -973,7 +1009,8 @@ function AppContent() {
                 );
                 setAuthModalOpen(true);
               } else {
-                setCheckoutModalOpen(true);
+                setView("checkout");
+                window.scrollTo({ top: 0, behavior: "smooth" });
               }
             }}
             onContinueShopping={handleNavigateHome}
@@ -1018,6 +1055,32 @@ function AppContent() {
               }
               loadProducts();
             }}
+            onUpdateUser={(updated) => {
+              setUser(updated);
+              localStorage.setItem("pasaria_user", JSON.stringify(updated));
+            }}
+            onOpenShopDashboard={() => {
+              setView("shop_dashboard");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onNavigateProduct={(slug) => {
+              const p = products.find((x) => x.slug === slug);
+              if (p) {
+                handleSelectProduct(p);
+              } else {
+                api.getProductBySlug(slug).then((res) => {
+                  setSelectedProduct(res.product);
+                  setRelatedProducts(res.related || []);
+                  setView("product");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }).catch(() => {});
+              }
+            }}
+            onNavigateShop={(shopIdOrSlug) => {
+              handleViewShopPublic(String(shopIdOrSlug), typeof shopIdOrSlug === 'number' ? shopIdOrSlug : undefined);
+            }}
+            onSearchQuery={handleNavigateSearch}
+            onLogout={handleLogout}
           />
         )}
 
@@ -1128,6 +1191,38 @@ function AppContent() {
             }}
           />
         )}
+
+        {view === "checkout" && (
+          <CheckoutPage
+            items={cartItems}
+            user={user}
+            onBack={() => {
+              setView(cartItems.length > 0 ? "cart" : "home");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onOrderSuccess={async (orderNum, shipment, openDeliveryView) => {
+              setCartItems([]);
+              localStorage.removeItem("pasaria_cart");
+              if (user) {
+                try {
+                  await api.clearCart(user.id);
+                } catch (_) {}
+                try {
+                  loadOrders(user.id);
+                } catch (_) {}
+              }
+              setActiveShipment(shipment);
+              if (openDeliveryView !== false) {
+                setView("delivery");
+              } else {
+                setView("orders");
+              }
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            subtotal={cartSubtotal}
+            onNavigateHome={handleNavigateHome}
+          />
+        )}
       </main>
 
       {/* 3. Checkout Modal */}
@@ -1213,7 +1308,7 @@ function AppContent() {
       )}
 
       {/* 7. Footer */}
-      {view !== 'auth' && <Footer />}
+      {view !== 'auth' && view !== 'checkout' && <Footer />}
     </div>
   );
 }

@@ -94,6 +94,10 @@ Configured via `app/Providers/AppServiceProvider.php` using Laravel 11 `RateLimi
 | `orders-create` | `POST /api/orders` | 10 req/min | User ID or IP address |
 | `uploads` | `POST /api/upload` | 10 req/min | User ID or IP address |
 | `messages-send` | `POST /api/conversations/messages` | 30 req/min | User ID or IP address |
+| `password-change` | `POST /api/user/password` | 5 req/min | User ID or IP address |
+| `email-change` | `POST /api/user/email/*` | 3 req/min | User ID or IP address |
+| `two-factor` | `POST /api/user/2fa/*` | 5 req/min | User ID or IP address |
+| `account-delete` | `DELETE /api/user/account` | 3 req/min | User ID or IP address |
 
 ### Standardized 429 response envelope
 
@@ -107,6 +111,9 @@ Handled in `bootstrap/app.php` via `ThrottleRequestsException`:
 <!-- BEGIN AUTO GENERATED: DATABASE_SCHEMA -->
 users (id PK, name, email unique, password, role enum[customer|seller|admin], avatar nullable, status string, email_verified_at, deleted_at nullable, remember_token)
 user_addresses (id PK, user_id FK -> users.id, label, recipient_name, phone, address_line, city, postal_code, is_default bool)
+user_notification_preferences (id PK, user_id unique FK -> users.id, order_updates bool, delivery_updates bool, chat_messages bool, reviews_qa bool, wishlist_price_alerts bool, promotional_discounts bool, marketplace_announcements bool, channel_in_app bool, channel_email bool)
+user_privacy_preferences (id PK, user_id unique FK -> users.id, personalized_recommendations bool, marketing_emails bool, activity_tracking bool, search_history_storage bool)
+user_two_factor_auth (id PK, user_id unique FK -> users.id, secret text encrypted, is_enabled bool, confirmed_at datetime nullable, recovery_codes json nullable)
 shops (id PK, user_id FK -> users.id, name, slug unique, description text, city, rating decimal, is_verified bool, status string, deleted_at nullable)
 categories (id PK, name, slug unique, item_count int, icon nullable)
 products (id PK, shop_id FK -> shops.id, category_id FK -> categories.id nullable, name, slug unique, price decimal, stock int, is_active bool, deleted_at nullable, index[shop_id, is_active], index[category, price])
@@ -127,6 +134,11 @@ seller_payouts (id PK, shop_id FK -> shops.id, amount decimal, bank_name string,
 payment_events (id PK, payment_id FK -> payments.id nullable, event_id string unique, provider string, event_type string, payload_json json, status enum[processed|rejected], unique[provider, event_id])
 refunds (id PK, order_id FK -> orders.id, payment_id FK -> payments.id nullable, return_id FK -> order_returns.id nullable, shop_id FK -> shops.id nullable, user_id FK -> users.id, type enum[full|partial], amount decimal, currency string, reason text, status enum[pending|processing|completed|failed], provider string, refund_reference string unique, processed_by FK -> users.id nullable, processed_at datetime nullable, index[order_id, status])
 admin_actions (id PK, user_id FK -> users.id, action string, target_type string nullable, target_id int nullable, details_json json nullable, ip_address string nullable, user_agent text nullable, append_only bool)
+user_shopping_preferences (id PK, user_id unique FK -> users.id, favorite_categories json, favorite_brands json, min_price decimal nullable, max_price decimal nullable, hide_out_of_stock bool, prioritize_official_stores bool, default_sort string, preferred_density string, recommendation_personalization bool, theme string, font_size string, reduced_motion bool, high_contrast bool)
+product_alerts (id PK, user_id FK -> users.id, product_id FK -> products.id, alert_type enum[price_drop|back_in_stock|target_price|shop_new_product], target_price decimal nullable, last_observed_price decimal nullable, is_active bool, last_notified_at datetime nullable, unique[user_id, product_id, alert_type])
+user_search_histories (id PK, user_id FK -> users.id, query string, index[user_id, created_at])
+user_viewed_products (id PK, user_id FK -> users.id, product_id FK -> products.id, viewed_at datetime, unique[user_id, product_id])
+seller_preferences (id PK, user_id FK -> users.id, shop_id unique FK -> shops.id, notify_new_orders bool, notify_customer_chat bool, notify_low_stock bool, notify_reviews bool, notify_returns bool, low_stock_threshold int, vacation_mode bool, vacation_message text nullable, vacation_start datetime nullable, vacation_end datetime nullable)
 <!-- END AUTO GENERATED: DATABASE_SCHEMA -->
 
 Full catalog for all 30+ tables is recorded in `.agents/references/database-schema.md`.
@@ -137,10 +149,30 @@ Full catalog for all 30+ tables is recorded in `.agents/references/database-sche
 | Method | Endpoint | Handler | Access |
 |---|---|---|---|
 | POST | /api/auth/login | Api\AuthApiController@login | Public (throttle:auth-login) |
+| POST | /api/auth/two-factor-challenge | Api\AuthApiController@twoFactorChallenge | Public (throttle:two-factor) |
 | POST | /api/auth/register | Api\AuthApiController@register | Public (throttle:auth-register) |
 | POST | /api/auth/verify-email | Api\AuthApiController@verifyEmail | Public / Authenticated |
 | POST | /api/auth/resend-verification | Api\AuthApiController@resendVerification | Public / Authenticated (throttle:auth-resend) |
 | GET | /api/auth/me | Api\AuthApiController@me | Authenticated |
+| POST | /api/user/password | Api\AuthApiController@changePassword | Authenticated (throttle:password-change) |
+| GET,PUT | /api/user/notification-preferences | Api\UserPreferenceApiController | Authenticated |
+| GET,PUT | /api/user/privacy-preferences | Api\UserPreferenceApiController | Authenticated |
+| GET,PUT | /api/user/shopping-preferences | Api\UserShoppingPreferenceApiController | Authenticated |
+| GET,POST | /api/user/product-alerts | Api\ProductAlertApiController | Authenticated |
+| PUT,DELETE | /api/user/product-alerts/{id} | Api\ProductAlertApiController | Authenticated |
+| GET,POST,DELETE | /api/user/activity/recent-searches | Api\UserActivityApiController | Authenticated |
+| DELETE | /api/user/activity/recent-searches/{id} | Api\UserActivityApiController | Authenticated |
+| GET,POST,DELETE | /api/user/activity/recently-viewed | Api\UserActivityApiController | Authenticated |
+| DELETE | /api/user/activity/recently-viewed/{id} | Api\UserActivityApiController | Authenticated |
+| PUT | /api/shops/{id}/follow-preferences | Api\ShopApiController@updateFollowPreferences | Authenticated |
+| GET,PUT | /api/seller/preferences | Api\SellerPreferenceApiController | Seller / Admin |
+| GET,DELETE | /api/user/sessions | Api\UserSecurityApiController | Authenticated |
+| DELETE | /api/user/sessions/others | Api\UserSecurityApiController@revokeOtherSessions | Authenticated |
+| POST | /api/user/email/request-change | Api\UserSecurityApiController@requestEmailChange | Authenticated (throttle:email-change) |
+| POST | /api/user/email/verify-change | Api\UserSecurityApiController@verifyEmailChange | Authenticated (throttle:email-change) |
+| GET,POST,DELETE | /api/user/2fa | Api\UserSecurityApiController | Authenticated (throttle:two-factor) |
+| GET | /api/user/data-export | Api\UserPrivacyApiController@exportData | Authenticated |
+| DELETE | /api/user/account | Api\UserPrivacyApiController@deleteAccount | Authenticated (throttle:account-delete) |
 | GET | /api/products | Api\ProductApiController@index | Public |
 | POST,PUT,DELETE | /api/products | Api\ProductApiController | Seller / Admin |
 | PATCH | /api/products/{id}/status | Api\ProductApiController@toggleStatus | Seller / Admin |

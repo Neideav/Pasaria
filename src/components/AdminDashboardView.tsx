@@ -166,7 +166,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-left">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-8 py-8 text-left">
       {/* Admin Header */}
       <div className="flex items-center justify-between pb-6 border-b border-slate-200/80 mb-6">
         <div>

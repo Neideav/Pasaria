@@ -223,11 +223,57 @@ class ShopApiController extends Controller
         $userId = $user->id;
         $shops = Shop::whereIn('id', function ($query) use ($userId) {
             $query->select('shop_id')->from('shop_followers')->where('user_id', $userId);
-        })->withCount('products')->get();
+        })->withCount('products')->get()->map(function ($shop) use ($userId) {
+            $followRecord = DB::table('shop_followers')
+                ->where('shop_id', $shop->id)
+                ->where('user_id', $userId)
+                ->first();
+            $arr = $shop->toArray();
+            $arr['notify_new_products'] = (bool) ($followRecord->notify_new_products ?? true);
+            return $arr;
+        });
 
         return response()->json([
             'success' => true,
             'data'    => $shops,
+        ]);
+    }
+
+    /**
+     * Update notification preferences for a followed shop.
+     */
+    public function updateFollowPreferences(Request $request, int $shopId): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $request->validate([
+            'notify_new_products' => 'required|boolean',
+        ]);
+
+        $notify = $request->boolean('notify_new_products');
+
+        $affected = DB::table('shop_followers')
+            ->where('user_id', $user->id)
+            ->where('shop_id', $shopId)
+            ->update([
+                'notify_new_products' => $notify,
+                'updated_at'          => now(),
+            ]);
+
+        if (!$affected) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda belum mengikuti toko ini.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success'             => true,
+            'message'             => 'Preferensi notifikasi toko berhasil diperbarui.',
+            'notify_new_products' => $notify,
         ]);
     }
 }
