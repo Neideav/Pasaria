@@ -1,21 +1,39 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import fs from 'fs';
+import { defineConfig, Plugin } from 'vite';
+
+function syncDistPlugin(): Plugin {
+  return {
+    name: 'sync-dist-plugin',
+    closeBundle() {
+      try {
+        const distDir = path.resolve('dist');
+        const buildDir = path.resolve('public/build');
+        if (fs.existsSync(distDir)) {
+          fs.mkdirSync(buildDir, { recursive: true });
+          fs.cpSync(distDir, buildDir, { recursive: true });
+        }
+      } catch (err) {
+        console.warn('Sync build error:', err);
+      }
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), syncDistPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname ?? '.'),
       },
     },
     build: {
-      outDir: 'public/build',
+      outDir: 'dist',
       emptyOutDir: true,
       manifest: true,
-      copyPublicDir: false,
     },
     server: {
       port: 3000,

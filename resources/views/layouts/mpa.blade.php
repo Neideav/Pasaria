@@ -41,13 +41,25 @@
         $manifestPaths = [
             public_path('build/.vite/manifest.json'),
             public_path('build/manifest.json'),
+            public_path('.vite/manifest.json'),
+            public_path('manifest.json'),
+            base_path('dist/.vite/manifest.json'),
+            base_path('dist/manifest.json'),
         ];
         $manifest = null;
+        $manifestDir = 'build';
         foreach ($manifestPaths as $mp) {
             if (file_exists($mp)) {
                 $decoded = json_decode(file_get_contents($mp), true);
                 if (is_array($decoded)) {
                     $manifest = $decoded;
+                    if (str_contains($mp, 'build')) {
+                        $manifestDir = 'build';
+                    } elseif (str_contains($mp, 'dist')) {
+                        $manifestDir = 'dist';
+                    } else {
+                        $manifestDir = '';
+                    }
                     break;
                 }
             }
@@ -60,20 +72,33 @@
             $entry = $manifest['index.html'] ?? $manifest['src/main.tsx'] ?? reset($manifest);
             if ($entry) {
                 if (!empty($entry['file'])) {
-                    $jsFiles[] = '/build/' . $entry['file'];
+                    if (file_exists(public_path($manifestDir . '/' . $entry['file']))) {
+                        $jsFiles[] = '/' . trim($manifestDir . '/' . $entry['file'], '/');
+                    } elseif (file_exists(public_path($entry['file']))) {
+                        $jsFiles[] = '/' . ltrim($entry['file'], '/');
+                    } else {
+                        $jsFiles[] = ($manifestDir ? '/' . $manifestDir . '/' : '/') . ltrim($entry['file'], '/');
+                    }
                 }
                 if (!empty($entry['css']) && is_array($entry['css'])) {
                     foreach ($entry['css'] as $c) {
-                        $cssFiles[] = '/build/' . $c;
+                        if (file_exists(public_path($manifestDir . '/' . $c))) {
+                            $cssFiles[] = '/' . trim($manifestDir . '/' . $c, '/');
+                        } elseif (file_exists(public_path($c))) {
+                            $cssFiles[] = '/' . ltrim($c, '/');
+                        } else {
+                            $cssFiles[] = ($manifestDir ? '/' . $manifestDir . '/' : '/') . ltrim($c, '/');
+                        }
                     }
                 }
             }
         } elseif (!$isHot) {
-            $buildAssetFiles = glob(public_path('build/assets/*.{css,js}'), GLOB_BRACE) ?: [];
+            $buildAssetFiles = glob(public_path('{build/assets,assets}/*.{css,js}'), GLOB_BRACE) ?: [];
             foreach ($buildAssetFiles as $bf) {
-                $rel = '/build/assets/' . basename($bf);
-                if (str_ends_with($bf, '.css')) $cssFiles[] = $rel;
-                if (str_ends_with($bf, '.js')) $jsFiles[] = $rel;
+                $rel = str_replace(public_path(), '', $bf);
+                $rel = '/' . ltrim(str_replace('\\', '/', $rel), '/');
+                if (str_ends_with($bf, '.css') && !in_array($rel, $cssFiles)) $cssFiles[] = $rel;
+                if (str_ends_with($bf, '.js') && !in_array($rel, $jsFiles)) $jsFiles[] = $rel;
             }
         }
     @endphp

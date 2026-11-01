@@ -61,6 +61,7 @@ RUN composer install \
 
 # React build → Laravel public
 COPY --from=frontend /app/dist/ ./public/
+RUN rm -f ./public/index.html && mkdir -p ./public/build && cp -r ./public/assets ./public/build/ 2>/dev/null || true
 
 # Apache → Laravel public
 RUN sed -i \
@@ -68,7 +69,7 @@ RUN sed -i \
     /etc/apache2/sites-available/000-default.conf
 
 RUN printf '%s\n' \
-    'DirectoryIndex index.html index.php' \
+    'DirectoryIndex index.php index.html' \
     '<Directory /var/www/html/public>' \
     '    Options -Indexes +FollowSymLinks' \
     '    AllowOverride All' \
