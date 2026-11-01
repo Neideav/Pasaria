@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist public/build",
     "start": "vite",
     "dev:mock-express": "tsx server.ts",
     "quality-gate": "bash scripts/quality-gate.sh"

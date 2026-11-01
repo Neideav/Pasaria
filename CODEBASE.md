@@ -14,7 +14,7 @@ Consult [`AGENTS.md`](./AGENTS.md) for working instructions and operational boun
 | Backend framework | Laravel 11.57.0 | PHP 8.2+ runtime, strict PSR-4 autoloading |
 | Database | MariaDB / MySQL | Relational engine with foreign key constraints, SQLite for tests |
 | API authentication | Laravel Sanctum 4.0 | Bearer token authorization via personal_access_tokens |
-| Frontend framework | React 19.3.0 | TypeScript 7.0.2, Single Page Application |
+| Frontend framework | React 19.3.0 | TypeScript 7.0.2, Multi-Page Application (MPA) with Laravel Blade document shells & React page renderers |
 | Bundler and tooling | Vite 8.3.4 | Tailwind CSS v4.3.3, Lucide React icons, UI Motion physics tokens |
 | Test suite | PHPUnit 11.0.0 | Unit and Feature tests with in-memory SQLite |
 | Container runtime | Docker | Multi-stage build (Node 22 builder into PHP 8.2 Apache) |
@@ -55,7 +55,9 @@ HTTP JSON Response to Client { success, message, data }
 ```text
 app/
 ├── Http/
-│   ├── Controllers/Api/           # API endpoints (Auth, Products, Cart, Orders, Seller, Admin)
+│   ├── Controllers/
+│   │   ├── Api/                   # API endpoints (Auth, Products, Cart, Orders, Seller, Admin)
+│   │   └── Web/                   # MPA Web Controllers (Home, Product, Category, Cart, Checkout, Orders, etc.)
 │   ├── Middleware/                # Request processing and authentication checks
 │   └── Resources/                 # Allowlist API Resources (PublicUser, PublicReview, PublicQuestion, PublicTracking, ShipmentDetail)
 ├── Models/                        # Eloquent models (User, Shop, Product, Order, Payment, Refund, OrderReturn, etc.)
@@ -64,15 +66,21 @@ app/
 database/
 ├── migrations/                    # Database schema definitions and historical tables
 └── seeders/                       # Database seeders for initial data
-public/                            # Static assets and compiled SPA entrypoint (index.html)
+public/
+├── build/                         # Compiled Vite MPA assets and manifest
+└── images/                        # Static public brand and media assets
 resources/
-└── views/                         # Blade templates used for server-rendered web fallback
+└── views/
+    ├── layouts/mpa.blade.php      # Master MPA Blade document shell with Vite asset loader
+    └── pages/                     # Dedicated Blade views per route (home, product, cart, etc.)
 src/
 ├── components/                    # Reusable React components (Navbar, Modals, ProductCards)
 ├── context/                       # React context providers (ToastContext)
 ├── services/                      # Frontend API client and communication adapters
 ├── types/                         # TypeScript interfaces and domain type declarations
-└── App.tsx                        # Root React application component and view switching
+├── layouts/                       # Shared MPA AppShell and provider (MainLayout.tsx)
+├── pages/                         # Page-level React renderers (HomePage, ProductPage, CartPage, etc.)
+└── main.tsx                       # MPA mount entrypoint resolving data-page & data-props
 tests/
 ├── Feature/                       # End-to-end and integration feature tests
 └── Unit/                          # Isolated service and calculation tests

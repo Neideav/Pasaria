@@ -1,74 +1,92 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\HomeController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\SearchController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Web\HomeWebController;
+use App\Http\Controllers\Web\ProductWebController;
+use App\Http\Controllers\Web\CategoryWebController;
+use App\Http\Controllers\Web\SearchWebController;
+use App\Http\Controllers\Web\CartWebController;
+use App\Http\Controllers\Web\CheckoutWebController;
+use App\Http\Controllers\Web\OrderWebController;
+use App\Http\Controllers\Web\DeliveryWebController;
+use App\Http\Controllers\Web\ProfileWebController;
+use App\Http\Controllers\Web\SettingsWebController;
+use App\Http\Controllers\Web\WishlistWebController;
+use App\Http\Controllers\Web\FollowingWebController;
+use App\Http\Controllers\Web\SellerWebController;
+use App\Http\Controllers\Web\ShopWebController;
+use App\Http\Controllers\Web\AdminWebController;
+use App\Http\Controllers\Web\AuthWebController;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| PASARIA Marketplace Web (MPA) Routes
 |--------------------------------------------------------------------------
 |
-| Shopcart Modern E-Commerce Routes
+| Multi-Page Application (MPA) routes:
+| Laravel serves dedicated Blade shells with React mounting per page.
+| Every main navigation initiates a real document request.
 |
 */
 
-// Home & Catalog (serves React SPA if built, otherwise fallback to Blade)
-Route::get('/', function () {
-    $spaPath = public_path('index.html');
-    if (file_exists($spaPath)) {
-        return response()->file($spaPath);
-    }
-    return app(HomeController::class)->index(request());
-})->name('home');
-Route::get('/products/{slug}', [ProductController::class, 'show'])->name('products.show');
-Route::get('/category/{slug}', [HomeController::class, 'category'])->name('category.show');
+// Catalog & Discovery
+Route::get('/', [HomeWebController::class, 'index'])->name('home');
+Route::get('/products/{slug}', [ProductWebController::class, 'show'])->name('products.show');
+Route::get('/category/{slug}', [CategoryWebController::class, 'show'])->name('category.show');
+Route::get('/deals', [CategoryWebController::class, 'deals'])->name('deals');
+Route::get('/whats-new', [CategoryWebController::class, 'whatsNew'])->name('whats-new');
+Route::get('/search', [SearchWebController::class, 'index'])->name('search');
 
-// Search Route
-Route::get('/search', [SearchController::class, 'index'])->name('search');
+// Cart & Checkout
+Route::get('/cart', [CartWebController::class, 'index'])->name('cart.index');
+Route::get('/checkout', [CheckoutWebController::class, 'index'])->name('checkout');
 
-// Authentication Routes
-Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+// Orders & Delivery Tracking
+Route::get('/orders', [OrderWebController::class, 'index'])->name('orders.index');
+Route::get('/delivery/{code?}', [DeliveryWebController::class, 'index'])->name('delivery.index');
+
+// Customer Profile, Settings, Wishlist & Following
+Route::get('/profile', [ProfileWebController::class, 'index'])->name('profile.index');
+Route::get('/settings', [SettingsWebController::class, 'index'])->name('settings.index');
+Route::get('/wishlist', [WishlistWebController::class, 'index'])->name('wishlist.index');
+Route::get('/following', [FollowingWebController::class, 'index'])->name('following.index');
+
+// Public Shops & Seller Center
+Route::get('/shops/{slugOrId}', [ShopWebController::class, 'show'])->name('shops.show');
+Route::get('/shop/{slugOrId}', [ShopWebController::class, 'show'])->name('shop.show');
+Route::get('/seller/dashboard', [SellerWebController::class, 'dashboard'])->name('seller.dashboard');
+Route::get('/seller', [SellerWebController::class, 'dashboard'])->name('seller.index');
+
+// Administration
+Route::get('/admin/dashboard', [AdminWebController::class, 'dashboard'])->name('admin.dashboard');
+Route::get('/admin', [AdminWebController::class, 'dashboard'])->name('admin.index');
+
+// Authentication Pages
+Route::get('/login', [AuthWebController::class, 'login'])->name('login');
+Route::get('/register', [AuthWebController::class, 'register'])->name('register');
+Route::get('/auth', [AuthWebController::class, 'index'])->name('auth.index');
+
+// Legacy Session / Form Support
 Route::post('/login', [AuthController::class, 'login']);
-Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-
-// Cart Routes
-Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
 Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
 Route::post('/cart/update', [CartController::class, 'update'])->name('cart.update');
 Route::post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
-
-// Checkout & Orders
-Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
 Route::post('/checkout', [OrderController::class, 'store'])->name('checkout.store');
-Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-// User Profile
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
-    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
-});
-
-// React SPA Fallback Route (serves React frontend when built)
+// 404 Fallback
 Route::fallback(function () {
     if (request()->is('api/*')) {
-        return response()->json(['message' => 'API endpoint not found.'], 404);
+        return response()->json([
+            'success' => false,
+            'message' => 'API endpoint not found.',
+        ], 404);
     }
-    $spaPath = public_path('index.html');
-    if (file_exists($spaPath)) {
-        return response()->file($spaPath);
-    }
-    $distPath = base_path('dist/index.html');
-    if (file_exists($distPath)) {
-        return response()->file($distPath);
-    }
-    return response()->view('home');
+    abort(404);
 });
-
